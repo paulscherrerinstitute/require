@@ -2,7 +2,7 @@
 #
 '''
   $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.4 $   $Date: 2004/05/28 12:10:34 $
+  $Revision: 1.5 $   $Date: 2004/06/14 13:04:31 $
 
   Obtain boot information about IOCs from the ssrm_public Oracle
   database and make a pretty printout.
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     hdrNotDone = 1
     for item in items:
       if caseConvert: item = string.upper (item)
-      query = "SELECT SYSTEM, " + \
+      query = "SELECT SYSTEM AS IOC, " + \
                      "BOOTDATE, " + \
                      "BOOTTIME, " + \
                      "BOOTPC, " + \
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                     "ETHADDR    LIKE '%" + item + "%' OR " + \
                     "IPADDR     LIKE '%" + item + "%' OR " + \
                     "VXWORKS    LIKE '%" + item + "%' " + \
-              "ORDER BY SYSTEM"
+              "ORDER BY IOC"
 
       url = "http://pc3839.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
               urllib.quote_plus (query)
