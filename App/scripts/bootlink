@@ -1,0 +1,77 @@
+#!/bin/sh
+if [ $# -lt 2 ] || [ "$1" = "-?" ]
+then 
+    echo "using: $0 (<newbase>|-) <IOC> [<IOC2> [...]]"
+    echo "change boot path for list of IOCs"
+    echo "if <newbase> = \"-\" it shows the current links"
+    exit
+fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.1 2005/03/21 11:10:43 luedeke Exp $";exit;fi
+if [ -d /usr/oracle-9.2 ] ; then
+        export ORACLE_HOME=/usr/oracle-9.2
+else
+        export ORACLE_HOME=/usr/oracle-8.1.7
+	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
+fi
+targetbase=$1
+if [ "$(chkslsbase.sh $targetbase)" = "" ] && [ "$targetbase" != "-" ]
+then
+    echo -ne "first argument (\"$targetbase\") has to be one out of\n$SLSBASELIST\n"
+    exit
+fi
+shift
+for ioc in $*
+do
+    list=$(echo $(
+    $ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF
+    SET HEADING OFF;
+    SELECT BOOTPC,SLSBASE FROM SSRM.IOC_LASTBOOTED WHERE  SYSTEM = '$ioc';
+    EXIT
+    EOF
+    ))
+    if [ "$list" = "no rows selected" ]
+    then
+	    echo "IOC $ioc not in bootinfo DB"
+	    exit
+    fi
+    bootpc=$(echo $list|awk '{print $1}' );
+
+    slsbase=$(echo $list|awk '{print $2}');
+
+    #echo "BootPC=$bootpc"
+    if [ "$slsbase" = "$targetbase" ]
+    then
+        echo "according to bootinfo, IOC $ioc already has SLSBASE=$slsbase"
+        echo "continue anyway"
+    fi
+    old=$(ssh $bootpc readlink /ioc/$ioc)
+    if [ "-" = "$targetbase" ]
+    then
+        old=$(ssh $bootpc readlink /ioc/$ioc)
+        echo "link on $bootpc for $ioc is \"$old\""
+        continue
+    fi
+    new="$targetbase/iocBoot/ioc/$ioc"
+    if [ "$old" = "$new" ] 
+    then
+        echo "no operation: on $bootpc \"/ioc/$ioc\" already points to \"$old\""
+        continue
+    fi
+    if [ -d "$new" ]
+    then
+        ssh $bootpc rm -f /ioc/$ioc
+        ssh $bootpc ln -s $new /ioc/$ioc
+        rep=$(ssh $bootpc readlink /ioc/$ioc)
+        if [ "$rep" = "$new" ] 
+        then
+            echo "changed on $bootpc from \"$old\" to \"$new\""
+        else
+            echo "ERROR: change on $bootpc from \"$old\" to \"$new\" failed"
+            echo "link points now to \"$req\". Check permissions:"
+            ssh $bootpc ls -l /ioc/$ioc
+        fi  
+    else
+        echo "target dir \"$tdir\" does not exist"
+        continue
+    fi
+done
