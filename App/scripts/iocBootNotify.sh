@@ -6,8 +6,9 @@
 
 if [ "$1" = "-v" ]
 then
-    echo '$Author: zimoch $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
+    echo '$Author: zimoch $'
+    echo '$Date: 2004/05/03 12:59:56 $'
     exit
 fi
 
