@@ -2,7 +2,7 @@
 #
 '''
   $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.3 $   $Date: 2004/05/03 12:48:57 $
+  $Revision: 1.4 $   $Date: 2004/05/28 12:10:34 $
 
   Obtain boot information about IOCs from the ssrm_public Oracle
   database and make a pretty printout.
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     #endfor
 
     nFnd = 0
-    if len (items) == 0: raise "NoArgs"
+    if len (items) == 0: items = "%"
                       #
                       # Loop over the list of patterns.
     hdrNotDone = 1
