@@ -1,0 +1,2 @@
+Functions in this library depend on EPICS but are not
+real device drivers. It's a bunch of utilities.
