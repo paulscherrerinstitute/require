@@ -1,7 +1,15 @@
 #! /usr/bin/env python
 #
 #  $Source: /cvs/G/DRV/misc/App/scripts/call_ioc_ins,v $
-#  $Revision: 1.6 $   $Date: 2004/07/26 14:27:13 $
+#  $Revision: 1.7 $   $Date: 2004/10/07 12:08:26 $
+#
+#   Obsolete Obsolete Obsolete Obsolete Obsolete Obsolete Obsolete Obsolete
+#
+#     This script is obsolete. It may be of some interest as an example 
+#     of URL access from python.
+# 
+#   Obsolete Obsolete Obsolete Obsolete Obsolete Obsolete Obsolete Obsolete
+
 '''
   Insert boot information about IOCs into the ssrm_public Oracle database.
 
@@ -38,7 +46,7 @@ def showVersion ():
 #   ===========
   '''
   $Source: /cvs/G/DRV/misc/App/scripts/call_ioc_ins,v $
-  $Revision: 1.6 $   $Date: 2004/07/26 14:27:13 $
+  $Revision: 1.7 $   $Date: 2004/10/07 12:08:26 $
   Installed Location: $SLSBASE/sls/bin
   '''
   print showVersion.__doc__
@@ -160,6 +168,9 @@ if __name__ == "__main__":
 #--------------------------------------------------#
 #
 #  $Log: call_ioc_ins,v $
+#  Revision 1.7  2004/10/07 12:08:26  maden
+#  Mark this file as obsolete
+#
 #  Revision 1.6  2004/07/26 14:27:13  maden
 #  No longer python2 dependent (there is no python2 on boot nodes yet).
 #
