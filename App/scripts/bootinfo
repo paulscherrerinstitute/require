@@ -1,27 +1,29 @@
 #! /usr/bin/env python
 #
+#  $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
+#  $Revision: 1.8 $   $Date: 2004/07/27 07:26:30 $
+#
 '''
-  $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.7 $   $Date: 2004/07/22 11:44:00 $
-
   Obtain boot information about IOCs from the ssrm_public Oracle
   database and make a pretty printout.
 
   Usage:
   -----
-         %s [--nocc] <pattern> [...]
+         %s [--help] [-v] [--debug] [--nocc] [<pattern> ...]
   where
     <pattern> is used to match part of the system (i.e. crate name),
               bootpc, ipaddr or ethaddr.
     Unless "--nocc" is specified, <pattern> will be converted to uppercase
                                  before being used.
-  Example:
+    -v displays the script's version number.
+ 
+ Example:
            %s x04sa
 '''
 #--------------------------------------------------------------------
 
-import    sys
-import    os
+import    os, sys
+import    signal
 import    urllib
 import    string
 import    getopt
@@ -36,33 +38,55 @@ def showUsage ():
   print __doc__ % (base, base)
   return
 
+#--------------------------------------------------------------------
+
+def showVersion ():
+#   ===========
+  '''
+  $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
+  $Revision: 1.8 $   $Date: 2004/07/27 07:26:30 $
+  Installed Location: $SLSBASE/sls/bin
+  '''
+  print showVersion.__doc__
+  return
+
 #---------------------------------------------------------------------------
 #                           The program starts here!
 if __name__ == "__main__":
 
+  sys.stderr = sys.stdout
+  caseConvert =  1
+  debug       =  0
+  timeout     = 10
   try:
-    sys.stderr = sys.stdout
-    caseConvert = 1
                       #
                       # Analyse the options
                       #
-    (opts, items) = getopt.getopt (sys.argv[1:], "h?", \
-                              ("help", "nocc"))
+    (opts, items) = getopt.getopt (sys.argv[1:], "h?v", \
+                              ("help", "nocc", "debug"))
     for opt in opts:
       if opt[0] == "-h":       raise "Help"
       if opt[0] == "-?":       raise "Help"
+      if opt[0] == "-v":       raise "Version"
       if opt[0] == "--help":   raise "Help"
       if opt[0] == "--nocc":   caseConvert = 0
+      if opt[0] == "--debug":  debug       = 1
     #endfor
+  except "Help":
+    showUsage ()
+    sys.exit (0)
+  except "Version":
+    showVersion ()
+    sys.exit (0)
+  except:
+    print "Bad option. Specify \"-h\" for help."
+    sys.exit (1)
+  #endtry
 
-    nFnd = 0
-    if len (items) == 0: items = "%"
+  nFnd = 0
+  if len (items) == 0: items = "%"
                       #
-                      # Loop over the list of patterns.
-    hdrNotDone = 1
-    for item in items:
-      if caseConvert: item = string.upper (item)
-
+##
 ## The following code has been hacked around because of DUO problems.
 ##                   DM, 22-Jul-2004
 ##
@@ -86,7 +110,9 @@ if __name__ == "__main__":
 ##                    "IPADDR     LIKE '%" + item + "%' OR " + \
 ##                    "VXWORKS    LIKE '%" + item + "%' " + \
 ##              "ORDER BY IOC"
-      query = "SELECT SYSTEM AS IOC, " + \
+  childPID = os.fork ()
+  if childPID == 0:
+    query = "SELECT SYSTEM AS IOC, " + \
                      "BOOTDATE, " + \
                      "BOOTTIME, " + \
                      "BOOTPC, " + \
@@ -97,57 +123,61 @@ if __name__ == "__main__":
                      "VXWORKS    AS ARCH " + \
                      "FROM SSRM.IOC_LASTBOOTED"
 
-      url = "http://pc4860.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
+    url = "http://pc4860.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
               urllib.quote_plus (query)
-      try:
-        ufo = urllib.urlopen (url)     # Query the database
-        lines = ufo.readlines ()       # Get the result
-        ufo.close ()
-        if hdrNotDone:
-          toks = string.split (lines[0])
-          print "\n%-16s %-11s %-8s %-8s %-6s %-8s %-8s %-15s %s" % \
-            (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
-          hdrNotDone = 0
-        else:
-          print
-        #endif
-        for line in lines[1:]:
-          toks = string.split (line)
-          if len (toks) >= 9:
-            toks[8] = os.path.basename(os.path.dirname (toks[8]))
-            #endif
-            if toks[8][-8:] == "/vxWorks": toks[8] = toks[8][0:-8]
-            date = time.strptime ("%s %s" % (toks[1], toks[2]), "%d-%m-%Y %H:%M:%S")
-            dateStr = time.strftime ("%d-%b-%Y %H:%M:%S", date)
-            recd = "%-16s %s %-8s %-7s %-8s %-8s %-15s %s" % \
-              (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
-            if (item == "%") or (string.find (recd, item) >= 0):
-              print recd
-              nFnd = nFnd + 1
-            #endif
+    try:
+      ufo = urllib.urlopen (url)     # Query the database
+      lines = ufo.readlines ()       # Get the result
+      ufo.close ()
+    except:
+      print "\aError getting data from database!"
+      raise
+    #endtry
+                      # Loop over the list of patterns.
+    hdrNotDone = 1
+    for item in items:
+      if caseConvert: item = string.upper (item)
+      #
+      if hdrNotDone:
+        toks = string.split (lines[0])
+        print "\n%-16s %-11s %-8s %-8s %-6s %-8s %-8s %-15s %s" % \
+          (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
+        for i in range (9): toks[i] = "-------------------"[0:len (toks[i])]
+        print "%-16s %-11s %-8s %-8s %-6s %-8s %-8s %-15s %s" % \
+          (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
+        hdrNotDone = 0
+      #endif
+      for line in lines[1:]:
+        toks = string.split (line)
+        if len (toks) >= 9:
+          toks[8] = os.path.basename(os.path.dirname (toks[8]))
+          if toks[8][-8:] == "/vxWorks": toks[8] = toks[8][0:-8]
+          date = time.strptime ("%s %s" % (toks[1], toks[2]), "%d-%m-%Y %H:%M:%S")
+          dateStr = time.strftime ("%d-%b-%Y %H:%M:%S", date)
+          recd = "%-16s %s %-8s %-7s %-8s %-8s %-15s %s" % \
+            (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
+          if (item == "%") or (string.find (recd, item) >= 0):
+            print recd
+            nFnd = nFnd + 1
           #endif
-        #endfor
-      except:
-        print "\aError getting data from database!"
-        raise
-      #endtry
+        #endif
+      #endif
     #endfor
+    print
     if nFnd == 0: print "No database entries found!"
-
-  except getopt.error:
-    print "Bad option. Specify \"-h\" for help."
-    sys.exit (1)
-
-  except "Help":
-    showUsage ()
-    sys.exit (0)
-
-  except "NoArgs":
-    print "\aYou must specify a search pattern!"
-    sys.exit (1)
-
-  #endtry
-
+  else:
+    for i in range (int (timeout)):
+      time.sleep (1)
+      (pid, status) = os.waitpid (childPID, os.WNOHANG)
+      if debug: print "waitpid return status = (%d, %d)" % (pid, status)
+      if pid == childPID:
+        if debug: print "Child has exited."
+        sys.exit (0)
+      #endif
+    #endfor
+    os.kill (childPID, signal.SIGKILL)
+    print "Time-out getting data from database!"
+  #endif
   sys.exit (0)
 #endif
 
