@@ -1,0 +1,140 @@
+#! /usr/bin/env python
+#
+'''
+  $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
+  $Revision: 1.1 $   $Date: 2004/04/02 15:40:57 $
+
+  Obtain boot information about IOCs from the ssrm_public Oracle
+  database and make a pretty printout.
+
+  Usage:
+  -----
+         %s [--nocc] <pattern> [...]
+  where
+    <pattern> is used to match part of the system (i.e. crate name),
+              bootpc, ipaddr or ethaddr.
+    Unless "--nocc" is specified, <pattern> will be converted to uppercase
+                                 before being used.
+  Example:
+           %s x04sa
+'''
+#--------------------------------------------------------------------
+
+import    sys
+import    os
+import    urllib
+import    string
+import    getopt
+import    time
+
+#---------------------------------------------------------------------------
+
+def showUsage ():
+#   =========
+
+  base = os.path.basename (sys.argv[0])
+  print __doc__ % (base, base)
+  return
+
+#---------------------------------------------------------------------------
+#                           The program starts here!
+if __name__ == "__main__":
+
+  try:
+    sys.stderr = sys.stdout
+    caseConvert = 1
+                      #
+                      # Analyse the options
+                      #
+    (opts, items) = getopt.getopt (sys.argv[1:], "h?", \
+                              ("help", "nocc"))
+    for opt in opts:
+      if opt[0] == "-h":       raise "Help"
+      if opt[0] == "-?":       raise "Help"
+      if opt[0] == "--help":   raise "Help"
+      if opt[0] == "--nocc":   caseConvert = 0
+    #endfor
+
+    nFnd = 0
+    if len (items) == 0: raise "NoArgs"
+                      #
+                      # Loop over the list of patterns.
+    hdrNotDone = 1
+    for item in items:
+      if caseConvert: item = string.upper (item)
+      query = "SELECT SYSTEM, " + \
+                     "BOOTDATE, " + \
+                     "BOOTTIME, " + \
+                     "BOOTPC, " + \
+                     "SLSBASE, " + \
+                     "EPICSVER AS EPICS, " + \
+                     "VXWORKSVER AS VXWORKS, + " \
+                     "IPADDR FROM SSRM.IOC_LASTBOOTED " + \
+              "WHERE SYSTEM     LIKE '%" + item + "%' OR " + \
+                    "BOOTPC     LIKE '%" + item + "%' OR " + \
+                    "SLSBASE    LIKE '%" + item + "%' OR " + \
+                    "EPICSVER   LIKE '%" + item + "%' OR " + \
+                    "VXWORKSVER LIKE '%" + item + "%' OR " + \
+                    "IPADDR     LIKE '%" + item + "%' OR " + \
+                    "ETHADDR    LIKE '%" + item + "%' OR " + \
+                    "IPADDR     LIKE '%" + item + "%' " + \
+              "ORDER BY SYSTEM"
+
+      url = "http://pc3839.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
+              urllib.quote_plus (query)
+      try:
+        ufo = urllib.urlopen (url)     # Query the database
+        lines = ufo.readlines ()       # Get the result
+        ufo.close ()
+        if hdrNotDone:
+          toks = string.split (lines[0])
+          print "\n%-16s %-11s %-8s %-8s %-6s %-8s %-8s %s" % \
+            (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7])
+          hdrNotDone = 0
+        else:
+          print
+        #endif
+        for line in lines[1:]:
+          nFnd = nFnd + 1
+          toks = string.split (line)
+          if len (toks) >= 8:
+            date = time.strptime ("%s %s" % (toks[1], toks[2]), "%d-%m-%Y %H:%M:%S")
+            dateStr = time.strftime ("%d-%b-%Y %H:%M:%S", date)
+            print "%-16s %s %-8s %-7s %-8s %-8s %s" % \
+              (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7])
+          #endif
+        #endfor
+      except:
+        print "\aError getting data from database!"
+        raise
+      #endtry
+    #endfor
+    if nFnd == 0: print "No database entries found!"
+
+  except getopt.error:
+    print "Bad option. Specify \"-h\" for help."
+    sys.exit (1)
+
+  except "Help":
+    showUsage ()
+    sys.exit (0)
+
+  except "NoArgs":
+    print "\aYou must specify a search pattern!"
+    sys.exit (1)
+
+  #endtry
+
+  sys.exit (0)
+#endif
+
+#--------------------------------------------------#
+# emacs setup - force text mode to prevent emacs   #
+#               from helping with the indentation! #
+# Local Variables:                                 #
+# mode:text                                        #
+# indent-tabs-mode:nil                             #
+# End:                                             #
+#--------------------------------------------------#
+#
+#------------------------------------------------- End of $RCSfile: bootinfo,v $
