@@ -8,7 +8,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: zimoch $'
-    echo '$Date: 2004/08/02 11:36:43 $'
+    echo '$Date: 2004/08/02 11:58:36 $'
     exit
 fi
 
@@ -110,10 +110,10 @@ INSERT INTO SSRM.IOC_BOOTLOG
         VXWORKSVER, ETHADDR)
 VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
         '$SLSBASE', '$BOOTFILE', '$SCRIPT', '$VXWORKS', '$EPICSVER',
-        '$VXWORKSVER', '$ETHADDR')
+        '$VXWORKSVER', '$ETHADDR');
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.6 2004/08/02 11:36:43 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.7 2004/08/02 11:58:36 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
