@@ -1,9 +1,12 @@
 #include <symLib.h>
 #include <sysSymTbl.h>
-#include <stdio.h>
-#include <string.h>
+#include <sysLib.h>
 #include <shellLib.h>
 #include <usrLib.h>
+#include <taskLib.h>
+#include <stat.h>
+#include <stdio.h>
+#include <string.h>
 
 int dbLoadDatabase(char *filename, char *path, char *substitutions);
 
@@ -15,6 +18,7 @@ int require(char* lib, char* version)
     char** path;
     char* loaded;
     SYM_TYPE type;
+    struct stat filestat;
     
     if (symFindByName(sysSymTbl, "LIB", (char**)&path, &type) != OK)
     {
@@ -45,16 +49,24 @@ int require(char* lib, char* version)
         /* Load library and dbd file of requested version */
         if (ld(0, 0, libname) == NULL)
         {
-            printf ("%s not loaded\n", libname);
+            printf ("Aborting startup stript.\n");
+            shellScriptAbort();
             return ERROR;
         }
-        printf("%s loaded\n", libname);
-        if (dbLoadDatabase(dbdname, NULL, NULL) != OK)
+        symFindByName(sysSymTbl, symbol, &loaded, &type);
+        printf("%sLib-%s loaded\n", lib, loaded);
+        if (stat(dbdname, &filestat) != ERROR)
         {
-            printf ("%s not loaded\n", dbdname);
-            return ERROR;
+            /* If file exists */
+            if (dbLoadDatabase(dbdname, NULL, NULL) != OK)
+            {
+                taskDelay(sysClkRateGet());
+                printf ("Aborting startup stript.\n");
+                shellScriptAbort();
+                return ERROR;
+            }
+            printf("dbd/%s-%s.dbd loaded\n", lib, loaded);
         }
-        printf("%s loaded\n", dbdname);
         return OK;
     }
     else
@@ -72,7 +84,9 @@ int require(char* lib, char* version)
                 || (matches >= 2 && minor != lminor)
                 || (matches > 2 && patch != lpatch))
             {
-                printf("Conflict between requested %s\nand already loaded version %s\n",
+                printf("Conflict between requested %s\n"
+                    "and already loaded version %s.\n"
+                    "Aborting startup stript.\n",
                     libname, loaded);
                 shellScriptAbort();
                 return ERROR;
