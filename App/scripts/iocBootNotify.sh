@@ -2,9 +2,14 @@
 #
 # This script should only be called by the ioc at boot time.
 # The startup script should have the following line:
-# rsh bootHost(),"cd",SLSBASE,";sls/bin/iocBootNotice.sh",bootInfo("TendFs"),vxWorksVersion,"'",epicsRelease1,"'"
-# or
-# bootNotice SLSBASE,"sls/bin/iocBootNotice.sh"
+# bootNotify SLSBASE,"sls/bin/iocBootNotify.sh"
+
+if [ "$1" = "-v" ]
+then
+    echo '$Author: zimoch $'
+    echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
+    exit
+fi
 
 if [ $# -lt 9 ]
 then
@@ -20,7 +25,7 @@ PROCNUM=$3
 DEVICE=$4
 BOOTFILE=$5
 SCRIPT=$6
-VXWORKSVER=$7
+VXWORKSVER=${7#VxWorks}
 EPICSVER=$8
 ETHADDR=$9
 if [ ! -L /ioc/$SYSTEM ]
@@ -45,6 +50,7 @@ then
 else
   VXWORKS=$BOOTFILE
 fi
+
 echo "I will put the following values to the database:"
 echo "SYSTEM=$SYSTEM"
 echo "IPADDR=$IPADDR"
