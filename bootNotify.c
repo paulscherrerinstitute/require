@@ -5,6 +5,9 @@
 *  $Author: zimoch $
 *
 *  $Log: bootNotify.c,v $
+*  Revision 1.2  2004/05/24 15:18:58  zimoch
+*  use ifName()
+*
 *  Revision 1.1  2004/04/16 08:07:12  zimoch
 *  put here from utilities
 *  these are EPICS dependend, utilities not
@@ -50,5 +53,5 @@ int bootNotify (char* script, char* script2)
     }
     sscanf (epicsRelease1, "@(#)Version R%s", epicsver);
     return rsh (bootHost(), command, bootInfo("%T %e %n %d %F %s"),
-        vxWorksVersion, epicsver, etherAddr((char *)1), 0);
+        vxWorksVersion, epicsver, etherAddr((char*)ifName()), 0);
 }
