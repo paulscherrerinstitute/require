@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 #  $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-#  $Revision: 1.8 $   $Date: 2004/07/27 07:26:30 $
+#  $Revision: 1.9 $   $Date: 2004/07/30 13:28:56 $
 #
 '''
   Obtain boot information about IOCs from the ssrm_public Oracle
@@ -44,7 +44,7 @@ def showVersion ():
 #   ===========
   '''
   $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.8 $   $Date: 2004/07/27 07:26:30 $
+  $Revision: 1.9 $   $Date: 2004/07/30 13:28:56 $
   Installed Location: $SLSBASE/sls/bin
   '''
   print showVersion.__doc__
@@ -57,7 +57,7 @@ if __name__ == "__main__":
   sys.stderr = sys.stdout
   caseConvert =  1
   debug       =  0
-  timeout     = 10
+  timeout     = 15
   try:
                       #
                       # Analyse the options
@@ -72,6 +72,7 @@ if __name__ == "__main__":
       if opt[0] == "--nocc":   caseConvert = 0
       if opt[0] == "--debug":  debug       = 1
     #endfor
+    if debug: timeout = 30
   except "Help":
     showUsage ()
     sys.exit (0)
@@ -122,9 +123,10 @@ if __name__ == "__main__":
                      "IPADDR, " + \
                      "VXWORKS    AS ARCH " + \
                      "FROM SSRM.IOC_LASTBOOTED"
-
+    if debug: print "query = \"%s\"" % query
     url = "http://pc4860.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
               urllib.quote_plus (query)
+    if debug: print "url   = \"%s\"" % url
     try:
       ufo = urllib.urlopen (url)     # Query the database
       lines = ufo.readlines ()       # Get the result
@@ -133,6 +135,10 @@ if __name__ == "__main__":
       print "\aError getting data from database!"
       raise
     #endtry
+    if debug:
+      print "Response:"
+      for line in lines: print "   \"%s\"" % string.rstrip (line)
+    #endif
                       # Loop over the list of patterns.
     hdrNotDone = 1
     for item in items:
