@@ -2,7 +2,7 @@
 #
 '''
   $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.5 $   $Date: 2004/06/14 13:04:31 $
+  $Revision: 1.6 $   $Date: 2004/07/22 11:40:27 $
 
   Obtain boot information about IOCs from the ssrm_public Oracle
   database and make a pretty printout.
@@ -62,6 +62,30 @@ if __name__ == "__main__":
     hdrNotDone = 1
     for item in items:
       if caseConvert: item = string.upper (item)
+
+## The following code has been hacked around because of DUO problems.
+##                   DM, 22-Jul-2004
+##
+##      query = "SELECT SYSTEM AS IOC, " + \
+##                     "BOOTDATE, " + \
+##                     "BOOTTIME, " + \
+##                     "BOOTPC, " + \
+##                     "SLSBASE, " + \
+##                     "EPICSVER   AS EPICS, " + \
+##                     "VXWORKSVER AS VXWORKS, " + \
+##                     "IPADDR, " + \
+##                     "VXWORKS    AS ARCH " + \
+##                     "FROM SSRM.IOC_LASTBOOTED " + \
+##              "WHERE SYSTEM     LIKE '%" + item + "%' OR " + \
+##                    "BOOTPC     LIKE '%" + item + "%' OR " + \
+##                    "SLSBASE    LIKE '%" + item + "%' OR " + \
+##                    "EPICSVER   LIKE '%" + item + "%' OR " + \
+##                    "VXWORKSVER LIKE '%" + item + "%' OR " + \
+##                    "IPADDR     LIKE '%" + item + "%' OR " + \
+##                    "ETHADDR    LIKE '%" + item + "%' OR " + \
+##                    "IPADDR     LIKE '%" + item + "%' OR " + \
+##                    "VXWORKS    LIKE '%" + item + "%' " + \
+##              "ORDER BY IOC"
       query = "SELECT SYSTEM AS IOC, " + \
                      "BOOTDATE, " + \
                      "BOOTTIME, " + \
@@ -71,19 +95,9 @@ if __name__ == "__main__":
                      "VXWORKSVER AS VXWORKS, " + \
                      "IPADDR, " + \
                      "VXWORKS    AS ARCH " + \
-                     "FROM SSRM.IOC_LASTBOOTED " + \
-              "WHERE SYSTEM     LIKE '%" + item + "%' OR " + \
-                    "BOOTPC     LIKE '%" + item + "%' OR " + \
-                    "SLSBASE    LIKE '%" + item + "%' OR " + \
-                    "EPICSVER   LIKE '%" + item + "%' OR " + \
-                    "VXWORKSVER LIKE '%" + item + "%' OR " + \
-                    "IPADDR     LIKE '%" + item + "%' OR " + \
-                    "ETHADDR    LIKE '%" + item + "%' OR " + \
-                    "IPADDR     LIKE '%" + item + "%' OR " + \
-                    "VXWORKS    LIKE '%" + item + "%' " + \
-              "ORDER BY IOC"
+                     "FROM SSRM.IOC_LASTBOOTED"
 
-      url = "http://pc3839.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
+      url = "http://pc4860.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
               urllib.quote_plus (query)
       try:
         ufo = urllib.urlopen (url)     # Query the database
@@ -98,7 +112,6 @@ if __name__ == "__main__":
           print
         #endif
         for line in lines[1:]:
-          nFnd = nFnd + 1
           toks = string.split (line)
           if len (toks) >= 9:
             toks[8] = os.path.basename(os.path.dirname (toks[8]))
@@ -106,8 +119,12 @@ if __name__ == "__main__":
             if toks[8][-8:] == "/vxWorks": toks[8] = toks[8][0:-8]
             date = time.strptime ("%s %s" % (toks[1], toks[2]), "%d-%m-%Y %H:%M:%S")
             dateStr = time.strftime ("%d-%b-%Y %H:%M:%S", date)
-            print "%-16s %s %-8s %-7s %-8s %-8s %-15s %s" % \
+            recd = "%-16s %s %-8s %-7s %-8s %-8s %-15s %s" % \
               (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
+            if string.find (recd, item) >= 0:
+              print recd
+              nFnd = nFnd + 1
+            #endif
           #endif
         #endfor
       except:
