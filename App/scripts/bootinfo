@@ -2,7 +2,7 @@
 #
 '''
   $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.1 $   $Date: 2004/04/02 15:40:57 $
+  $Revision: 1.2 $   $Date: 2004/04/19 11:59:29 $
 
   Obtain boot information about IOCs from the ssrm_public Oracle
   database and make a pretty printout.
@@ -67,9 +67,11 @@ if __name__ == "__main__":
                      "BOOTTIME, " + \
                      "BOOTPC, " + \
                      "SLSBASE, " + \
-                     "EPICSVER AS EPICS, " + \
-                     "VXWORKSVER AS VXWORKS, + " \
-                     "IPADDR FROM SSRM.IOC_LASTBOOTED " + \
+                     "EPICSVER   AS EPICS, " + \
+                     "VXWORKSVER AS VXWORKS, " + \
+                     "IPADDR, " + \
+                     "VXWORKS    AS ARCH " + \
+                     "FROM SSRM.IOC_LASTBOOTED " + \
               "WHERE SYSTEM     LIKE '%" + item + "%' OR " + \
                     "BOOTPC     LIKE '%" + item + "%' OR " + \
                     "SLSBASE    LIKE '%" + item + "%' OR " + \
@@ -77,7 +79,8 @@ if __name__ == "__main__":
                     "VXWORKSVER LIKE '%" + item + "%' OR " + \
                     "IPADDR     LIKE '%" + item + "%' OR " + \
                     "ETHADDR    LIKE '%" + item + "%' OR " + \
-                    "IPADDR     LIKE '%" + item + "%' " + \
+                    "IPADDR     LIKE '%" + item + "%' OR " + \
+                    "VXWORKS    LIKE '%" + item + "%' " + \
               "ORDER BY SYSTEM"
 
       url = "http://pc3839.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
@@ -88,8 +91,8 @@ if __name__ == "__main__":
         ufo.close ()
         if hdrNotDone:
           toks = string.split (lines[0])
-          print "\n%-16s %-11s %-8s %-8s %-6s %-8s %-8s %s" % \
-            (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7])
+          print "\n%-16s %-11s %-8s %-8s %-6s %-8s %-8s %-13s %s" % \
+            (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
           hdrNotDone = 0
         else:
           print
@@ -97,11 +100,17 @@ if __name__ == "__main__":
         for line in lines[1:]:
           nFnd = nFnd + 1
           toks = string.split (line)
-          if len (toks) >= 8:
+          if len (toks) >= 9:
+            archBase = os.path.join (toks[4], "epics/base/bin/")
+            archBaseLen = len (archBase)
+            if toks[8][0:archBaseLen] == archBase:
+              toks[8] = toks[8][archBaseLen:]
+            #endif
+            if toks[8][-8:] == "/vxWorks": toks[8] = toks[8][0:-8]
             date = time.strptime ("%s %s" % (toks[1], toks[2]), "%d-%m-%Y %H:%M:%S")
             dateStr = time.strftime ("%d-%b-%Y %H:%M:%S", date)
-            print "%-16s %s %-8s %-7s %-8s %-8s %s" % \
-              (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7])
+            print "%-16s %s %-8s %-7s %-8s %-8s %-13s %s" % \
+              (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
           #endif
         #endfor
       except:
