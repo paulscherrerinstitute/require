@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 #  $Source: /cvs/G/DRV/misc/App/scripts/call_ioc_ins,v $
-#  $Revision: 1.2 $   $Date: 2004/07/22 14:05:27 $
+#  $Revision: 1.3 $   $Date: 2004/07/26 09:32:34 $
 '''
   Insert boot information about IOCs into the ssrm_public Oracle database.
 
@@ -42,7 +42,7 @@ def showVersion ():
 #   ===========
   '''
   $Source: /cvs/G/DRV/misc/App/scripts/call_ioc_ins,v $
-  $Revision: 1.2 $   $Date: 2004/07/22 14:05:27 $
+  $Revision: 1.3 $   $Date: 2004/07/26 09:32:34 $
   Installed Location: $SLSBASE/sls/bin
   '''
   print showVersion.__doc__
@@ -64,17 +64,25 @@ if __name__ == "__main__":
                       #
                       # Analyse the options
                       #
-    (opts, items) = getopt.getopt (sys.argv[1:], "h?v", \
+    force = 0
+    (opts, items) = getopt.getopt (sys.argv[1:], "h?vf", \
                               ("help", "nocc"))
     for opt in opts:
       if opt[0] == "-h":       raise "Help"
       if opt[0] == "-?":       raise "Help"
       if opt[0] == "--help":   raise "Help"
       if opt[0] == "-v":       raise "Version"
+      if opt[0] == "-f":       force = 1
     #endfor
-
+                   #######################################
+                   ####
+                   #### Network problems --- disable!!!
+                   ####
+    if not force: sys.exit (0)
+                   ####
+                   #######################################
     if len (items) != 12:
-      print "\aTwelve arguments are needed, not %d" % len (items)
+      print "Twelve arguments are needed, not %d" % len (items)
       sys.exit (1)
     #endif
 
