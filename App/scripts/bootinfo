@@ -7,55 +7,31 @@
 function help() {
     echo "usage: bootinfo [options] [pattern]"
     echo "  Find boot information about %pattern% in database"
-    echo "  pattern is matched against IOC,IP_ADDRESS,BOOTPC,PORTSV,LOCATION,SWITCH"
     echo "options are:"
     echo "  -h, -?, --help : print this help and quit"
     echo "  -v, --version  : print cvs version info and quit"
-    echo "  -i : print IP_ADDRESS"
-    echo "  -l : print LOCATION"
-    echo "  -b : print BOOTPC and BOOTPC_IP_ADDR"
-    echo "  -p : print PORTSERVER (server and port)"
-    echo "  -s : print SAVERESTORE (server and if restore should be used)"
-    echo "  -n : print network SWITCH"
-    echo "  -a : print all (= -ilbpsn)"
     echo "  -- : treat next word as pattern, even if starting with -"
-    echo "default options are: -ibl"
     exit 0
 }
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2004/08/02 09:02:38 $'
+    echo '$Date: 2004/08/02 09:05:46 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
 
 while true
 do
-case "$1" in
+  case "$1" in
     -*h* | -*\?* | --help) help ;;
     -*v* | --version) version ;;
     --) shift; break ;;
-    -*) OPTION=$1
-        while true
-        do
-        OPTION=${OPTION:1}
-        case "$OPTION" in
-            i*) SEL="$SEL,IP_ADDRESS" ;;
-            l*) SEL="$SEL,LOCATION" ;;
-            b*) SEL="$SEL,BOOTPC,BOOTPC_IP_ADDR" ;;
-            p*) SEL="$SEL,PORTSERVER" ;;
-            s*) SEL="$SEL,SAVERESTORE" ;;
-            n*) SEL="$SEL,SWITCH" ;;
-            a*) SEL="$SEL,IP_ADDRESS,LOCATION,BOOTPC,BOOTPC_IP_ADDR,PORTSERVER,SAVERESTORE,SWITCH" ;;
-            "") break ;;
-            *)  echo "Unknown option -${OPTION:0:1}. Try: --help"
-                exit 1 ;;
-        esac
-        done  ;;
-    *)  break;;
-esac
-shift
+    -*) echo "Unknown option $1. Try: --help"
+        exit 1 ;;
+    *)  break ;;
+  esac
+  shift
 done
 
 if [ -d /usr/oracle-9.2 ] ; then
@@ -100,7 +76,7 @@ ORDER BY 1;
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.10 2004/08/02 09:02:38 zimoch Exp $
+# $Id: bootinfo,v 1.11 2004/08/02 09:05:46 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.10 $
+# $Revision: 1.11 $
 
