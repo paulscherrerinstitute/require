@@ -8,7 +8,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: zimoch $'
-    echo '$Date: 2004/08/02 11:29:58 $'
+    echo '$Date: 2004/08/02 11:36:43 $'
     exit
 fi
 
@@ -82,7 +82,6 @@ else
   VXWORKS=$BOOTFILE
 fi
 
-echo "New Version"
 echo "I will put the following values to the database:"
 echo "SYSTEM=$SYSTEM"
 echo "IPADDR=$IPADDR"
@@ -115,6 +114,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.5 2004/08/02 11:29:58 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.6 2004/08/02 11:36:43 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
