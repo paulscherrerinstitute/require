@@ -2,7 +2,7 @@
 #
 '''
   $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.6 $   $Date: 2004/07/22 11:40:27 $
+  $Revision: 1.7 $   $Date: 2004/07/22 11:44:00 $
 
   Obtain boot information about IOCs from the ssrm_public Oracle
   database and make a pretty printout.
@@ -121,7 +121,7 @@ if __name__ == "__main__":
             dateStr = time.strftime ("%d-%b-%Y %H:%M:%S", date)
             recd = "%-16s %s %-8s %-7s %-8s %-8s %-15s %s" % \
               (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
-            if string.find (recd, item) >= 0:
+            if (item == "%") or (string.find (recd, item) >= 0):
               print recd
               nFnd = nFnd + 1
             #endif
