@@ -1,199 +1,106 @@
-#! /usr/bin/env python
-#
-#  $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-#  $Revision: 1.9 $   $Date: 2004/07/30 13:28:56 $
-#
-'''
-  Obtain boot information about IOCs from the ssrm_public Oracle
-  database and make a pretty printout.
+#!/bin/sh
+#File: 		bootinfo
+#Description: 	get info from the IOC_LASTBOOTED database table
+#Author:	D.Zimoch
+#Parameters:    
 
-  Usage:
-  -----
-         %s [--help] [-v] [--debug] [--nocc] [<pattern> ...]
-  where
-    <pattern> is used to match part of the system (i.e. crate name),
-              bootpc, ipaddr or ethaddr.
-    Unless "--nocc" is specified, <pattern> will be converted to uppercase
-                                 before being used.
-    -v displays the script's version number.
- 
- Example:
-           %s x04sa
-'''
-#--------------------------------------------------------------------
+function help() {
+    echo "usage: bootinfo [options] [pattern]"
+    echo "  Find boot information about %pattern% in database"
+    echo "  pattern is matched against IOC,IP_ADDRESS,BOOTPC,PORTSV,LOCATION,SWITCH"
+    echo "options are:"
+    echo "  -h, -?, --help : print this help and quit"
+    echo "  -v, --version  : print cvs version info and quit"
+    echo "  -i : print IP_ADDRESS"
+    echo "  -l : print LOCATION"
+    echo "  -b : print BOOTPC and BOOTPC_IP_ADDR"
+    echo "  -p : print PORTSERVER (server and port)"
+    echo "  -s : print SAVERESTORE (server and if restore should be used)"
+    echo "  -n : print network SWITCH"
+    echo "  -a : print all (= -ilbpsn)"
+    echo "  -- : treat next word as pattern, even if starting with -"
+    echo "default options are: -ibl"
+    exit 0
+}
 
-import    os, sys
-import    signal
-import    urllib
-import    string
-import    getopt
-import    time
+function version() {
+    echo 'Author: D. Zimoch'
+    echo '$Date: 2004/08/02 09:02:38 $'
+    echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
+    exit 0
+}
 
-#---------------------------------------------------------------------------
+while true
+do
+case "$1" in
+    -*h* | -*\?* | --help) help ;;
+    -*v* | --version) version ;;
+    --) shift; break ;;
+    -*) OPTION=$1
+        while true
+        do
+        OPTION=${OPTION:1}
+        case "$OPTION" in
+            i*) SEL="$SEL,IP_ADDRESS" ;;
+            l*) SEL="$SEL,LOCATION" ;;
+            b*) SEL="$SEL,BOOTPC,BOOTPC_IP_ADDR" ;;
+            p*) SEL="$SEL,PORTSERVER" ;;
+            s*) SEL="$SEL,SAVERESTORE" ;;
+            n*) SEL="$SEL,SWITCH" ;;
+            a*) SEL="$SEL,IP_ADDRESS,LOCATION,BOOTPC,BOOTPC_IP_ADDR,PORTSERVER,SAVERESTORE,SWITCH" ;;
+            "") break ;;
+            *)  echo "Unknown option -${OPTION:0:1}. Try: --help"
+                exit 1 ;;
+        esac
+        done  ;;
+    *)  break;;
+esac
+shift
+done
 
-def showUsage ():
-#   =========
+if [ -d /usr/oracle-9.2 ] ; then
+        export ORACLE_HOME=/usr/oracle-9.2
+else
+        export ORACLE_HOME=/usr/oracle-8.1.7
+	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
+fi
 
-  base = os.path.basename (sys.argv[0])
-  print __doc__ % (base, base)
-  return
+$ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF
+SET PAGESIZE 10000;
+SET LINESIZE 1000;
+SET FEEDBACK OFF;
 
-#--------------------------------------------------------------------
+COLUMN IOC FORMAT A17;
+COLUMN SLSBASE FORMAT A7;
+COLUMN EPICS FORMAT A7;
+COLUMN VXWORKS FORMAT A7;
+COLUMN ARCH FORMAT A15;
 
-def showVersion ():
-#   ===========
-  '''
-  $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-  $Revision: 1.9 $   $Date: 2004/07/30 13:28:56 $
-  Installed Location: $SLSBASE/sls/bin
-  '''
-  print showVersion.__doc__
-  return
+SELECT SYSTEM AS IOC,
+       BOOTDATE,
+       BOOTTIME,
+       BOOTPC,
+       SLSBASE,
+       EPICSVER AS EPICS,
+       VXWORKSVER AS VXWORKS,
+       IPADDR,
+       SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
+            INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH
+FROM SSRM.IOC_LASTBOOTED
+WHERE  SYSTEM     LIKE '%$1%' OR
+       BOOTPC     LIKE '%$1%' OR
+       SLSBASE    LIKE '%$1%' OR
+       EPICSVER   LIKE '%$1%' OR
+       VXWORKSVER LIKE '%$1%' OR
+       ETHADDR    LIKE '%$1%' OR
+       IPADDR     LIKE '%$1%' OR
+       VXWORKS    LIKE '%$1%'
+ORDER BY 1;
 
-#---------------------------------------------------------------------------
-#                           The program starts here!
-if __name__ == "__main__":
+EXIT
+EOF
+# $Name:  $
+# $Id: bootinfo,v 1.10 2004/08/02 09:02:38 zimoch Exp $
+# $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
+# $Revision: 1.10 $
 
-  sys.stderr = sys.stdout
-  caseConvert =  1
-  debug       =  0
-  timeout     = 15
-  try:
-                      #
-                      # Analyse the options
-                      #
-    (opts, items) = getopt.getopt (sys.argv[1:], "h?v", \
-                              ("help", "nocc", "debug"))
-    for opt in opts:
-      if opt[0] == "-h":       raise "Help"
-      if opt[0] == "-?":       raise "Help"
-      if opt[0] == "-v":       raise "Version"
-      if opt[0] == "--help":   raise "Help"
-      if opt[0] == "--nocc":   caseConvert = 0
-      if opt[0] == "--debug":  debug       = 1
-    #endfor
-    if debug: timeout = 30
-  except "Help":
-    showUsage ()
-    sys.exit (0)
-  except "Version":
-    showVersion ()
-    sys.exit (0)
-  except:
-    print "Bad option. Specify \"-h\" for help."
-    sys.exit (1)
-  #endtry
-
-  nFnd = 0
-  if len (items) == 0: items = "%"
-                      #
-##
-## The following code has been hacked around because of DUO problems.
-##                   DM, 22-Jul-2004
-##
-##      query = "SELECT SYSTEM AS IOC, " + \
-##                     "BOOTDATE, " + \
-##                     "BOOTTIME, " + \
-##                     "BOOTPC, " + \
-##                     "SLSBASE, " + \
-##                     "EPICSVER   AS EPICS, " + \
-##                     "VXWORKSVER AS VXWORKS, " + \
-##                     "IPADDR, " + \
-##                     "VXWORKS    AS ARCH " + \
-##                     "FROM SSRM.IOC_LASTBOOTED " + \
-##              "WHERE SYSTEM     LIKE '%" + item + "%' OR " + \
-##                    "BOOTPC     LIKE '%" + item + "%' OR " + \
-##                    "SLSBASE    LIKE '%" + item + "%' OR " + \
-##                    "EPICSVER   LIKE '%" + item + "%' OR " + \
-##                    "VXWORKSVER LIKE '%" + item + "%' OR " + \
-##                    "IPADDR     LIKE '%" + item + "%' OR " + \
-##                    "ETHADDR    LIKE '%" + item + "%' OR " + \
-##                    "IPADDR     LIKE '%" + item + "%' OR " + \
-##                    "VXWORKS    LIKE '%" + item + "%' " + \
-##              "ORDER BY IOC"
-  childPID = os.fork ()
-  if childPID == 0:
-    query = "SELECT SYSTEM AS IOC, " + \
-                     "BOOTDATE, " + \
-                     "BOOTTIME, " + \
-                     "BOOTPC, " + \
-                     "SLSBASE, " + \
-                     "EPICSVER   AS EPICS, " + \
-                     "VXWORKSVER AS VXWORKS, " + \
-                     "IPADDR, " + \
-                     "VXWORKS    AS ARCH " + \
-                     "FROM SSRM.IOC_LASTBOOTED"
-    if debug: print "query = \"%s\"" % query
-    url = "http://pc4860.psi.ch/testplan/IOC_INFOS/ioc_select.php?SQLQUER=" + \
-              urllib.quote_plus (query)
-    if debug: print "url   = \"%s\"" % url
-    try:
-      ufo = urllib.urlopen (url)     # Query the database
-      lines = ufo.readlines ()       # Get the result
-      ufo.close ()
-    except:
-      print "\aError getting data from database!"
-      raise
-    #endtry
-    if debug:
-      print "Response:"
-      for line in lines: print "   \"%s\"" % string.rstrip (line)
-    #endif
-                      # Loop over the list of patterns.
-    hdrNotDone = 1
-    for item in items:
-      if caseConvert: item = string.upper (item)
-      #
-      if hdrNotDone:
-        toks = string.split (lines[0])
-        print "\n%-16s %-11s %-8s %-8s %-6s %-8s %-8s %-15s %s" % \
-          (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
-        for i in range (9): toks[i] = "-------------------"[0:len (toks[i])]
-        print "%-16s %-11s %-8s %-8s %-6s %-8s %-8s %-15s %s" % \
-          (toks[0], toks[1], toks[2], toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
-        hdrNotDone = 0
-      #endif
-      for line in lines[1:]:
-        toks = string.split (line)
-        if len (toks) >= 9:
-          toks[8] = os.path.basename(os.path.dirname (toks[8]))
-          if toks[8][-8:] == "/vxWorks": toks[8] = toks[8][0:-8]
-          date = time.strptime ("%s %s" % (toks[1], toks[2]), "%d-%m-%Y %H:%M:%S")
-          dateStr = time.strftime ("%d-%b-%Y %H:%M:%S", date)
-          recd = "%-16s %s %-8s %-7s %-8s %-8s %-15s %s" % \
-            (toks[0], dateStr, toks[3], toks[4], toks[5], toks[6], toks[7], toks[8])
-          if (item == "%") or (string.find (recd, item) >= 0):
-            print recd
-            nFnd = nFnd + 1
-          #endif
-        #endif
-      #endif
-    #endfor
-    print
-    if nFnd == 0: print "No database entries found!"
-  else:
-    for i in range (int (timeout)):
-      time.sleep (1)
-      (pid, status) = os.waitpid (childPID, os.WNOHANG)
-      if debug: print "waitpid return status = (%d, %d)" % (pid, status)
-      if pid == childPID:
-        if debug: print "Child has exited."
-        sys.exit (0)
-      #endif
-    #endfor
-    os.kill (childPID, signal.SIGKILL)
-    print "Time-out getting data from database!"
-  #endif
-  sys.exit (0)
-#endif
-
-#--------------------------------------------------#
-# emacs setup - force text mode to prevent emacs   #
-#               from helping with the indentation! #
-# Local Variables:                                 #
-# mode:text                                        #
-# indent-tabs-mode:nil                             #
-# End:                                             #
-#--------------------------------------------------#
-#
-#------------------------------------------------- End of $RCSfile: bootinfo,v $
