@@ -1,17 +1,19 @@
 #! /usr/bin/env python
 #
 #  $Source: /cvs/G/DRV/misc/App/scripts/call_ioc_ins,v $
-#  $Revision: 1.4 $   $Date: 2004/07/26 09:33:25 $
+#  $Revision: 1.5 $   $Date: 2004/07/26 11:39:38 $
 '''
   Insert boot information about IOCs into the ssrm_public Oracle database.
 
   Usage:
   -----
-    call_ioc_ins [--help] [-v] \\
+    call_ioc_ins [--help] [-v] [--debug] [-t=<secs>] \\
           <system>     <ipadd>      <procnum>    \\
           <device>     <bootpc>     <slsbase>    \\
           <bootfile>   <script>     <vxworks>    \\
           <epicsver>   <vxworksver> <ethaddr>
+
+               Default time-out (-t) = 10 secs.
   Example:
   -------
      call_ioc_ins X04SA-VME-PLD 172.19.151.29 0       \\
@@ -23,26 +25,20 @@
 '''
 #--------------------------------------------------------------------
 
-import    sys
-import    os
+import    os, sys
+import    commands
 import    urllib
 import    string
 import    getopt
 import    time
-
+import    signal
 #--------------------------------------------------------------------
-
-import    sys
-import    os
-import    urllib
-
-#---------------------------------------------------------------------------
 
 def showVersion ():
 #   ===========
   '''
   $Source: /cvs/G/DRV/misc/App/scripts/call_ioc_ins,v $
-  $Revision: 1.4 $   $Date: 2004/07/26 09:33:25 $
+  $Revision: 1.5 $   $Date: 2004/07/26 11:39:38 $
   Installed Location: $SLSBASE/sls/bin
   '''
   print showVersion.__doc__
@@ -59,50 +55,101 @@ def showUsage ():
 #                           The program starts here!
 if __name__ == "__main__":
 
-  try:
-    sys.stderr = sys.stdout
+  sys.stderr = sys.stdout
                       #
                       # Analyse the options
                       #
-    force = 0
-    (opts, items) = getopt.getopt (sys.argv[1:], "h?vf", \
-                              ("help", "nocc"))
+  debug   = 0
+  timeout = 10
+  try:
+    (opts, items) = getopt.getopt (sys.argv[1:], "h?vt:", \
+                              ("help", "debug"))
     for opt in opts:
       if opt[0] == "-h":       raise "Help"
       if opt[0] == "-?":       raise "Help"
       if opt[0] == "--help":   raise "Help"
       if opt[0] == "-v":       raise "Version"
-      if opt[0] == "-f":       force = 1
+      if opt[0] == "-t":
+        timeout = int (opt[1])
+        if timeout <= 0:
+          print "\aTime-out must be a positive integer."
+          raise
+        #endif
+      #endif
+      if opt[0] == "--debug": debug = 1
     #endfor
-                   #######################################
-                   ####
-                   #### Network problems --- disable!!!
-                   ####
-    if not force: sys.exit (0)
-                   ####
-                   #######################################
-    if len (items) != 12:
-      print "Twelve arguments are needed, not %d" % len (items)
+  except "Help":
+    showUsage ()
+    sys.exit (0)
+  except "Version":
+    showVersion ()
+    sys.exit (0)
+  except:
+    print "\aBad option. Specify \"-h\" for help."
+    sys.exit (1)
+  #endtry
+                          #######################################
+                          # Make sure we are running at least python level 2.
+                          # CaChannel seems to give troubles otherwise!
+                          #
+  if sys.version[0:1] == "1":
+    if debug:
+      print "The default python version is", string.split (sys.version)[0]
+      print "Trying to find a version of python2 ..."
+    #endif
+    python2 = commands.getoutput ("type -p python2")
+    if python2 == "":
+      print "\n\aThe default python version is", sys.version
+      print     "and this script needs python level 2 or higher."
+      print     " Python level 2 cannot be found."
       sys.exit (1)
     #endif
+    if debug: print "Switching to %s ..." % python2
+    sys.argv.insert (0, python2)
+    os.execv (python2, sys.argv)
+  #endif
+  if sys.version[0:1] == "1":
+    print "\n\aThe loading of a higher level of python seems to have failed!"
+    sys.exit (1)
+  #endif
+                          #######################################
 
-    args = {}
-    args["SYSTEM"]     = items[ 0]
-    args["IPADDR"]     = items[ 1]
-    args["PROCNUM"]    = items[ 2]
-    args["DEVICE"]     = items[ 3]
-    args["BOOTPC"]     = items[ 4]
-    args["SLSBASE"]    = items[ 5]
-    args["BOOTFILE"]   = items[ 6]
-    args["SCRIPT"]     = items[ 7]
-    args["VXWORKS"]    = items[ 8]
-    args["EPICSVER"]   = items[ 9]
-    args["VXWORKSVER"] = items[10]
-    args["ETHADDR"]    = items[11]
+  if debug:
+    print "Time-out = %d secs" % timeout
+    print "Arguments:"
+    for i in range (len (items)):
+      print "     ", items[i]
+    #endfor
+  #endif
 
-    encArgs = urllib.urlencode (args)
+  if len (items) != 12:
+    print "Twelve arguments are needed, not %d" % len (items)
+    sys.exit (1)
+  #endif
 
-    url = "http://pc4860.psi.ch/testplan/IOC_INFOS/ioc_boot_ins.php?" + encArgs
+  args = {}
+  args["SYSTEM"]     = items[ 0]
+  args["IPADDR"]     = items[ 1]
+  args["PROCNUM"]    = items[ 2]
+  args["DEVICE"]     = items[ 3]
+  args["BOOTPC"]     = items[ 4]
+  args["SLSBASE"]    = items[ 5]
+  args["BOOTFILE"]   = items[ 6]
+  args["SCRIPT"]     = items[ 7]
+  args["VXWORKS"]    = items[ 8]
+  args["EPICSVER"]   = items[ 9]
+  args["VXWORKSVER"] = items[10]
+  args["ETHADDR"]    = items[11]
+
+  encArgs = urllib.urlencode (args)
+
+  url = "http://pc4860.psi.ch/testplan/IOC_INFOS/ioc_boot_ins.php?" + encArgs
+  if debug:
+    print "The URL is \"%s\"" % url
+    print "Forking child process to do the work ..."
+  #endif
+  childPID = os.fork ()
+  if childPID == 0:
     try:
       ufo = urllib.urlopen (url)     # Query the database
       lines = ufo.readlines ()       # Get the result
@@ -111,26 +158,21 @@ if __name__ == "__main__":
       print "\aError inserting data into database!"
       raise
     #endtry
-
-  except getopt.error:
-    print "Bad option. Specify \"-h\" for help."
-    sys.exit (1)
-
-  except "Help":
-    showUsage ()
     sys.exit (0)
-
-  except "Version":
-    showVersion ()
-    sys.exit (0)
-
-  except "NoArgs":
-    print "\aYou must specify a search pattern!"
-    sys.exit (1)
-
-  #endtry
-
-  sys.exit (0)
+  else:
+    if debug: print "Child's pid = %d" % childPID
+    for i in range (int (timeout)):
+      time.sleep (1)
+      (pid, status) = os.waitpid (childPID, os.WNOHANG)
+      if debug: print "waitpid return status = (%d, %d)" % (pid, status)
+      if pid == childPID:
+        if debug: print "Child has exited."
+        sys.exit (0)
+      #endif
+    #endfor
+    if debug: print "Timeout."
+    os.kill (childPID, signal.SIGKILL)
+  #endif
 #endif
 
 #--------------------------------------------------#
@@ -143,6 +185,9 @@ if __name__ == "__main__":
 #--------------------------------------------------#
 #
 #  $Log: call_ioc_ins,v $
+#  Revision 1.5  2004/07/26 11:39:38  maden
+#  Add time-out
+#
 #  Revision 1.4  2004/07/26 09:33:25  maden
 #  Disable database update ... server is in trouble.
 #
