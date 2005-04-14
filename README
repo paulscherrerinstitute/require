@@ -1,2 +1,21 @@
 Functions in this library depend on EPICS but are not
 real device drivers. It's a bunch of utilities.
+
+Functions are:
+
+require "<lib>" [,"<version>"]
+ shell function
+ load a library and its dbd file
+
+updateMenuConvert
+ shell function
+ add all breakpoint tables found on this ioc to menu convert
+ 
+bootNotify
+ startup script function
+ call a script on the boot pc and tell it a lot of boot infos
+ 
+iocCheck / iocCheckInit
+ subroutine record function
+ set record to 0 if any task dies
+ reset record to 1 when 1 is written to A
