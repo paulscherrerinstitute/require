@@ -1,6 +1,7 @@
 #include <symLib.h>
 #include <sysSymTbl.h>
 #include <sysLib.h>
+#include <symLib.h>
 #include <shellLib.h>
 #include <usrLib.h>
 #include <taskLib.h>
@@ -15,7 +16,6 @@ int require(char* lib, char* version)
 {
     char libname[256];
     char dbdname[256];
-    char symbol[256];
     char** path;
     char* loaded;
     SYM_TYPE type;
@@ -33,7 +33,6 @@ int require(char* lib, char* version)
         printf("Directory is LIB = %s\n", *path);
         return ERROR;
     }
-    sprintf(symbol, "_%sLibRelease", lib);
     if (version)
     {
         sprintf(libname, "%s/%sLib-%s", *path, lib, version);
@@ -45,16 +44,22 @@ int require(char* lib, char* version)
         sprintf(dbdname, "%s/dbd/%s.dbd", *path, lib);
     }
 
-    if (symFindByName(sysSymTbl, symbol, &loaded, &type) != OK)
+    loaded = getLibVersion(lib);
+    if (!loaded)
     {
         /* Load library and dbd file of requested version */
-        if (ld(0, 0, libname) == NULL)
+        errno = 0;
+        if (ld(0, 0, libname) == NULL || errno)
         {
+            if (errno == S_symLib_SYMBOL_NOT_FOUND)
+            {
+                printf ("Library requires some other library\n");
+            }
             printf ("Aborting startup stript.\n");
             shellScriptAbort();
             return ERROR;
         }
-        symFindByName(sysSymTbl, symbol, &loaded, &type);
+        loaded = getLibVersion(lib);
         printf("%sLib-%s loaded\n", lib, loaded);
         if (stat(dbdname, &filestat) != ERROR)
         {
@@ -98,3 +103,16 @@ int require(char* lib, char* version)
         return OK;
     }
 }
+
+char* getLibVersion(char* lib)
+{
+    char symbol[256];
+    char* loaded;
+    SYM_TYPE type;
+    
+    sprintf(symbol, "_%sLibRelease", lib);
+    if (symFindByName(sysSymTbl, symbol, &loaded, &type) != OK) return NULL;
+    return loaded;
+}
+
+
