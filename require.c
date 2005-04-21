@@ -7,6 +7,7 @@
 #include <stat.h>
 #include <stdio.h>
 #include <string.h>
+#include <require.h>
 
 int dbLoadDatabase(char *filename, char *path, char *substitutions);
 
