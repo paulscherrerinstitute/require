@@ -49,7 +49,7 @@ int require(char* lib, char* version)
     {
         /* Load library and dbd file of requested version */
         errno = 0;
-        if (ld(0, 0, libname) == NULL || errno)
+        if (ld(0, 0, libname) == NULL)
         {
             if (errno == S_symLib_SYMBOL_NOT_FOUND)
             {
