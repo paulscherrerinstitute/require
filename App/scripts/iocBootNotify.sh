@@ -7,8 +7,8 @@
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: zimoch $'
-    echo '$Date: 2004/08/02 11:58:36 $'
+    echo '$Author: maden $'
+    echo '$Date: 2005/05/27 09:32:09 $'
     exit
 fi
 
@@ -77,7 +77,13 @@ SLSBASE=${link%%/iocBoot*}
 if [ -L $BOOTFILE ]
 then
   link=$(readlink $BOOTFILE)
-  VXWORKS=$SLSBASE/${link##*../}
+  tail=${link#../../}
+  if [ $tail = $link ]
+  then
+    VXWORKS=$BOOTFILE
+  else
+    VXWORKS=$SLSBASE/$tail
+  fi
 else
   VXWORKS=$BOOTFILE
 fi
@@ -103,7 +109,7 @@ else
 	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
 fi
 
-$ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF
+$ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF &
 INSERT INTO SSRM.IOC_BOOTLOG
        (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
         SLSBASE, BOOTFILE, SCRIPT, VXWORKS, EPICSVER,
@@ -114,6 +120,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.7 2004/08/02 11:58:36 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.8 2005/05/27 09:32:09 maden Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
