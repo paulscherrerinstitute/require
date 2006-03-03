@@ -5,6 +5,9 @@
 *  $Author: zimoch $
 *
 *  $Log: bootNotify.c,v $
+*  Revision 1.3  2006/03/03 13:30:33  zimoch
+*  made epicsver compatible to 3.14
+*
 *  Revision 1.2  2004/05/24 15:18:58  zimoch
 *  use ifName()
 *
@@ -30,8 +33,7 @@
 #include <bootInfo.h>
 #include <rsh.h>
 #include <version.h>
-
-extern char* epicsRelease1;
+#include <epicsVersion.h>
 
 int bootNotify (char* script, char* script2)
 {
@@ -51,7 +53,8 @@ int bootNotify (char* script, char* script2)
     {
         sprintf (command, "%s", script);
     }
-    sscanf (epicsRelease1, "@(#)Version R%s", epicsver);
+    sprintf (epicsver, "%d.%d.%d",
+        EPICS_VERSION, EPICS_REVISION, EPICS_MODIFICATION);
     return rsh (bootHost(), command, bootInfo("%T %e %n %d %F %s"),
-        vxWorksVersion, epicsver, etherAddr((char*)ifName()), 0);
+        vxWorksVersion, epicsver, etherAddr(ifName()), 0);
 }
