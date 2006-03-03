@@ -35,12 +35,12 @@ int require(char* lib, char* version)
     }
     if (version)
     {
-        sprintf(libname, "%s/%sLib-%s", *path, lib, version);
+        sprintf(libname, "%s/%sLib-%s.munch", *path, lib, version);
         sprintf(dbdname, "%s/dbd/%s-%s.dbd", *path, lib, version);
     }
     else
     {
-        sprintf(libname, "%s/%sLib", *path, lib);
+        sprintf(libname, "%s/%sLib.munch", *path, lib);
         sprintf(dbdname, "%s/dbd/%s.dbd", *path, lib);
     }
 
@@ -48,14 +48,29 @@ int require(char* lib, char* version)
     if (!loaded)
     {
         /* Load library and dbd file of requested version */
+        if (stat(libname, &filestat) == ERROR)
+        {
+            /* no munched lib */
+            libname[strlen(libname)-6]=0;  /* skip ".munch" */
+        }
+        if (stat(libname, &filestat) == ERROR)
+        {
+            printf("Library %s not found\n", libname);
+            printf("Aborting startup stript.\n");
+            shellScriptAbort();
+            return ERROR;
+        }
         errno = 0;
         if (ld(0, 0, libname) == NULL)
         {
-            if (errno == S_symLib_SYMBOL_NOT_FOUND)
-            {
-                printf ("Library requires some other library\n");
-            }
-            printf ("Aborting startup stript.\n");
+            printf("Aborting startup stript.\n");
+            shellScriptAbort();
+            return ERROR;
+        }
+        if (errno == S_symLib_SYMBOL_NOT_FOUND)
+        {
+            printf("Library requires some other library\n");
+            printf("Aborting startup stript.\n");
             shellScriptAbort();
             return ERROR;
         }
