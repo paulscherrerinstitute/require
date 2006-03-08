@@ -9,6 +9,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <require.h>
+#include <epicsVersion.h>
+#ifndef BASE_VERSION
+/* This is R3.14.* */
+extern int iocshCmd (const char *cmd);
+#endif
 
 int dbLoadDatabase(char *filename, char *path, char *substitutions);
 
@@ -74,8 +79,8 @@ int require(char* lib, char* version)
             shellScriptAbort();
             return ERROR;
         }
+        printf("%s loaded\n", libname);
         loaded = getLibVersion(lib);
-        printf("%sLib-%s loaded\n", lib, loaded);
         if (stat(dbdname, &filestat) != ERROR)
         {
             /* If file exists */
@@ -86,8 +91,17 @@ int require(char* lib, char* version)
                 shellScriptAbort();
                 return ERROR;
             }
-            printf("dbd/%s-%s.dbd loaded\n", lib, loaded);
+            printf("%s loaded\n", dbdname);
         }
+#ifndef BASE_VERSION
+        {
+            char initfunc[256];
+            
+            sprintf (initfunc, "%s_registerRecordDeviceDriver", lib);
+            iocshCmd (initfunc);
+        }
+#endif        
+        printf("%s version is %s\n", lib, loaded);
         return OK;
     }
     else
