@@ -19,8 +19,6 @@ int dbLoadDatabase(char *filename, char *path, char *substitutions);
 
 int require(char* lib, char* version)
 {
-    char libname[256];
-    char dbdname[256];
     char** path;
     char* loaded;
     SYM_TYPE type;
@@ -38,32 +36,55 @@ int require(char* lib, char* version)
         printf("Directory is LIB = %s\n", *path);
         return ERROR;
     }
-    if (version)
-    {
-        sprintf(libname, "%s/%sLib-%s.munch", *path, lib, version);
-        sprintf(dbdname, "%s/dbd/%s-%s.dbd", *path, lib, version);
-    }
-    else
-    {
-        sprintf(libname, "%s/%sLib.munch", *path, lib);
-        sprintf(dbdname, "%s/dbd/%s.dbd", *path, lib);
-    }
-
     loaded = getLibVersion(lib);
     if (!loaded)
     {
-        /* Load library and dbd file of requested version */
+        char libname[256];
+        char dbdname[256];
+
+        /* first try local library */
+        if (version)
+        {
+            sprintf(libname, "bin/%sLib-%s.munch", lib, version);
+            sprintf(dbdname, "dbd/%s-%s.dbd", lib, version);
+        }
+        else
+        {
+            sprintf(libname, "bin/%sLib.munch", lib);
+            sprintf(dbdname, "dbd/%s.dbd", lib);
+        }
         if (stat(libname, &filestat) == ERROR)
         {
-            /* no munched lib */
+            /* no munched local lib */
             libname[strlen(libname)-6]=0;  /* skip ".munch" */
         }
         if (stat(libname, &filestat) == ERROR)
         {
-            printf("Library %s not found\n", libname);
-            printf("Aborting startup stript.\n");
-            shellScriptAbort();
-            return ERROR;
+            /* no local lib at all */
+            libname[strlen(libname)-6]=0;  /* skip ".munch" */
+            if (version)
+            {
+                sprintf(libname, "%s/%sLib-%s.munch", *path, lib, version);
+                sprintf(dbdname, "%s/dbd/%s-%s.dbd", *path, lib, version);
+            }
+            else
+            {
+                sprintf(libname, "%s/%sLib.munch", *path, lib);
+                sprintf(dbdname, "%s/dbd/%s.dbd", *path, lib);
+            }
+            if (stat(libname, &filestat) == ERROR)
+            {
+                /* no munched lib */
+                libname[strlen(libname)-6]=0;  /* skip ".munch" */
+            }
+            if (stat(libname, &filestat) == ERROR)
+            {
+                /* still no library found */
+                printf("Library %s not found\n", libname);
+                printf("Aborting startup stript.\n");
+                shellScriptAbort();
+                return ERROR;
+            }
         }
         errno = 0;
         if (ld(0, 0, libname) == NULL)
@@ -101,7 +122,7 @@ int require(char* lib, char* version)
             iocshCmd (initfunc);
         }
 #endif        
-        printf("%s version is %s\n", lib, loaded);
+        if (loaded) printf("%s version is %s\n", lib, loaded);
         return OK;
     }
     else
@@ -119,10 +140,10 @@ int require(char* lib, char* version)
                 || (matches >= 2 && minor != lminor)
                 || (matches > 2 && patch != lpatch))
             {
-                printf("Conflict between requested %s\n"
+                printf("Version conflict between requested %s\n"
                     "and already loaded version %s.\n"
                     "Aborting startup stript.\n",
-                    libname, loaded);
+                    lib, loaded);
                 shellScriptAbort();
                 return ERROR;
             }
