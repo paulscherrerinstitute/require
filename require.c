@@ -113,15 +113,15 @@ int require(char* lib, char* version)
                 return ERROR;
             }
             printf("%s loaded\n", dbdname);
-        }
 #ifndef BASE_VERSION
-        {
-            char initfunc[256];
-            
-            sprintf (initfunc, "%s_registerRecordDeviceDriver", lib);
-            iocshCmd (initfunc);
-        }
+            {
+                char initfunc[256];
+
+                sprintf (initfunc, "%s_registerRecordDeviceDriver", lib);
+                iocshCmd (initfunc);
+            }
 #endif        
+        }
         if (loaded) printf("%s version is %s\n", lib, loaded);
         return OK;
     }
