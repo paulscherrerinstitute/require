@@ -27,7 +27,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2006/03/30 14:13:37 $'
+    echo '$Date: 2006/03/30 14:26:10 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -38,6 +38,7 @@ DEFAULTSEL=",BOOTDATE,BOOTTIME,BOOTPC,SLSBASE,
             SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
             INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH"
 TABLE="IOC_LASTBOOTED"
+ORDER="IOC,TO_DATE(BOOTDATE||' '||BOOTTIME,'DD-MM-YYYY HH24:MI:SS')"
 
 while true
 do
@@ -105,12 +106,12 @@ WHERE  SYSTEM     LIKE '%$1%' OR
        ETHADDR    LIKE '%$1%' OR
        IPADDR     LIKE '%$1%' OR
        VXWORKS    LIKE '%$1%'
-ORDER BY 1;
+ORDER BY ${ORDER};
 
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.13 2006/03/30 14:13:37 zimoch Exp $
+# $Id: bootinfo,v 1.14 2006/03/30 14:26:10 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.13 $
+# $Revision: 1.14 $
 
