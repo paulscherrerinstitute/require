@@ -19,6 +19,7 @@ function help() {
     echo "  -i : print IP_ADDR"
     echo "  -A : print ARCH"
     echo "  -a : print a lot (= -dtbSEViA)"
+    echo "  -L : log (print all reboots, not only last)"
     echo "  --noheader : don't print table header"
     echo "  -- : treat next word as pattern, even if starting with -"
     exit 0
@@ -26,7 +27,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2005/10/25 10:00:52 $'
+    echo '$Date: 2006/03/30 14:13:37 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -36,6 +37,7 @@ DEFAULTSEL=",BOOTDATE,BOOTTIME,BOOTPC,SLSBASE,
             EPICSVER AS EPICS,VXWORKSVER AS VXWORKS,IPADDR AS IP_ADDR,
             SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
             INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH"
+TABLE="IOC_LASTBOOTED"
 
 while true
 do
@@ -61,6 +63,7 @@ do
                 INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH" ;;
             f*) SEL="$SEL,VXWORKS AS FILENAME" ;;
             a*) OPTION=-dtbSEViA${OPTION:1} ;;
+            L*) TABLE="IOC_BOOTLOG" ;;
             "") break ;;
             *)  echo "Unknown option -${OPTION:0:1}. Try: --help"
                 exit 1 ;;
@@ -93,7 +96,7 @@ COLUMN VXWORKS FORMAT A7;
 COLUMN ARCH FORMAT A15;
 
 SELECT ${HSEL} ${SEL:-$DEFAULTSEL}
-FROM SSRM.IOC_LASTBOOTED
+FROM SSRM.${TABLE}
 WHERE  SYSTEM     LIKE '%$1%' OR
        BOOTPC     LIKE '%$1%' OR
        SLSBASE    LIKE '%$1%' OR
@@ -107,7 +110,7 @@ ORDER BY 1;
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.12 2005/10/25 10:00:52 luedeke Exp $
+# $Id: bootinfo,v 1.13 2006/03/30 14:13:37 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.12 $
+# $Revision: 1.13 $
 
