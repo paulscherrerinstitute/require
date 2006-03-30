@@ -87,6 +87,7 @@ int require(char* lib, char* version)
             }
         }
         errno = 0;
+        printf("loading %s\n", libname);
         if (ld(0, 0, libname) == NULL)
         {
             printf("Aborting startup stript.\n");
@@ -100,11 +101,11 @@ int require(char* lib, char* version)
             shellScriptAbort();
             return ERROR;
         }
-        printf("%s loaded\n", libname);
         loaded = getLibVersion(lib);
         if (stat(dbdname, &filestat) != ERROR)
         {
             /* If file exists */
+            printf("loading %s\n", dbdname);
             if (dbLoadDatabase(dbdname, NULL, NULL) != OK)
             {
                 taskDelay(sysClkRateGet());
@@ -112,7 +113,6 @@ int require(char* lib, char* version)
                 shellScriptAbort();
                 return ERROR;
             }
-            printf("%s loaded\n", dbdname);
 #ifndef BASE_VERSION
             {
                 char initfunc[256];
