@@ -20,6 +20,7 @@ function help() {
     echo "  -A : print ARCH"
     echo "  -a : print a lot (= -dtbSEViA)"
     echo "  -L : log (print all reboots, not only last)"
+    echo "  -x : do exact query, i.e. do not append '%' to search pattern"
     echo "  --noheader : don't print table header"
     echo "  -- : treat next word as pattern, even if starting with -"
     exit 0
@@ -27,7 +28,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2006/03/30 14:26:10 $'
+    echo '$Date: 2006/04/26 08:16:09 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -39,7 +40,7 @@ DEFAULTSEL=",BOOTDATE,BOOTTIME,BOOTPC,SLSBASE,
             INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH"
 TABLE="IOC_LASTBOOTED"
 ORDER="IOC,TO_DATE(BOOTDATE||' '||BOOTTIME,'DD-MM-YYYY HH24:MI:SS')"
-
+JOKER="%"
 while true
 do
   case "$1" in
@@ -65,6 +66,7 @@ do
             f*) SEL="$SEL,VXWORKS AS FILENAME" ;;
             a*) OPTION=-dtbSEViA${OPTION:1} ;;
             L*) TABLE="IOC_BOOTLOG" ;;
+            x*) JOKER="" ;;
             "") break ;;
             *)  echo "Unknown option -${OPTION:0:1}. Try: --help"
                 exit 1 ;;
@@ -83,7 +85,7 @@ else
 fi
 
 eval $(resize 2>/dev/null)
-
+pattern="$JOKER$1$JOKER"
 $ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF
 SET PAGESIZE 10000;
 SET LINESIZE ${COLUMNS:-120};
@@ -98,20 +100,20 @@ COLUMN ARCH FORMAT A15;
 
 SELECT ${HSEL} ${SEL:-$DEFAULTSEL}
 FROM SSRM.${TABLE}
-WHERE  SYSTEM     LIKE '%$1%' OR
-       BOOTPC     LIKE '%$1%' OR
-       SLSBASE    LIKE '%$1%' OR
-       EPICSVER   LIKE '%$1%' OR
-       VXWORKSVER LIKE '%$1%' OR
-       ETHADDR    LIKE '%$1%' OR
-       IPADDR     LIKE '%$1%' OR
-       VXWORKS    LIKE '%$1%'
+WHERE  SYSTEM     LIKE '$pattern' OR
+       BOOTPC     LIKE '$pattern' OR
+       SLSBASE    LIKE '$pattern' OR
+       EPICSVER   LIKE '$pattern' OR
+       VXWORKSVER LIKE '$pattern' OR
+       ETHADDR    LIKE '$pattern' OR
+       IPADDR     LIKE '$pattern' OR
+       VXWORKS    LIKE '$pattern'
 ORDER BY ${ORDER};
 
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.14 2006/03/30 14:26:10 zimoch Exp $
+# $Id: bootinfo,v 1.15 2006/04/26 08:16:09 luedeke Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.14 $
+# $Revision: 1.15 $
 
