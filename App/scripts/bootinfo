@@ -28,7 +28,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2006/04/26 08:16:09 $'
+    echo '$Date: 2006/07/18 09:02:23 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -100,20 +100,20 @@ COLUMN ARCH FORMAT A15;
 
 SELECT ${HSEL} ${SEL:-$DEFAULTSEL}
 FROM SSRM.${TABLE}
-WHERE  SYSTEM     LIKE '$pattern' OR
-       BOOTPC     LIKE '$pattern' OR
-       SLSBASE    LIKE '$pattern' OR
-       EPICSVER   LIKE '$pattern' OR
-       VXWORKSVER LIKE '$pattern' OR
-       ETHADDR    LIKE '$pattern' OR
-       IPADDR     LIKE '$pattern' OR
-       VXWORKS    LIKE '$pattern'
+WHERE  SYSTEM         LIKE UPPER('$pattern') OR
+       BOOTPC         LIKE '$pattern' OR
+       SLSBASE        LIKE '$pattern' OR
+       EPICSVER       LIKE '$pattern' OR
+       VXWORKSVER     LIKE '$pattern' OR
+       ETHADDR        LIKE REPLACE(LOWER('$pattern'),'-',':') OR
+       IPADDR         LIKE '$pattern' OR
+       LOWER(VXWORKS) LIKE LOWER('$pattern')
 ORDER BY ${ORDER};
 
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.15 2006/04/26 08:16:09 luedeke Exp $
+# $Id: bootinfo,v 1.16 2006/07/18 09:02:23 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.15 $
+# $Revision: 1.16 $
 
