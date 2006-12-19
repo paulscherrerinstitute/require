@@ -118,6 +118,7 @@ int require(char* lib, char* version)
                 char initfunc[256];
 
                 sprintf (initfunc, "%s_registerRecordDeviceDriver", lib);
+                printf("calling %s\n", initfunc);
                 iocshCmd (initfunc);
             }
 #endif        
