@@ -2,6 +2,7 @@
 #define require_h
 
 int require(char* lib, char* version);
-char* getLibVersion(char* lib);
+char* getLibversion(char* lib);
+int libversionShow(char* pattern);
 
 #endif

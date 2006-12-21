@@ -36,21 +36,24 @@ int require(char* lib, char* version)
         printf("Directory is LIB = %s\n", *path);
         return ERROR;
     }
-    loaded = getLibVersion(lib);
+    loaded = getLibversion(lib);
     if (!loaded)
     {
         char libname[256];
         char dbdname[256];
+        char depname[256];
 
         /* first try local library */
         if (version)
         {
             sprintf(libname, "bin/%sLib-%s.munch", lib, version);
+            sprintf(depname, "bin/%s-%s.dep", lib, version);
             sprintf(dbdname, "dbd/%s-%s.dbd", lib, version);
         }
         else
         {
             sprintf(libname, "bin/%sLib.munch", lib);
+            sprintf(depname, "bin/%s.dep", lib);
             sprintf(dbdname, "dbd/%s.dbd", lib);
         }
         if (stat(libname, &filestat) == ERROR)
@@ -65,11 +68,13 @@ int require(char* lib, char* version)
             if (version)
             {
                 sprintf(libname, "%s/%sLib-%s.munch", *path, lib, version);
+                sprintf(depname, "%s/%s-%s.dep", *path, lib, version);
                 sprintf(dbdname, "%s/dbd/%s-%s.dbd", *path, lib, version);
             }
             else
             {
                 sprintf(libname, "%s/%sLib.munch", *path, lib);
+                sprintf(depname, "%s/%s.dep", *path, lib);
                 sprintf(dbdname, "%s/dbd/%s.dbd", *path, lib);
             }
             if (stat(libname, &filestat) == ERROR)
@@ -87,7 +92,33 @@ int require(char* lib, char* version)
             }
         }
         errno = 0;
-        printf("loading %s\n", libname);
+        
+        /* check dependencies */
+        if (stat(depname, &filestat) != ERROR)
+        {
+            FILE* depfile;
+            char buffer[40];
+            char *v;
+            
+            depfile = fopen(depname, "r");
+            while (fgets(buffer, sizeof(buffer), depfile))
+            {
+                if (buffer[0] == '#' || buffer[0] == 0) continue;
+                buffer[strlen(buffer)-1] = 0;
+                v = strchr(buffer, ' ');
+                if (v) *v++ = 0;
+                printf ("%s depends on %s %s\n", lib, buffer, v);
+                if (require(buffer,v) != OK)
+                {
+                    fclose(depfile);
+                    return ERROR;
+                }
+            }
+            fclose(depfile);
+        }
+        
+        /* load library */
+        printf("Loading %s\n", libname);
         if (ld(0, 0, libname) == NULL)
         {
             printf("Aborting startup stript.\n");
@@ -96,16 +127,18 @@ int require(char* lib, char* version)
         }
         if (errno == S_symLib_SYMBOL_NOT_FOUND)
         {
-            printf("Library requires some other library\n");
+            printf("Library requires some other functions.\n");
             printf("Aborting startup stript.\n");
             shellScriptAbort();
             return ERROR;
         }
-        loaded = getLibVersion(lib);
+        loaded = getLibversion(lib);
+        
+        /* load dbd file */
         if (stat(dbdname, &filestat) != ERROR)
         {
             /* If file exists */
-            printf("loading %s\n", dbdname);
+            printf("Loading %s\n", dbdname);
             if (dbLoadDatabase(dbdname, NULL, NULL) != OK)
             {
                 taskDelay(sysClkRateGet());
@@ -114,6 +147,7 @@ int require(char* lib, char* version)
                 return ERROR;
             }
 #ifndef BASE_VERSION
+            /* call register function for R3.14 */
             {
                 char initfunc[256];
 
@@ -155,7 +189,7 @@ int require(char* lib, char* version)
     }
 }
 
-char* getLibVersion(char* lib)
+char* getLibversion(char* lib)
 {
     char symbol[256];
     char* loaded;
@@ -166,4 +200,23 @@ char* getLibVersion(char* lib)
     return loaded;
 }
 
+static BOOL printIfLibversion(char* name, int val,
+    SYM_TYPE type, int arg, UINT16 group)
+{
+    int l;
+    char* pattern = (char*) arg;
+    
+    l = strlen(name);
+    if (l > 10 && strcmp(name+l-10, "LibRelease") == 0)
+    {
+        if (pattern && !strstr(name, pattern)) return TRUE;
+        printf("%15.*s %s\n", l-11, name+1, (char*)val);
+    }
+    return TRUE;
+}
 
+int libversionShow(char* pattern)
+{
+    symEach(sysSymTbl, (FUNCPTR)printIfLibversion, (int)pattern);
+    return OK;
+}
