@@ -26,7 +26,7 @@ int listRecords(char* file, char* fields)
     
     if (!file)
     {
-        printf ("usage: listRecords \"filename\", \"field, field, ...\"\n");
+        printf ("usage: listRecords \"filename\", \"field  field  ...\"\n");
         return -1;
     }
     
