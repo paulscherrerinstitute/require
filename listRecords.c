@@ -7,6 +7,7 @@
 
 #ifdef BASE_VERSION
 /* This is R3.13 */
+#include <stdio.h>
 long dbl(char *precordTypename, char *filename, char *fields);
 #else
 /* This is R3.14 */
@@ -47,4 +48,5 @@ int listRecords(char* file, char* fields)
     fclose(newStdout);
     epicsSetThreadStdout(oldStdout);
     return OK;
+#endif
 }
