@@ -36,7 +36,7 @@ int require(char* lib, char* version)
         printf("Directory is LIB = %s\n", *path);
         return ERROR;
     }
-    loaded = getLibversion(lib);
+    loaded = getLibVersion(lib);
     if (!loaded)
     {
         char libname[256];
@@ -132,7 +132,7 @@ int require(char* lib, char* version)
             shellScriptAbort();
             return ERROR;
         }
-        loaded = getLibversion(lib);
+        loaded = getLibVersion(lib);
         
         /* load dbd file */
         if (stat(dbdname, &filestat) != ERROR)
@@ -189,7 +189,7 @@ int require(char* lib, char* version)
     }
 }
 
-char* getLibversion(char* lib)
+char* getLibVersion(char* lib)
 {
     char symbol[256];
     char* loaded;
