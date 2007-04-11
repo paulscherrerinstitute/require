@@ -43,6 +43,12 @@ int require(char* lib, char* version)
         char dbdname[256];
         char depname[256];
 
+        /* try to find module in local /bin directory first, then in path
+           prefer *Lib.munch file over *Lib file
+           check for dependencies in *.dep file
+           load *.dbd file if it exists
+        */
+
         /* first try local library */
         if (version)
         {
@@ -165,17 +171,22 @@ int require(char* lib, char* version)
         /* Library already loaded. Check Version. */
         if (version && strcmp(loaded, version) != 0)
         {
+            /* non-numerical versions must match exactly
+               numerical versions must have exact match in major version and
+               backward-compatible match in minor version and patch level
+            */
             int lmajor, lminor, lpatch, lmatches;
             int major, minor, patch, matches;
             
             lmatches = sscanf(loaded, "%d.%d.%d", &lmajor, &lminor, &lpatch);
             matches = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
-            if (matches == 0 || lmatches == 0 /* non-numerical version*/
+            if (((matches == 0 || lmatches == 0) &&
+                    strcmp(loaded, version) != 0)             
                 || major != lmajor
-                || (matches >= 2 && minor != lminor)
-                || (matches > 2 && patch != lpatch))
+                || (matches >= 2 && minor > lminor)
+                || (matches > 2 && minor == lminor && patch > lpatch))
             {
-                printf("Version conflict between requested %s\n"
+                printf("Conflict between requested version %s\n"
                     "and already loaded version %s.\n"
                     "Aborting startup stript.\n",
                     lib, loaded);
