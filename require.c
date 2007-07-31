@@ -8,6 +8,7 @@
 #include <stat.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <require.h>
 #include <epicsVersion.h>
 #ifndef BASE_VERSION
@@ -50,7 +51,7 @@ int require(char* lib, char* version)
         */
 
         /* first try local library */
-        if (version)
+        if (version && *version)
         {
             sprintf(libname, "bin/%sLib-%s.munch", lib, version);
             sprintf(depname, "bin/%s-%s.dep", lib, version);
@@ -71,7 +72,7 @@ int require(char* lib, char* version)
         {
             /* no local lib at all */
             libname[strlen(libname)-6]=0;  /* skip ".munch" */
-            if (version)
+            if (version && *version)
             {
                 sprintf(libname, "%s/%sLib-%s.munch", *path, lib, version);
                 sprintf(depname, "%s/%s-%s.dep", *path, lib, version);
@@ -104,16 +105,24 @@ int require(char* lib, char* version)
         {
             FILE* depfile;
             char buffer[40];
-            char *v;
+            char *l; /* required library */
+            char *v; /* required version */
+            char *e; /* end */
             
             depfile = fopen(depname, "r");
             while (fgets(buffer, sizeof(buffer), depfile))
             {
-                if (buffer[0] == '#' || buffer[0] == 0) continue;
-                buffer[strlen(buffer)-1] = 0;
-                v = strchr(buffer, ' ');
-                if (v) *v++ = 0;
-                printf ("%s depends on %s %s\n", lib, buffer, v);
+                l = buffer;
+                while (isspace((int)*l)) l++;
+                if (*l == 0 || *l == '#') continue;
+                v = l;
+                while (*v && !isspace((int)*v)) v++;
+                *v++ = 0;
+                while (isspace((int)*v)) v++;
+                e = v;
+                while (*e && !isspace((int)*e)) e++;
+                *e = 0;
+                printf ("%s depends on %s %s\n", lib, l, v);
                 if (require(buffer,v) != OK)
                 {
                     fclose(depfile);
@@ -169,7 +178,7 @@ int require(char* lib, char* version)
     else
     {
         /* Library already loaded. Check Version. */
-        if (version && strcmp(loaded, version) != 0)
+        if (version && *version && strcmp(loaded, version) != 0)
         {
             /* non-numerical versions must match exactly
                numerical versions must have exact match in major version and
