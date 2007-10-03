@@ -123,7 +123,7 @@ int require(char* lib, char* version)
                 while (*e && !isspace((int)*e)) e++;
                 *e = 0;
                 printf ("%s depends on %s %s\n", lib, l, v);
-                if (require(buffer,v) != OK)
+                if (require(l, v) != OK)
                 {
                     fclose(depfile);
                     return ERROR;
@@ -178,6 +178,12 @@ int require(char* lib, char* version)
     else
     {
         /* Library already loaded. Check Version. */
+        if (version && strcmp(loaded, "test") == 0)
+        {
+            printf("Warning: %s version is test where %s was requested\n",
+                lib, version);
+            return OK;
+        }
         if (version && *version && strcmp(loaded, version) != 0)
         {
             /* non-numerical versions must match exactly
@@ -195,10 +201,10 @@ int require(char* lib, char* version)
                 || (matches >= 2 && minor > lminor)
                 || (matches > 2 && minor == lminor && patch > lpatch))
             {
-                printf("Conflict between requested version %s\n"
+                printf("Conflict between requested %s version %s\n"
                     "and already loaded version %s.\n"
                     "Aborting startup stript.\n",
-                    lib, loaded);
+                    lib, version, loaded);
                 shellScriptAbort();
                 return ERROR;
             }
