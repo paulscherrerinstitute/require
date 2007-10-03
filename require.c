@@ -154,9 +154,9 @@ int require(char* lib, char* version)
         loaded = getLibVersion(lib);
         
         /* load dbd file */
-        if (stat(dbdname, &filestat) != ERROR)
+        if (stat(dbdname, &filestat) != ERROR && filestat.st_size > 0)
         {
-            /* If file exists */
+            /* If file exists and is not empty */
             printf("Loading %s\n", dbdname);
             if (dbLoadDatabase(dbdname, NULL, NULL) != OK)
             {
