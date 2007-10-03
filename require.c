@@ -13,7 +13,11 @@
 #include <epicsVersion.h>
 #ifndef BASE_VERSION
 /* This is R3.14.* */
+#include <iocsh.h>
 extern int iocshCmd (const char *cmd);
+#include <dbAccess.h>
+#include <epicsExit.h>
+#include <epicsExport.h>
 #endif
 
 int dbLoadDatabase(char *filename, char *path, char *substitutions);
@@ -246,3 +250,32 @@ int libversionShow(char* pattern)
     symEach(sysSymTbl, (FUNCPTR)printIfLibversion, (int)pattern);
     return OK;
 }
+
+#ifndef BASE_VERSION
+static const iocshArg requireArg0 = { "module", iocshArgString };
+static const iocshArg requireArg1 = { "version", iocshArgString };
+static const iocshArg * const requireArgs[2] = { &requireArg0, &requireArg1 };
+static const iocshFuncDef requireDef = { "require", 2, requireArgs };
+static void requireFunc (const iocshArgBuf *args)
+{
+    if (require (args[0].sval, args[1].sval) != 0
+        && !interruptAccept)
+    {
+        /* require failed in startup script before iocInit */
+        fprintf (stderr, "Aborting startup script\n");
+        epicsExit (1);
+    }
+}
+
+static void requireRegister(void)
+{
+    static int firstTime = 1;
+    if (firstTime) {
+        iocshRegister (&requireDef, requireFunc);
+        firstTime = 0;
+    }
+}
+
+epicsExportRegistrar(requireRegister);
+
+#endif
