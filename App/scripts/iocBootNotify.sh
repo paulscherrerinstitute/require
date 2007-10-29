@@ -7,8 +7,8 @@
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: maden $'
-    echo '$Date: 2005/05/27 09:32:09 $'
+    echo '$Author: krempaska $'
+    echo '$Date: 2007/10/29 13:24:03 $'
     exit
 fi
 
@@ -109,8 +109,8 @@ else
 	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
 fi
 
-$ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF &
-INSERT INTO SSRM.IOC_BOOTLOG
+$ORACLE_HOME/bin/sqlplus -s gfa_public/pub01@GFAPRD << EOF &
+INSERT INTO HOSTS.IOC_BOOTLOG
        (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
         SLSBASE, BOOTFILE, SCRIPT, VXWORKS, EPICSVER,
         VXWORKSVER, ETHADDR)
@@ -120,6 +120,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.8 2005/05/27 09:32:09 maden Exp $
+# $Id: iocBootNotify.sh,v 1.9 2007/10/29 13:24:03 krempaska Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.8 $
+# $Revision: 1.9 $

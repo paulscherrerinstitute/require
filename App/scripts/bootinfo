@@ -28,7 +28,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2006/07/18 09:02:23 $'
+    echo '$Date: 2007/10/29 13:20:41 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -86,7 +86,7 @@ fi
 
 eval $(resize 2>/dev/null)
 pattern="$JOKER$1$JOKER"
-$ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF
+$ORACLE_HOME/bin/sqlplus -s gfa_public/pub01@gfaprd << EOF
 SET PAGESIZE 10000;
 SET LINESIZE ${COLUMNS:-120};
 SET FEEDBACK OFF;
@@ -99,7 +99,7 @@ COLUMN VXWORKS FORMAT A7;
 COLUMN ARCH FORMAT A15;
 
 SELECT ${HSEL} ${SEL:-$DEFAULTSEL}
-FROM SSRM.${TABLE}
+FROM HOSTS.${TABLE}
 WHERE  SYSTEM         LIKE UPPER('$pattern') OR
        BOOTPC         LIKE '$pattern' OR
        SLSBASE        LIKE '$pattern' OR
@@ -113,7 +113,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.16 2006/07/18 09:02:23 zimoch Exp $
+# $Id: bootinfo,v 1.17 2007/10/29 13:20:41 krempaska Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.16 $
+# $Revision: 1.17 $
 

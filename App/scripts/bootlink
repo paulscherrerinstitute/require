@@ -6,7 +6,7 @@ then
     echo "if <newbase> = \"-\" it shows the current links"
     exit
 fi
-if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.1 2005/03/21 11:10:43 luedeke Exp $";exit;fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.2 2007/10/29 13:23:57 krempaska Exp $";exit;fi
 if [ -d /usr/oracle-9.2 ] ; then
         export ORACLE_HOME=/usr/oracle-9.2
 else
@@ -23,9 +23,9 @@ shift
 for ioc in $*
 do
     list=$(echo $(
-    $ORACLE_HOME/bin/sqlplus -s ssrm_public/pub01@psip0 << EOF
+    $ORACLE_HOME/bin/sqlplus -s gfa_public/pub01@GFAPRD << EOF
     SET HEADING OFF;
-    SELECT BOOTPC,SLSBASE FROM SSRM.IOC_LASTBOOTED WHERE  SYSTEM = '$ioc';
+    SELECT BOOTPC,SLSBASE FROM HOSTS.IOC_LASTBOOTED WHERE  SYSTEM = '$ioc';
     EXIT
     EOF
     ))
