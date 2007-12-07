@@ -7,8 +7,8 @@
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: krempaska $'
-    echo '$Date: 2007/10/29 13:24:03 $'
+    echo '$Author: zimoch $'
+    echo '$Date: 2007/12/07 15:20:19 $'
     exit
 fi
 
@@ -58,7 +58,7 @@ then
     exit 1
 fi
 
-BOOTPC=$(hostname -s)
+BOOTPC=$(/bin/hostname -s)
 
 if [ ! -L /ioc/$SYSTEM ]
 then
@@ -72,11 +72,11 @@ case $SYSTEM in
           echo "Rename your system and 'target name' to match *-VME*."
           exit 1 ;;
 esac
-link=$(readlink /ioc/$SYSTEM)
+link=$(/usr/bin/readlink /ioc/$SYSTEM)
 SLSBASE=${link%%/iocBoot*}
 if [ -L $BOOTFILE ]
 then
-  link=$(readlink $BOOTFILE)
+  link=$(/usr/bin/readlink $BOOTFILE)
   tail=${link#../../}
   if [ $tail = $link ]
   then
@@ -120,6 +120,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.9 2007/10/29 13:24:03 krempaska Exp $
+# $Id: iocBootNotify.sh,v 1.10 2007/12/07 15:20:19 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.9 $
+# $Revision: 1.10 $
