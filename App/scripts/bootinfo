@@ -28,7 +28,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2007/10/29 13:20:41 $'
+    echo '$Date: 2008/04/28 07:44:16 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -77,11 +77,13 @@ do
   shift
 done
 
+if [ -z "$ORACLE_HOME"; then
 if [ -d /usr/oracle-9.2 ] ; then
         export ORACLE_HOME=/usr/oracle-9.2
 else
         export ORACLE_HOME=/usr/oracle-8.1.7
 	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
+fi
 fi
 
 eval $(resize 2>/dev/null)
@@ -113,7 +115,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.17 2007/10/29 13:20:41 krempaska Exp $
+# $Id: bootinfo,v 1.18 2008/04/28 07:44:16 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.17 $
+# $Revision: 1.18 $
 
