@@ -1,5 +1,5 @@
 #!/bin/sh
-if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.3 2008/01/17 10:03:08 luedeke Exp $";exit;fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.4 2008/04/28 07:52:01 zimoch Exp $";exit;fi
 if [ $# -lt 2 ] || [ "$1" = "-?" ]
 then 
     echo "using: $0 (<newbase>|-) <IOC> [<IOC2> [...]]"
@@ -7,12 +7,15 @@ then
     echo "if <newbase> = \"-\" it shows the current links"
     exit
 fi
+if [ -z "$ORACLE_HOME" ] ; then
 if [ -d /usr/oracle-9.2 ] ; then
         export ORACLE_HOME=/usr/oracle-9.2
 else
         export ORACLE_HOME=/usr/oracle-8.1.7
 	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
 fi
+fi
+
 targetbase=$1
 if [ "$(chkslsbase.sh $targetbase)" = "" ] && [ "$targetbase" != "-" ]
 then
