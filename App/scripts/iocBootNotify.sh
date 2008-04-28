@@ -8,7 +8,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: zimoch $'
-    echo '$Date: 2007/12/07 15:20:19 $'
+    echo '$Date: 2008/04/28 08:01:53 $'
     exit
 fi
 
@@ -102,11 +102,13 @@ echo "EPICSVER=$EPICSVER"
 echo "VXWORKSVER=$VXWORKSVER"
 echo "ETHADDR=$ETHADDR"
 
+if [ -z "$ORACLE_HOME" ] ; then
 if [ -d /usr/oracle-9.2 ] ; then
         export ORACLE_HOME=/usr/oracle-9.2
 else
         export ORACLE_HOME=/usr/oracle-8.1.7
 	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
+fi
 fi
 
 $ORACLE_HOME/bin/sqlplus -s gfa_public/pub01@GFAPRD << EOF &
@@ -120,6 +122,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.10 2007/12/07 15:20:19 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.11 2008/04/28 08:01:53 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.10 $
+# $Revision: 1.11 $
