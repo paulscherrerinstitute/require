@@ -4,11 +4,14 @@
 # The startup script should have the following line:
 # bootNotify SLSBASE,"sls/bin/iocBootNotify.sh"
 
+PATH=/bin:/usr/bin
+. /etc/profile.d/sls_oracle.sh
+
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: zimoch $'
-    echo '$Date: 2008/04/28 08:01:53 $'
+    echo '$Date: 2008/05/13 08:32:21 $'
     exit
 fi
 
@@ -58,7 +61,7 @@ then
     exit 1
 fi
 
-BOOTPC=$(/bin/hostname -s)
+BOOTPC=$(hostname -s)
 
 if [ ! -L /ioc/$SYSTEM ]
 then
@@ -72,11 +75,11 @@ case $SYSTEM in
           echo "Rename your system and 'target name' to match *-VME*."
           exit 1 ;;
 esac
-link=$(/usr/bin/readlink /ioc/$SYSTEM)
+link=$(readlink /ioc/$SYSTEM)
 SLSBASE=${link%%/iocBoot*}
 if [ -L $BOOTFILE ]
 then
-  link=$(/usr/bin/readlink $BOOTFILE)
+  link=$(readlink $BOOTFILE)
   tail=${link#../../}
   if [ $tail = $link ]
   then
@@ -103,15 +106,11 @@ echo "VXWORKSVER=$VXWORKSVER"
 echo "ETHADDR=$ETHADDR"
 
 if [ -z "$ORACLE_HOME" ] ; then
-if [ -d /usr/oracle-9.2 ] ; then
-        export ORACLE_HOME=/usr/oracle-9.2
-else
-        export ORACLE_HOME=/usr/oracle-8.1.7
-	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
-fi
+    echo "ORACLE_HOME not defined" >&2
+    exit 1
 fi
 
-$ORACLE_HOME/bin/sqlplus -s gfa_public/pub01@GFAPRD << EOF &
+sqlplus -s gfa_public/pub01@GFAPRD << EOF &
 INSERT INTO HOSTS.IOC_BOOTLOG
        (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
         SLSBASE, BOOTFILE, SCRIPT, VXWORKS, EPICSVER,
@@ -122,6 +121,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.11 2008/04/28 08:01:53 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.12 2008/05/13 08:32:21 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.11 $
+# $Revision: 1.12 $

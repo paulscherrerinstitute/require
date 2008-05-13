@@ -1,5 +1,5 @@
 #!/bin/sh
-if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.4 2008/04/28 07:52:01 zimoch Exp $";exit;fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.5 2008/05/13 08:32:21 zimoch Exp $";exit;fi
 if [ $# -lt 2 ] || [ "$1" = "-?" ]
 then 
     echo "using: $0 (<newbase>|-) <IOC> [<IOC2> [...]]"
@@ -8,12 +8,8 @@ then
     exit
 fi
 if [ -z "$ORACLE_HOME" ] ; then
-if [ -d /usr/oracle-9.2 ] ; then
-        export ORACLE_HOME=/usr/oracle-9.2
-else
-        export ORACLE_HOME=/usr/oracle-8.1.7
-	export LD_LIBRARY_PATH=$ORACLE_HOME/lib:$LD_LIBRARY_PATH
-fi
+    echo "ORACLE_HOME not defined" >&2
+    exit 1
 fi
 
 targetbase=$1
@@ -26,7 +22,7 @@ shift
 for ioc in $*
 do
     list=$(echo $(
-    $ORACLE_HOME/bin/sqlplus -s gfa_public/pub01@GFAPRD << EOF
+    sqlplus -s gfa_public/pub01@GFAPRD << EOF
     SET HEADING OFF;
     SELECT BOOTPC,SLSBASE FROM HOSTS.IOC_LASTBOOTED WHERE  SYSTEM = '$ioc';
     EXIT
