@@ -13,7 +13,8 @@ function help() {
     echo "  -d : print BOOTDATE"
     echo "  -t : print BOOTTIME"
     echo "  -b : print BOOTPC"
-    echo "  -S : print SLSBASE"
+    echo "  -I : print INSTBASE"
+    echo "  -S : print INSTBASE (was SLSBASE before)"
     echo "  -E : print EPICS version"
     echo "  -V : print vxWorks version"
     echo "  -i : print IP_ADDR"
@@ -28,13 +29,13 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2008/05/13 08:32:21 $'
+    echo '$Date: 2008/08/14 08:39:03 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
 
 HSEL="SYSTEM AS IOC"
-DEFAULTSEL=",BOOTDATE,BOOTTIME,BOOTPC,SLSBASE,
+DEFAULTSEL=",BOOTDATE,BOOTTIME,BOOTPC,SLSBASE AS INSTBASE,
             EPICSVER AS EPICS,VXWORKSVER AS VXWORKS,IPADDR AS IP_ADDR,
             SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
             INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH"
@@ -60,7 +61,7 @@ do
             V*) SEL="$SEL,VXWORKSVER AS VXWORKS";;
             i*) SEL="$SEL,IPADDR AS IP_ADDR" ;;
             e*) SEL="$SEL,ETHADDR AS ETH_ADDR" ;;
-            S*) SEL="$SEL,SLSBASE" ;;
+            [SI]*) SEL="$SEL,SLSBASE AS INSTBASE" ;;
             A*) SEL="$SEL,SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
                 INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH" ;;
             f*) SEL="$SEL,VXWORKS AS FILENAME" ;;
@@ -91,7 +92,8 @@ SET FEEDBACK OFF;
 $OPTS
 
 COLUMN IOC FORMAT A17;
-COLUMN SLSBASE FORMAT A7;
+COLUMN BOOTPC FORMAT A12;
+COLUMN INSTBASE FORMAT A14;
 COLUMN EPICS FORMAT A7;
 COLUMN VXWORKS FORMAT A7;
 COLUMN ARCH FORMAT A15;
@@ -111,7 +113,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.19 2008/05/13 08:32:21 zimoch Exp $
+# $Id: bootinfo,v 1.20 2008/08/14 08:39:03 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.19 $
+# $Revision: 1.20 $
 
