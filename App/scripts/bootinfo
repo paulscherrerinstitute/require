@@ -29,7 +29,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2008/08/14 08:39:03 $'
+    echo '$Date: 2008/09/29 14:53:02 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -40,8 +40,9 @@ DEFAULTSEL=",BOOTDATE,BOOTTIME,BOOTPC,SLSBASE AS INSTBASE,
             SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
             INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH"
 TABLE="IOC_LASTBOOTED"
-ORDER="IOC,TO_DATE(BOOTDATE||' '||BOOTTIME,'DD-MM-YYYY HH24:MI:SS')"
+ORDER="BOOTDATE"
 JOKER="%"
+#ORDER="IOC,TO_DATE(BOOTDATE||' '||BOOTTIME,'DD-MM-YYYY HH24:MI:SS')"
 while true
 do
   case "$1" in
@@ -66,7 +67,9 @@ do
                 INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH" ;;
             f*) SEL="$SEL,VXWORKS AS FILENAME" ;;
             a*) OPTION=-dtbSEViA${OPTION:1} ;;
-            L*) TABLE="IOC_BOOTLOG" ;;
+            L*) SEL="$SEL, BOOT_DT, TO_CHAR(BOOT_DT,'HH24:MI:SS')";
+	    	ORDER="BOOT_DT";
+		TABLE="IOC_BOOTLOG" ;;
             x*) JOKER="" ;;
             "") break ;;
             *)  echo "Unknown option -${OPTION:0:1}. Try: --help"
@@ -113,7 +116,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.20 2008/08/14 08:39:03 zimoch Exp $
+# $Id: bootinfo,v 1.21 2008/09/29 14:53:02 krempaska Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.20 $
+# $Revision: 1.21 $
 
