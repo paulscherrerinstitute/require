@@ -10,8 +10,8 @@ PATH=/bin:/usr/bin
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: zimoch $'
-    echo '$Date: 2008/07/09 08:12:12 $'
+    echo '$Author: krempaska $'
+    echo '$Date: 2008/11/10 12:57:31 $'
     exit
 fi
 
@@ -71,9 +71,9 @@ then
 fi
 case $SYSTEM in
     ( *-VME* ) ;;
-    ( *-CVME* ) ;;
+    ( *-CV* ) ;;
     ( * ) echo "ERROR: $SYSTEM is not an acceptable system name."
-          echo "Rename your system and 'target name' to match *-VME* or *-CVME*."
+          echo "Rename your system and 'target name' to match *-VME* or *-CV*."
           exit 1 ;;
 esac
 link=$(readlink /ioc/$SYSTEM)
@@ -122,6 +122,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.14 2008/07/09 08:12:12 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.15 2008/11/10 12:57:31 krempaska Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.14 $
+# $Revision: 1.15 $
