@@ -1,0 +1,110 @@
+bootlink test scenarios/cases
+--------------------------------------------------------------------------------
+Facility: FELOBLA
+------------------------------------------------------------
+Called from: fin-cbpc01e
+Command:
+fin-cbpc01e:]bootlink /psi-xfel/devl FIN-M-CV10E
+/psi-xfel/devl/bin/bootlink: line 150: 3: Permission denied
+You are on FELOBLA subnet 172.21.70.
+Changing symbolic link for /ioc/FIN-M-CV10E...
+Current link is to:
+Requested link is to: /psi-xfel/devl/iocBoot/ioc/FIN-M-CV10E
+Changed on fin-cbpc01e
+from
+to   /psi-xfel/devl/iocBoot/ioc/FIN-M-CV10E
+Results: link created
+------------------------------------------------------------
+Called from: fin-con01e (as afs user)
+Command:
+[fin-cbpc01e:]ssh fin-ccon01e
+krempaska@fin-ccon01e's password:
+Last login: Tue Jan  6 10:08:29 2009 from fin-cgwe.psi.ch
+[fin-ccon01e:]bootlink /psi-xfel/work FIN-M-CV10E
+You are on FELOBLA subnet 172.21.70.
+krempaska@fin-cbpc01e's password:
+Changing symbolic link for /ioc/FIN-M-CV10E...
+Current link is to:   /psi-xfel/devl/iocBoot/ioc/FIN-M-CV10E
+Requested link is to: /psi-xfel/work/iocBoot/ioc/FIN-M-CV10E
+Changed on fin-cbpc01e
+from /psi-xfel/devl/iocBoot/ioc/FIN-M-CV10E
+to   /psi-xfel/work/iocBoot/ioc/FIN-M-CV10E
+Results: link created
+------------------------------------------------------------
+Called from: xfellc
+Command:
+[xfellc:]bootlink /psi-xfel/devl/ FINLB-RLLE-CV10E
+You are on OFFICE subnet 129.129.145. and you need to go to fin-cbpc01e
+Loging to fin-cgwe...
+krempaska@fin-cgwe's password:
+krempaska@fin-cbpc01e's password:
+Changing symbolic link for /ioc/FINLB-RLLE-CV10E...
+Current link is to:   /psi-xfel/devl/iocBoot/ioc/FINLB-RLLE-CV10E
+Requested link is to: /psi-xfel/devl//iocBoot/ioc/FINLB-RLLE-CV10E
+Changed on fin-cbpc01e
+from /psi-xfel/devl/iocBoot/ioc/FINLB-RLLE-CV10E
+to   /psi-xfel/devl//iocBoot/ioc/FINLB-RLLE-CV10E
+Connection to fin-cgwe closed.
+Results: link created
+------------------------------------------------------------
+Notes:
+1. Do not use fin-cgwe for this operation it has no settings and not supposed to
+do any operations/.
+--------------------------------------------------------------------------------
+Facility: SLS Machine
+------------------------------------------------------------
+Called from: slsbpc
+Command:
+
+Called from: slslc05 (when slsbridge is opened)
+Command:
+
+--------------------------------------------------------------------------------
+Facility: SLS Beamline
+Called from: x07da-bpc
+Command: !!called from devl
+cb /devl
+[x07da-bpc:/work]bootlink /devl X07DA-VME-OP1
+You are on one of beamlines subnets 129.129.113..
+Changing symbolic link for /ioc/X07DA-VME-OP1...
+Current link is to:   /work/iocBoot/ioc/X07DA-VME-OP1
+Requested link is to: /devl/iocBoot/ioc/X07DA-VME-OP1
+Changed on x07da-bpc
+from /work/iocBoot/ioc/X07DA-VME-OP1
+to   /devl/iocBoot/ioc/X07DA-VME-OP1
+Results: link created
+------------------------------------------------------------
+Called from: x07da-cons-1 
+Command: !!call from /devl
+cb /devl
+[-bash SLSBASE=/devl]$ bootlink /devl X07DA-VME-OP1
+You are on one of beamlines subnets 129.129.113..
+x07da@x07da-bpc's password:
+
+Results: CANNOT be used from console as this has no afs login possibility!
+------------------------------------------------------------
+Called from: slslc05
+Command:
+[gfalc05:/work]bootlink /devl X07DA-VME-OP1
+You are on OFFICE subnet 129.129.145. and you need to go to x07da-bpc
+Loging to x07da-gw...
+krempaska@x07da-gw's password:
+krempaska@x07da-bpc's password:
+Changing symbolic link for /ioc/X07DA-VME-OP1...
+Current link is to:   /work/iocBoot/ioc/X07DA-VME-OP1
+Requested link is to: /devl/iocBoot/ioc/X07DA-VME-OP1
+Changed on x07da-bpc
+from /work/iocBoot/ioc/X07DA-VME-OP1
+to   /devl/iocBoot/ioc/X07DA-VME-OP1
+Connection to x07da-gw closed.
+Results: link created
+--------------------------------------------------------------------------------
+Facility: HIPA
+------------------------------------------------------------
+Called from: hipa-bpc01
+
+
+Called from: hipa-lc01
+
+
+
