@@ -1,11 +1,11 @@
 #!/bin/sh
 ###############################################################################
 # $Author: krempaska $
-# $Date: 2009/01/13 16:34:07 $
-# $Id: bootlink,v 1.6 2009/01/13 16:34:07 krempaska Exp $
+# $Date: 2009/01/16 13:00:32 $
+# $Id: bootlink,v 1.7 2009/01/16 13:00:32 krempaska Exp $
 # $Name:  $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootlink,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 ###############################################################################
 # File name:
 # Description: creates a new link to the IOC booting directory 
@@ -144,7 +144,7 @@ function get_gw () {
    esac	  
 }
 
-if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.6 2009/01/13 16:34:07 krempaska Exp $";exit;fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.7 2009/01/16 13:00:32 krempaska Exp $";exit;fi
 
 #calling from the script $1=action: do_slink, $2=target, $3=bootpc, $4=ioc1, $5=ioc2,...
 if [ $# > 3 ] && [ "$1" = "do_slink" ]
@@ -268,8 +268,10 @@ then
   echo "continue anyway..."
 fi
     
-#get the currently used host IP -> nslookup 
-val=$(echo $(nslookup $(hostname) ));
+#get the currently used host IP -> nslookup
+#added .psi.ch because on slsbpc in /etc/resolve.conf the line:
+#search psi.ch is missing
+val=$(echo $(nslookup $(hostname).psi.ch ));
 hname=$(echo $val|awk '{print $6}')
 currhostIP=$(echo $val|awk '{print $8}')
    
@@ -279,7 +281,10 @@ case "$NET" in
   172.20.*.*)
     #SLS machine subnet
     echo "You are on the SLS machine subnet $NET";
-    if [ "$bootpcIP" = "$currhostIP" ] 
+    #tuto musim asi hardcoding of IP address
+    #172.20.20.70.|69|71
+    #if [ "$bootpcIP" = "$currhostIP" ] 
+    if [ "$currhostIP" = "172.20.20.70" ] || [ "$currhostIP" = "172.20.20.69" ] || [ "$currhostIP" = "172.20.20.71" ] 
     then
       do_slink $targetbase $*
     else
@@ -336,6 +341,9 @@ exit
 ###############################################################################
 #
 # $Log: bootlink,v $
+# Revision 1.7  2009/01/16 13:00:32  krempaska
+# added psi.ch domain to hostname beacause of SLS netvork, which has not domain search in /etc/desolve.conf yet
+#
 # Revision 1.6  2009/01/13 16:34:07  krempaska
 # modified create link: It goes first on the bootpc and then reads/creates a link, adapted also for psi-xfel, prepared for hipa (and proscan)
 #
