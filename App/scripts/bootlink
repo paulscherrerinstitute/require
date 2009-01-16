@@ -1,11 +1,11 @@
 #!/bin/sh
 ###############################################################################
 # $Author: krempaska $
-# $Date: 2009/01/16 13:00:32 $
-# $Id: bootlink,v 1.7 2009/01/16 13:00:32 krempaska Exp $
+# $Date: 2009/01/16 13:41:02 $
+# $Id: bootlink,v 1.8 2009/01/16 13:41:02 krempaska Exp $
 # $Name:  $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootlink,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 ###############################################################################
 # File name:
 # Description: creates a new link to the IOC booting directory 
@@ -144,18 +144,22 @@ function get_gw () {
    esac	  
 }
 
-if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.7 2009/01/16 13:00:32 krempaska Exp $";exit;fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.8 2009/01/16 13:41:02 krempaska Exp $";exit;fi
 
 #calling from the script $1=action: do_slink, $2=target, $3=bootpc, $4=ioc1, $5=ioc2,...
 if [ $# > 3 ] && [ "$1" = "do_slink" ]
 then
  #echo "calling $0 with parameters: $@"
  #check if you are on the bootpc
- val=$(echo $(nslookup $(hostname) ));
+ val=$(echo $(nslookup $(hostname).psi.ch ));
  hname=$(echo $val|awk '{print $6}')
  #cut the domain part of the hname
  hname=$(echo $hname|awk 'BEGIN {FS="."} {print $1}')
  bootpc=$2
+ echo $bootpc
+ #for slsbpc (slsbpc1/2) cluster exception
+ if [ $hname = "slsbpc2" ] || [ $hname = "slsbpc1" ];then hname="slsbpc";fi
+ 
  if [ "$hname" != "$bootpc" ];then echo "I am not on the $bootpc but on $hname";exit;fi
  shift
  shift
@@ -288,7 +292,10 @@ case "$NET" in
     then
       do_slink $targetbase $*
     else
-      ssh $bootpc bootlink do_slink $bootpc $targetbase $*
+      #echo "THis option is on work, please, login to the slsbpc directly."
+      SCRPATH="$INSTBASE/sls/bin"
+      echo "Logging to $bootpc and calling $SCRPATH/bootlink..."
+      ssh $bootpc $SCRPATH/bootlink do_slink $bootpc $targetbase $*
     fi
     ;;
   129.129.[01][0-9].*|129.129.12[0-2].*|129.129.[01][01][0-9].*)
@@ -297,7 +304,9 @@ case "$NET" in
     then
       do_slink $targetbase $*
     else
-      ssh $bootpc /devl/sls/bin/bootlink do_slink $bootpc $targetbase $*
+      SCRPATH="$INSTBASE/sls/bin"
+      echo "Logging to $bootpc..."
+      ssh $bootpc $SCRPATH/bootlink do_slink $bootpc $targetbase $*
     fi
     ;;
   172.21.70.*)
@@ -341,6 +350,9 @@ exit
 ###############################################################################
 #
 # $Log: bootlink,v $
+# Revision 1.8  2009/01/16 13:41:02  krempaska
+# fixed for SLS machine
+#
 # Revision 1.7  2009/01/16 13:00:32  krempaska
 # added psi.ch domain to hostname beacause of SLS netvork, which has not domain search in /etc/desolve.conf yet
 #
