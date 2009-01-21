@@ -5,13 +5,13 @@
 # bootNotify SLSBASE,"sls/bin/iocBootNotify.sh"
 
 PATH=/bin:/usr/bin
-. /etc/profile.d/sls_oracle.sh
+. /etc/profile
 
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: krempaska $'
-    echo '$Date: 2008/11/10 12:57:31 $'
+    echo '$Author: zimoch $'
+    echo '$Date: 2009/01/21 15:10:56 $'
     exit
 fi
 
@@ -122,6 +122,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.15 2008/11/10 12:57:31 krempaska Exp $
+# $Id: iocBootNotify.sh,v 1.16 2009/01/21 15:10:56 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.15 $
+# $Revision: 1.16 $
