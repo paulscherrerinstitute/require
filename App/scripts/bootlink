@@ -1,11 +1,11 @@
 #!/bin/sh
 ###############################################################################
 # $Author: krempaska $
-# $Date: 2009/03/10 17:25:45 $
-# $Id: bootlink,v 1.9 2009/03/10 17:25:45 krempaska Exp $
+# $Date: 2009/03/10 17:46:43 $
+# $Id: bootlink,v 1.10 2009/03/10 17:46:43 krempaska Exp $
 # $Name:  $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootlink,v $
-# $Revision: 1.9 $
+# $Revision: 1.10 $
 ###############################################################################
 # File name:
 # Description: creates a new link to the IOC booting directory 
@@ -144,7 +144,7 @@ function get_gw () {
    esac	  
 }
 
-if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.9 2009/03/10 17:25:45 krempaska Exp $";exit;fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.10 2009/03/10 17:46:43 krempaska Exp $";exit;fi
 
 #calling from the script $1=action: do_slink, $2=target, $3=bootpc, $4=ioc1, $5=ioc2,...
 if [ $# > 3 ] && [ "$1" = "do_slink" ]
@@ -200,7 +200,7 @@ in_list=$(awk -vb="${*%/}" -vl="$SLSBASELIST $INSTBASELIST $PSIXFELBASELIST" '
     }')
 
 #if [ "$(chkslsbase.sh $targetbase)" = "" ] && [ "$targetbase" != "-" ]
-if [ $in_list = "" ] && [ "$targetbase" != "-" ]
+if [ "$in_list" = "" ] && [ "$targetbase" != "-" ]
 then
     echo -ne "first argument (\"$targetbase\") has to be one out of\n$SLSBASELIST\t$INSTBASELIST\n"
     exit
@@ -340,8 +340,9 @@ case "$NET" in
     if [ "$bootpcIP" = "$currhostIP" ] 
     then
       do_slink $targetbase $*
-    fi
+    else
       ssh $bootpc /hipa/prod/bin/bootlink do_slink $bootpc $targetbase $*
+    fi
     ;;
   129.129.153.*)
     echo "You are on PROSCAN subnet $NET";
@@ -366,6 +367,9 @@ exit
 ###############################################################################
 #
 # $Log: bootlink,v $
+# Revision 1.10  2009/03/10 17:46:43  krempaska
+# a but in if statement fixed
+#
 # Revision 1.9  2009/03/10 17:25:45  krempaska
 # now it works also for hipa, the call of chkslsbase.sh script was replaced by the awk call which does exectly like this script
 #
