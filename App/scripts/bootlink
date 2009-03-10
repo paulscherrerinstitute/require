@@ -1,11 +1,11 @@
 #!/bin/sh
 ###############################################################################
 # $Author: krempaska $
-# $Date: 2009/01/16 13:41:02 $
-# $Id: bootlink,v 1.8 2009/01/16 13:41:02 krempaska Exp $
+# $Date: 2009/03/10 17:25:45 $
+# $Id: bootlink,v 1.9 2009/03/10 17:25:45 krempaska Exp $
 # $Name:  $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootlink,v $
-# $Revision: 1.8 $
+# $Revision: 1.9 $
 ###############################################################################
 # File name:
 # Description: creates a new link to the IOC booting directory 
@@ -67,7 +67,7 @@ function do_slink () {
        ls -l /ioc/$ioc
      fi  
    else
-     echo "Target directory \"$tdir\" does not exist"
+     echo "Target directory \"$tdir\" does not exist, no link has been done."
    fi
   done
   return
@@ -144,7 +144,7 @@ function get_gw () {
    esac	  
 }
 
-if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.8 2009/01/16 13:41:02 krempaska Exp $";exit;fi
+if [ "$1" = "-v" ];then echo "\$Header: /cvs/G/DRV/misc/App/scripts/bootlink,v 1.9 2009/03/10 17:25:45 krempaska Exp $";exit;fi
 
 #calling from the script $1=action: do_slink, $2=target, $3=bootpc, $4=ioc1, $5=ioc2,...
 if [ $# > 3 ] && [ "$1" = "do_slink" ]
@@ -156,7 +156,7 @@ then
  #cut the domain part of the hname
  hname=$(echo $hname|awk 'BEGIN {FS="."} {print $1}')
  bootpc=$2
- echo $bootpc
+ #echo $bootpc
  #for slsbpc (slsbpc1/2) cluster exception
  if [ $hname = "slsbpc2" ] || [ $hname = "slsbpc1" ];then hname="slsbpc";fi
  
@@ -183,8 +183,24 @@ fi
 targetbase=$1
 #chkslsbase.sh checks if the bootdirectory specified in the $1 argument is valid
 #it has to be one of $SLSBASELIST or $INSTBASELIST
-#to do: rename chkslsbase.sh, define $INSTBASE also in the SLS environment
-if [ "$(chkslsbase.sh $targetbase)" = "" ] && [ "$targetbase" != "-" ]
+#check if the requested directory is defined in one of the environment
+#variables $*LIST
+in_list=$(awk -vb="${*%/}" -vl="$SLSBASELIST $INSTBASELIST $PSIXFELBASELIST" '
+    BEGIN{
+        split(b,s)
+        for (j in s) {
+            split(l,f)
+            for (i in f) {
+                if (f[i] == s[j]) {
+                    print f[i]
+                    exit
+                }
+            }
+        }
+    }')
+
+#if [ "$(chkslsbase.sh $targetbase)" = "" ] && [ "$targetbase" != "-" ]
+if [ $in_list = "" ] && [ "$targetbase" != "-" ]
 then
     echo -ne "first argument (\"$targetbase\") has to be one out of\n$SLSBASELIST\t$INSTBASELIST\n"
     exit
@@ -325,7 +341,7 @@ case "$NET" in
     then
       do_slink $targetbase $*
     fi
-      echo "on work!";
+      ssh $bootpc /hipa/prod/bin/bootlink do_slink $bootpc $targetbase $*
     ;;
   129.129.153.*)
     echo "You are on PROSCAN subnet $NET";
@@ -350,6 +366,9 @@ exit
 ###############################################################################
 #
 # $Log: bootlink,v $
+# Revision 1.9  2009/03/10 17:25:45  krempaska
+# now it works also for hipa, the call of chkslsbase.sh script was replaced by the awk call which does exectly like this script
+#
 # Revision 1.8  2009/01/16 13:41:02  krempaska
 # fixed for SLS machine
 #
