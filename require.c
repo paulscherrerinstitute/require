@@ -1,3 +1,4 @@
+#include <vxWorks.h>
 #include <symLib.h>
 #include <sysSymTbl.h>
 #include <sysLib.h>
@@ -11,8 +12,11 @@
 #include <ctype.h>
 #include <require.h>
 #include <epicsVersion.h>
-#ifndef BASE_VERSION
-/* This is R3.14.* */
+#ifdef BASE_VERSION
+#define EPICS_3_13
+int dbLoadDatabase(char *filename, char *path, char *substitutions);
+#else
+#define EPICS_3_14
 #include <iocsh.h>
 extern int iocshCmd (const char *cmd);
 #include <dbAccess.h>
@@ -20,7 +24,6 @@ extern int iocshCmd (const char *cmd);
 #include <epicsExport.h>
 #endif
 
-int dbLoadDatabase(char *filename, char *path, char *substitutions);
 
 int require(char* lib, char* version)
 {
@@ -165,7 +168,7 @@ int require(char* lib, char* version)
                 shellScriptAbort();
                 return ERROR;
             }
-#ifndef BASE_VERSION
+#ifdef EPICS_3_14
             /* call register function for R3.14 */
             {
                 char initfunc[256];
@@ -251,7 +254,7 @@ int libversionShow(char* pattern)
     return OK;
 }
 
-#ifndef BASE_VERSION
+#ifdef EPICS_3_14
 static const iocshArg requireArg0 = { "module", iocshArgString };
 static const iocshArg requireArg1 = { "version", iocshArgString };
 static const iocshArg * const requireArgs[2] = { &requireArg0, &requireArg1 };
