@@ -11,7 +11,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: zimoch $'
-    echo '$Date: 2009/01/21 15:10:56 $'
+    echo '$Date: 2010/06/29 15:20:13 $'
     exit
 fi
 
@@ -34,13 +34,13 @@ then
 fi
 
 SYSTEM=$1
-IPADDR=$2
+IPADDR=${2/-/$(hostname -i)}
 PROCNUM=$3
 DEVICE=$4
 BOOTFILE=$5
 SCRIPT=$6
 VXWORKSVER=${7#VxWorks}
-EPICSVER=$8
+EPICSVER=${8#R}
 ETHADDR=$9
 
 if [ $# -lt 9 ]
@@ -72,6 +72,8 @@ fi
 case $SYSTEM in
     ( *-VME* ) ;;
     ( *-CV* ) ;;
+    ( *-PC* ) ;;
+    ( *-CP* ) ;;
     ( * ) echo "ERROR: $SYSTEM is not an acceptable system name."
           echo "Rename your system and 'target name' to match *-VME* or *-CV*."
           exit 1 ;;
@@ -122,6 +124,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.16 2009/01/21 15:10:56 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.17 2010/06/29 15:20:13 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.16 $
+# $Revision: 1.17 $
