@@ -24,13 +24,48 @@ extern int iocshCmd (const char *cmd);
 #include <epicsExport.h>
 #endif
 
+static int validate(char* version, char* loaded)
+{
+    int lmajor, lminor, lpatch, lmatches;
+    int major, minor, patch, matches;
+    
+    if (!version || !*version || strcmp(loaded, version) == 0)
+    {
+        /* no version requested or exact match */
+        return OK;
+    }
+    if (strcmp(loaded, "test") == 0)
+    {
+        /* test version already loaded */
+        printf("Warning: version is test where %s was requested\n",
+            version);
+        return OK;
+    }
+    /* non-numerical versions must match exactly
+       numerical versions must have exact match in major version and
+       backward-compatible match in minor version and patch level
+    */
 
-int require(char* lib, char* version)
+    lmatches = sscanf(loaded, "%d.%d.%d", &lmajor, &lminor, &lpatch);
+    matches = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
+    if (((matches == 0 || lmatches == 0) &&
+            strcmp(loaded, version) != 0)             
+        || major != lmajor
+        || (matches >= 2 && minor > lminor)
+        || (matches > 2 && minor == lminor && patch > lpatch))
+    {
+        return ERROR;
+    }
+    return OK;
+}
+
+int require(char* lib, char* vers)
 {
     char** path;
     char* loaded;
     SYM_TYPE type;
     struct stat filestat;
+    char version[20];
     
     if (symFindByName(sysSymTbl, "LIB", (char**)&path, &type) != OK)
     {
@@ -44,6 +79,10 @@ int require(char* lib, char* version)
         printf("Directory is LIB = %s\n", *path);
         return ERROR;
     }
+    
+    bzero(version, sizeof(version));
+    if (vers) strncpy(version, vers, sizeof(version));
+    
     loaded = getLibVersion(lib);
     if (!loaded)
     {
@@ -51,6 +90,13 @@ int require(char* lib, char* version)
         char dbdname[256];
         char depname[256];
 
+        if (version[strlen(version)-1] == '+')
+        {
+            char* p = strrchr(version, '.');
+            if (!p) p = version;
+            *p = 0;
+        }
+        
         /* try to find module in local /bin directory first, then in path
            prefer *Lib.munch file over *Lib file
            check for dependencies in *.dep file
@@ -128,6 +174,7 @@ int require(char* lib, char* version)
                 while (isspace((int)*v)) v++;
                 e = v;
                 while (*e && !isspace((int)*e)) e++;
+                *e++ = '+';
                 *e = 0;
                 printf ("%s depends on %s %s\n", lib, l, v);
                 if (require(l, v) != OK)
@@ -143,6 +190,7 @@ int require(char* lib, char* version)
         printf("Loading %s\n", libname);
         if (ld(0, 0, libname) == NULL)
         {
+            printf("Loading %s library failed.\n", lib);
             printf("Aborting startup stript.\n");
             shellScriptAbort();
             return ERROR;
@@ -155,7 +203,7 @@ int require(char* lib, char* version)
             return ERROR;
         }
         loaded = getLibVersion(lib);
-        
+
         /* load dbd file */
         if (stat(dbdname, &filestat) != ERROR && filestat.st_size > 0)
         {
@@ -179,42 +227,28 @@ int require(char* lib, char* version)
             }
 #endif        
         }
+        if (validate(vers, loaded) == ERROR)
+        {
+            printf("Requested %s version %s not available, found only %s.\n"
+                "Aborting startup stript.\n",
+                lib, vers, loaded);
+            shellScriptAbort();
+            return ERROR;
+        }
         if (loaded) printf("%s version is %s\n", lib, loaded);
         return OK;
     }
     else
     {
         /* Library already loaded. Check Version. */
-        if (version && strcmp(loaded, "test") == 0)
+        if (validate(version, loaded) == ERROR)
         {
-            printf("Warning: %s version is test where %s was requested\n",
-                lib, version);
-            return OK;
-        }
-        if (version && *version && strcmp(loaded, version) != 0)
-        {
-            /* non-numerical versions must match exactly
-               numerical versions must have exact match in major version and
-               backward-compatible match in minor version and patch level
-            */
-            int lmajor, lminor, lpatch, lmatches;
-            int major, minor, patch, matches;
-            
-            lmatches = sscanf(loaded, "%d.%d.%d", &lmajor, &lminor, &lpatch);
-            matches = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
-            if (((matches == 0 || lmatches == 0) &&
-                    strcmp(loaded, version) != 0)             
-                || major != lmajor
-                || (matches >= 2 && minor > lminor)
-                || (matches > 2 && minor == lminor && patch > lpatch))
-            {
-                printf("Conflict between requested %s version %s\n"
-                    "and already loaded version %s.\n"
-                    "Aborting startup stript.\n",
-                    lib, version, loaded);
-                shellScriptAbort();
-                return ERROR;
-            }
+            printf("Conflict between requested %s version %s\n"
+                "and already loaded version %s.\n"
+                "Aborting startup stript.\n",
+                lib, version, loaded);
+            shellScriptAbort();
+            return ERROR;
         }
         /* Loaded version is ok */
         printf("%sLib-%s already loaded\n", lib, loaded);
