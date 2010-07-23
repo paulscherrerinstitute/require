@@ -3,11 +3,13 @@
 #include <sysSymTbl.h>
 #include <sysLib.h>
 #include <symLib.h>
+#include <loadLib.h>
 #include <shellLib.h>
 #include <usrLib.h>
 #include <taskLib.h>
 #include <stat.h>
 #include <stdio.h>
+#include <ioLib.h>
 #include <string.h>
 #include <ctype.h>
 #include <require.h>
@@ -66,6 +68,8 @@ int require(char* lib, char* vers)
     SYM_TYPE type;
     struct stat filestat;
     char version[20];
+    int fd;
+    MODULE_ID libhandle = NULL;
     
     if (symFindByName(sysSymTbl, "LIB", (char**)&path, &type) != OK)
     {
@@ -188,16 +192,16 @@ int require(char* lib, char* vers)
         
         /* load library */
         printf("Loading %s\n", libname);
-        if (ld(0, 0, libname) == NULL)
+        fd = open(libname, O_RDONLY, 0);
+        if (fd >= 0)
         {
-            printf("Loading %s library failed.\n", lib);
-            printf("Aborting startup stript.\n");
-            shellScriptAbort();
-            return ERROR;
+            errno = 0;
+            libhandle = loadModule(fd, LOAD_GLOBAL_SYMBOLS);
+            close (fd);
         }
-        if (errno == S_symLib_SYMBOL_NOT_FOUND)
+        if (libhandle == NULL || errno == S_symLib_SYMBOL_NOT_FOUND)
         {
-            printf("Library requires some other functions.\n");
+            printf("Loading %s library failed: %s\n", lib, strerror(errno));
             printf("Aborting startup stript.\n");
             shellScriptAbort();
             return ERROR;
