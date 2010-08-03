@@ -6,6 +6,16 @@ set global_context [scancontext create]
 set file_context [scancontext create]
 set skip_context [scancontext create]
 
+scanmatch $global_context {no such directory `(.*)'} {
+    puts stderr "checking directory $matchInfo(submatch0): so such directory  => version test"
+    return
+}
+
+scanmatch $global_context {there is no version here} {
+    puts stderr "checking current directory: not in cvs => version test"
+    return
+}
+
 scanmatch $global_context {^File: .*Up-to-date} {
     set file [lindex $matchInfo(line) 1]
     puts -nonewline stderr "checking $file: "
@@ -88,21 +98,24 @@ scanmatch $file_context {=================} {
     return
 }
 
-#cvs bug: calling cvs status for files in other directories spoils status information for local files.
-#fix: make localfiles non-local: x -> ../dir/x
-set dir ../[file tail [pwd]]
-set files $dir
+# cvs bug: calling cvs status for files in other directories spoils status
+# information for local files.
+# fix: check local and non local files separately
+
+set cvsstatus [open "|cvs status -l -v 2>@ stdout"]
+scanfile $global_context $cvsstatus
+if [catch {close $cvsstatus}] {set version test}
+
+set files {}
 foreach file $argv {
-    if {[file tail $file] == $file} {
-        lappend files $dir/$file
-    } else {
+    if {[file tail $file] != $file} {
         lappend files $file
     }
 }
-
-set cvsstatus [open "|cvs status -l -v $files 2>/dev/null"]
-scanfile $global_context $cvsstatus
-close $cvsstatus
-
+if [llength $files] {
+    set cvsstatus [open "|cvs status -l -v $files 2>@ stdout"]
+    scanfile $global_context $cvsstatus
+    if [catch {close $cvsstatus}] {set version test}
+}
 if {![info exists version]} {set version test}
 puts $version
