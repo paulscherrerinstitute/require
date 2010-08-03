@@ -30,3 +30,5 @@ foreach filename [glob -nocomplain *.d] {
 }
 set prerequisites [lsort -unique $prerequisites]
 puts [join $prerequisites "\n"]
+
+# $Header: /cvs/G/DRV/misc/App/tools/getPrerequisites.tcl,v 1.2 2010/08/03 08:42:40 zimoch Exp $

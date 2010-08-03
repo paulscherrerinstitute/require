@@ -119,3 +119,5 @@ if [llength $files] {
 }
 if {![info exists version]} {set version test}
 puts $version
+
+# $Header: /cvs/G/DRV/misc/App/tools/getVersion.tcl,v 1.3 2010/08/03 08:42:40 zimoch Exp $
