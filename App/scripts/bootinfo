@@ -29,7 +29,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2010/10/27 08:37:13 $'
+    echo '$Date: 2010/10/27 09:08:00 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -62,6 +62,7 @@ do
             V*) SEL="$SEL,VXWORKSVER AS VXWORKS";;
             i*) SEL="$SEL,IPADDR AS IP_ADDR" ;;
             e*) SEL="$SEL,ETHADDR AS ETH_ADDR" ;;
+            p*) SEL="$SEL,PROCNUM as PORT" ;;
             [SI]*) SEL="$SEL,SLSBASE AS INSTBASE" ;;
             A*) SEL="$SEL,SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
                 INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH" ;;
@@ -116,7 +117,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.22 2010/10/27 08:37:13 zimoch Exp $
+# $Id: bootinfo,v 1.23 2010/10/27 09:08:00 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.22 $
+# $Revision: 1.23 $
 
