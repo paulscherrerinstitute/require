@@ -20,6 +20,7 @@ function help() {
     echo "  -i : print IP_ADDR"
     echo "  -A : print ARCH"
     echo "  -a : print a lot (= -dtbSEViA)"
+    echo "  -p : print PORT (soft IOCs) or processor number (VME IOCs)"
     echo "  -L : log (print all reboots, not only last)"
     echo "  -x : do exact query, i.e. do not append '%' to search pattern"
     echo "  --noheader : don't print table header"
@@ -29,18 +30,14 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2010/10/27 09:08:00 $'
+    echo '$Date: 2010/10/27 09:55:05 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
 
 HSEL="SYSTEM AS IOC"
-DEFAULTSEL=",BOOTDATE,BOOTTIME,BOOTPC,SLSBASE AS INSTBASE,
-            EPICSVER AS EPICS,VXWORKSVER AS VXWORKS,IPADDR AS IP_ADDR,
-            SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
-            INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH"
 TABLE="IOC_LASTBOOTED"
-ORDER="BOOTDATE"
+ORDER="1"
 JOKER="%"
 #ORDER="IOC,TO_DATE(BOOTDATE||' '||BOOTTIME,'DD-MM-YYYY HH24:MI:SS')"
 while true
@@ -49,27 +46,27 @@ do
     --noheader) OPTS="SET HEADING OFF;" ;;
     -*h* | -*\?* | --help) help ;;
     -*v* | --version) version ;;
-    --) shift; break ;;
+    --) shift; if [ -z "$SEL" ]; then set -- -a "$@"; else break; fi ;;
     -*) OPTION=$1
         while true
         do
         OPTION=${OPTION:1}
         case "$OPTION" in
-            d*) SEL="$SEL,BOOTDATE" ;;
-            t*) SEL="$SEL,BOOTTIME" ;;
-            b*) SEL="$SEL,BOOTPC" ;;
-            E*) SEL="$SEL,EPICSVER AS EPICS" ;;
-            V*) SEL="$SEL,VXWORKSVER AS VXWORKS";;
-            i*) SEL="$SEL,IPADDR AS IP_ADDR" ;;
-            e*) SEL="$SEL,ETHADDR AS ETH_ADDR" ;;
-            p*) SEL="$SEL,PROCNUM as PORT" ;;
-            [SI]*) SEL="$SEL,SLSBASE AS INSTBASE" ;;
-            A*) SEL="$SEL,SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
+            t*) SEL="$SEL, BOOTTIME"; ORDER="BOOTDATE" ;;
+            d*) SEL="$SEL, BOOTDATE"; ORDER="BOOTDATE" ;;
+            b*) SEL="$SEL, BOOTPC" ;;
+            E*) SEL="$SEL, EPICSVER AS EPICS" ;;
+            V*) SEL="$SEL, VXWORKSVER AS VXWORKS";;
+            i*) SEL="$SEL, IPADDR AS IP_ADDR" ;;
+            e*) SEL="$SEL, ETHADDR AS ETH_ADDR" ;;
+            p*) SEL="$SEL, PROCNUM as PORT" ;;
+            [SI]*) SEL="$SEL, SLSBASE AS INSTBASE" ;;
+            A*) SEL="$SEL, SUBSTR(VXWORKS,INSTR(VXWORKS,'/',-1,2)+1,
                 INSTR(VXWORKS,'/',-1,1)-INSTR(VXWORKS,'/',-1,2)-1) AS ARCH" ;;
-            f*) SEL="$SEL,VXWORKS AS FILENAME" ;;
+            f*) SEL="$SEL, VXWORKS AS FILENAME" ;;
             a*) OPTION=-dtbSEViA${OPTION:1} ;;
-            L*) SEL="$SEL, BOOT_DT, TO_CHAR(BOOT_DT,'HH24:MI:SS')";
-	    	ORDER="BOOT_DT";
+            L*) SEL="$SEL, BOOT_DT AS BOOTDATE, TO_CHAR(BOOT_DT,'HH24:MI:SS') AS BOOTTIME";
+	    	ORDER="BOOTDATE";
 		TABLE="IOC_BOOTLOG" ;;
             x*) JOKER="" ;;
             "") break ;;
@@ -77,7 +74,7 @@ do
                 exit 1 ;;
         esac
         done  ;;
-    *)  break ;;
+    *)  if [ -z "$SEL" ]; then set -- -a "$@"; continue; else break; fi ;;
   esac
   shift
 done
@@ -102,7 +99,7 @@ COLUMN EPICS FORMAT A7;
 COLUMN VXWORKS FORMAT A7;
 COLUMN ARCH FORMAT A15;
 
-SELECT ${HSEL} ${SEL:-$DEFAULTSEL}
+SELECT ${HSEL} ${SEL}
 FROM HOSTS.${TABLE}
 WHERE  SYSTEM         LIKE UPPER('$pattern') OR
        BOOTPC         LIKE '$pattern' OR
@@ -117,7 +114,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.23 2010/10/27 09:08:00 zimoch Exp $
+# $Id: bootinfo,v 1.24 2010/10/27 09:55:05 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.23 $
+# $Revision: 1.24 $
 
