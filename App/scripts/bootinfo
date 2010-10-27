@@ -30,7 +30,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2010/10/27 09:55:05 $'
+    echo '$Date: 2010/10/27 10:04:48 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -46,7 +46,7 @@ do
     --noheader) OPTS="SET HEADING OFF;" ;;
     -*h* | -*\?* | --help) help ;;
     -*v* | --version) version ;;
-    --) shift; if [ -z "$SEL" ]; then set -- -a "$@"; else break; fi ;;
+    --) shift; if [ -z "$SEL" ]; then set -- -a -- "$@"; continue; else break; fi ;;
     -*) OPTION=$1
         while true
         do
@@ -114,7 +114,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.24 2010/10/27 09:55:05 zimoch Exp $
+# $Id: bootinfo,v 1.25 2010/10/27 10:04:48 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.24 $
+# $Revision: 1.25 $
 
