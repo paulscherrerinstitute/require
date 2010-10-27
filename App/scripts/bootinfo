@@ -29,7 +29,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2008/09/29 14:53:02 $'
+    echo '$Date: 2010/10/27 08:37:13 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -94,9 +94,9 @@ SET LINESIZE ${COLUMNS:-120};
 SET FEEDBACK OFF;
 $OPTS
 
-COLUMN IOC FORMAT A17;
-COLUMN BOOTPC FORMAT A12;
-COLUMN INSTBASE FORMAT A14;
+COLUMN IOC FORMAT A20;
+COLUMN BOOTPC FORMAT A20;
+COLUMN INSTBASE FORMAT A15;
 COLUMN EPICS FORMAT A7;
 COLUMN VXWORKS FORMAT A7;
 COLUMN ARCH FORMAT A15;
@@ -116,7 +116,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.21 2008/09/29 14:53:02 krempaska Exp $
+# $Id: bootinfo,v 1.22 2010/10/27 08:37:13 zimoch Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.21 $
+# $Revision: 1.22 $
 
