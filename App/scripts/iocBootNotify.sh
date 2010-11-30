@@ -10,8 +10,8 @@ PATH=/bin:/usr/bin
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: zimoch $'
-    echo '$Date: 2010/07/05 14:09:03 $'
+    echo '$Author: portmann $'
+    echo '$Date: 2010/11/30 15:26:00 $'
     exit
 fi
 
@@ -113,7 +113,8 @@ if [ -z "$ORACLE_HOME" ] ; then
     echo "ORACLE_HOME not defined" >&2
     exit 1
 fi
-
+#if procnum is pc:procnum use procnum, only
+PROCNUM=${PROCNUM##*:}
 sqlplus -s gfa_public/pub01@GFAPRD << EOF &
 INSERT INTO HOSTS.IOC_BOOTLOG
        (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
@@ -125,6 +126,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.18 2010/07/05 14:09:03 zimoch Exp $
+# $Id: iocBootNotify.sh,v 1.19 2010/11/30 15:26:00 portmann Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.18 $
+# $Revision: 1.19 $
