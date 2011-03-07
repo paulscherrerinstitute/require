@@ -192,6 +192,11 @@ int require(char* lib, char* vers)
             fclose(depfile);
         }
         
+        if (stat(libname, &filestat) == ERROR)
+        {
+            /* no library, dep file was an alias */
+            return 0;
+        }
         /* load library */
         printf("Loading %s\n", libname);
         fd = open(libname, O_RDONLY, 0);
