@@ -146,7 +146,9 @@ int require(char* lib, char* vers)
                 /* no munched lib */
                 libname[strlen(libname)-6]=0;  /* skip ".munch" */
             }
-            if (stat(libname, &filestat) == ERROR)
+            if (stat(libname, &filestat) == ERROR &&
+                /* allow alias without library */
+                stat(depname, &filestat) == ERROR)
             {
                 /* still no library found */
                 printf("Library %s not found\n", libname);
