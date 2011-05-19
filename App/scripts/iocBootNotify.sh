@@ -4,14 +4,14 @@
 # The startup script should have the following line:
 # bootNotify SLSBASE,"sls/bin/iocBootNotify.sh"
 
-PATH=/bin:/usr/bin
+PATH=$PATH:/bin:/usr/bin
 . /etc/profile
 
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: portmann $'
-    echo '$Date: 2010/11/30 15:26:00 $'
+    echo '$Author: lutz_h $'
+    echo '$Date: 2011/05/19 12:31:26 $'
     exit
 fi
 
@@ -35,13 +35,13 @@ fi
 
 SYSTEM=$1
 IPADDR=${2/-/$(hostname -i)}
-PROCNUM=$3
-DEVICE=$4
+PROCNUM=${3#*:}
+DEVICE=${4/-/eth0}
 BOOTFILE=$5
 SCRIPT=$6
 VXWORKSVER=${7#VxWorks}
 EPICSVER=${8#R}
-ETHADDR=$9
+ETHADDR=${9/-/$(/sbin/ifconfig eth0 | awk '/HWaddr/ {print $5}')}
 
 if [ $# -lt 9 ]
 then
@@ -75,8 +75,7 @@ case $SYSTEM in
     ( *-PC* ) ;;
     ( *-CP* ) ;;
     ( * ) echo "ERROR: $SYSTEM is not an acceptable system name."
-          echo "VME IOCs must match *-VME* (SLS) or *-CV* (FEL)."
-          echo "PC IOCs must match *-PC* (SLS) or *-CP* (FEL)."
+          echo "Rename your system and 'target name' to match *-VME* or *-CV*."
           exit 1 ;;
 esac
 link=$(readlink /ioc/$SYSTEM)
@@ -93,6 +92,15 @@ then
   fi
 else
   VXWORKS=$BOOTFILE
+fi
+
+if [ "$7" = "-" ]
+then
+VXWORKSVER=NULL
+VXWORKS=NULL
+else
+VXWORKSVER="'$VXWORKSVER'"
+VXWORKS="'$VXWORKS'"
 fi
 
 echo "I will put the following values to the database:"
@@ -113,19 +121,18 @@ if [ -z "$ORACLE_HOME" ] ; then
     echo "ORACLE_HOME not defined" >&2
     exit 1
 fi
-#if procnum is pc:procnum use procnum, only
-PROCNUM=${PROCNUM##*:}
+
 sqlplus -s gfa_public/pub01@GFAPRD << EOF &
 INSERT INTO HOSTS.IOC_BOOTLOG
        (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
         SLSBASE, BOOTFILE, SCRIPT, VXWORKS, EPICSVER,
         VXWORKSVER, ETHADDR)
 VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
-        '$SLSBASE', '$BOOTFILE', '$SCRIPT', '$VXWORKS', '$EPICSVER',
-        '$VXWORKSVER', '$ETHADDR');
+        '$SLSBASE', '$BOOTFILE', '$SCRIPT', $VXWORKS, '$EPICSVER',
+        $VXWORKSVER, '$ETHADDR');
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.19 2010/11/30 15:26:00 portmann Exp $
+# $Id: iocBootNotify.sh,v 1.20 2011/05/19 12:31:26 lutz_h Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.19 $
+# $Revision: 1.20 $
