@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Id: driver.makefile,v 1.1 2010/07/26 11:20:46 zimoch Exp $
+# $Id: driver.makefile,v 1.2 2011/06/07 15:00:25 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -320,7 +320,9 @@ endif # 3.14
 PROJECTDBD=${PRJ}${LIBVERSIONSTR}.dbd
 export DBDFILES PROJECTDBD     
 
-RECORDS = $(sort $(patsubst %.dbd,%.h,$(notdir $(filter %Record.dbd,${DBDFILES}))))
+FINDINDBD = $(foreach file,${DBDFILES},$(shell grep -o $(subst *,[[:alnum:]_]*,$(1)) ${file}))
+
+RECORDS = $(sort $(patsubst %.dbd,%.h,$(notdir $(filter %Record.dbd,${DBDFILES})) $(call FINDINDBD,*Record.dbd)))
 export RECORDS
 
 MENUS = $(patsubst %.dbd,%.h,$(wildcard menu*.dbd))
@@ -450,6 +452,9 @@ debug::
 	@echo "LIBOBJS = ${LIBOBJS}"
 	@echo "DBDFILES = ${DBDFILES}"
 	@echo "RECORDS = ${RECORDS}"
+	@echo "MENUS = ${MENUS}"
+	@echo "BPTS = ${BPTS}"
+	@echo "HDRS = ${HDRS}"
 	@echo "PROJECTDBD = ${PROJECTDBD}"
 	@echo "T_A = ${T_A}"
 	@echo "ARCH_PARTS = ${ARCH_PARTS}"
