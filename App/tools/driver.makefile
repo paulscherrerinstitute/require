@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Id: driver.makefile,v 1.2 2011/06/07 15:00:25 zimoch Exp $
+# $Id: driver.makefile,v 1.3 2011/06/14 16:00:52 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -105,7 +105,7 @@ ifndef EPICSVERSION
 # in source directory, first run
 
 # Find out which EPICS versions to build
-INSTALLED_EPICS_VERSIONS := $(patsubst ${EPICS_LOCATION}/base-%/config/CONFIG,%,$(wildcard ${EPICS_LOCATION}/base-*[0-9]/config/CONFIG))
+INSTALLED_EPICS_VERSIONS := $(patsubst ${EPICS_LOCATION}/base-%,%,$(wildcard ${EPICS_LOCATION}/base-*[0-9]))
 EPICS_VERSIONS = $(filter-out ${EXCLUDE_VERSIONS:=%},${DEFAULT_EPICS_VERSIONS})
 MISSING_EPICS_VERSIONS = $(filter-out ${BUILD_EPICS_VERSIONS},${EPICS_VERSIONS})
 BUILD_EPICS_VERSIONS = $(filter ${EPICS_VERSIONS},${INSTALLED_EPICS_VERSIONS})
@@ -159,7 +159,7 @@ endif
 
 VERSIONCHECKFILES = ${SOURCES} ${SOURCES_3.13} ${SOURCES_3.14} ${DBDS} ${DBDS_3.13} ${DBD_3.14}
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONCHECKFILES}
-LIBVERSION_YES = $(shell ${VERSIONCHECKCMD})
+LIBVERSION_YES = $(shell ${VERSIONCHECKCMD} 2>/dev/null)
 LIBVERSION_Yes = $(LIBVERSION_YES)
 LIBVERSION_yes = $(LIBVERSION_YES)
 LIBVERSION = ${LIBVERSION_${USE_LIBVERSION}}
@@ -320,9 +320,7 @@ endif # 3.14
 PROJECTDBD=${PRJ}${LIBVERSIONSTR}.dbd
 export DBDFILES PROJECTDBD     
 
-FINDINDBD = $(foreach file,${DBDFILES},$(shell grep -o $(subst *,[[:alnum:]_]*,$(1)) ${file}))
-
-RECORDS = $(sort $(patsubst %.dbd,%.h,$(notdir $(filter %Record.dbd,${DBDFILES})) $(call FINDINDBD,*Record.dbd)))
+RECORDS = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBDFILES}))) ${DBDFILES})
 export RECORDS
 
 MENUS = $(patsubst %.dbd,%.h,$(wildcard menu*.dbd))
@@ -331,7 +329,7 @@ export MENUS
 BPTS = $(patsubst %.data,%.dbd,$(wildcard bpt*.data))
 export BPTS
 
-HDRS = ${HEADERS} ${RECORDS}
+HDRS = ${HEADERS} $(addsuffix Record.h,${RECORDS})
 export HDRS
 
 TEMPLS = ${TEMPLATES}
@@ -634,12 +632,12 @@ CPPFLAGS += -MD
 -include *.d
 
 # Setup searchpaths from all used files
-DIRS = $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%} ${TEMPLS:%=../%} ${DOCU:%=../%}))
 vpath % ..
 vpath % $(sort $(dir ${SRCS:%=../%}))
 vpath %.h $(sort $(dir ${HDRS:%=../%}))
 vpath %.template $(sort $(dir ${TEMPLS:%=../%}))
 vpath %.db $(sort $(dir ${TEMPLS:%=../%}))
+vpath %.dbd $(sort $(dir ${DBDFILES:%=../%}))
 #VPATH += $(sort $(dir ${DOCU:%=../%}))
 
 DBDDIRS = $(sort $(dir ${DBDFILES:%=../%}))
@@ -649,7 +647,7 @@ USR_DBDFLAGS += $(DBDEXPANDPATH)
 
 ifeq (${EPICS_BASETYPE},3.13)
 USR_INCLUDES += $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
-build:: ${PROJECTDBD} ${RECORDS} ${PROJECTLIB}
+build:: ${PROJECTDBD} $(addsuffix Record.h,${RECORDS}) ${PROJECTLIB}
 ifneq ($(filter %.cc %.cpp,${SRCS}),)
 ifneq (${T_A},T1-ppc604)
 #add munched library for C++ code (does not work for T1-ppc604)
@@ -658,7 +656,7 @@ endif # T1-ppc604
 endif # .cc or .cpp found
 else # 3.14
 GENERIC_SRC_INCLUDES = $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
-build: ${PROJECTDBD} ${RECORDS}
+build: ${PROJECTDBD} $(addsuffix Record.h,${RECORDS})
 EXPANDARG = -3.14
 endif # 3.14
 
@@ -859,3 +857,5 @@ endif # in O.* directory
 endif # T_A defined
 endif # OS_CLASS in BUILDCLASSES
 endif # EPICSVERSION defined
+
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.3 2011/06/14 16:00:52 zimoch Exp $
