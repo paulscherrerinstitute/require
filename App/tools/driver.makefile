@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Id: driver.makefile,v 1.3 2011/06/14 16:00:52 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.4 2011/06/14 16:03:14 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -857,5 +857,3 @@ endif # in O.* directory
 endif # T_A defined
 endif # OS_CLASS in BUILDCLASSES
 endif # EPICSVERSION defined
-
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.3 2011/06/14 16:00:52 zimoch Exp $
