@@ -4,6 +4,7 @@
 
 #include <epicsVersion.h>
 #include <stddef.h>
+#include <errno.h>
 
 #ifdef BASE_VERSION
 /* This is R3.13 */
@@ -47,6 +48,6 @@ int listRecords(char* file, char* fields)
     dbl(0L, fields);
     fclose(newStdout);
     epicsSetThreadStdout(oldStdout);
-    return OK;
+    return 0;
 #endif
 }
