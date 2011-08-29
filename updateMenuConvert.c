@@ -5,18 +5,25 @@
 *
 *  $Author: zimoch $
 *
-*  $Log: updateMenuConvert.c,v $
-*  Revision 1.1  2005/04/14 11:25:49  zimoch
-*  add breakpoint tabled to menu convert
+*  $Source: /cvs/G/DRV/misc/updateMenuConvert.c,v $
 *
 */
 
-#include <dbStaticLib.h>
 #include <string.h>
 #include <ellLib.h>
 #include <stdlib.h>
-
+#include <dbScan.h>
+#include <dbStaticLib.h>
+#include <dbAccess.h>
+#include <epicsVersion.h>
+#ifdef BASE_VERSION
+#define EPICS_3_13
 extern DBBASE *pdbbase;
+#else
+#define EPICS_3_14
+#include <iocsh.h>
+#include <epicsExport.h>
+#endif
 
 typedef struct node {
     ELLNODE node;
@@ -24,7 +31,7 @@ typedef struct node {
     char    *value;
 } node;
 
-int epicsShareAPI updateMenuConvert ()
+int updateMenuConvert ()
 {
     brkTable *pbrkTable;
     dbMenu   *menuConvert;
@@ -34,6 +41,11 @@ int epicsShareAPI updateMenuConvert ()
     char     **papChoiceName;      
     char     **papChoiceValue;     
     
+    if (interruptAccept)
+    {
+        fprintf(stderr, "updateMenuConvert: Can update menuConvert only before iocInit!\n");
+        return -1;
+    }
     menuConvert = dbFindMenu(pdbbase,"menuConvert");
     ellInit(&missing);
     for(pbrkTable = (brkTable *)ellFirst(&pdbbase->bptList);
@@ -87,3 +99,21 @@ int epicsShareAPI updateMenuConvert ()
     }
     return 0;
 }
+
+#ifdef EPICS_3_14
+static const iocshFuncDef updateMenuConvertDef = { "updateMenuConvert", 0, NULL };
+static void updateMenuConvertFunc (const iocshArgBuf *args)
+{
+    updateMenuConvert();
+}
+static void updateMenuConvertRegister(void)
+{
+    static int firstTime = 1;
+    if (firstTime) {
+        iocshRegister (&updateMenuConvertDef, updateMenuConvertFunc);
+        firstTime = 0;
+    }
+}
+epicsExportRegistrar(updateMenuConvertRegister);
+#endif
+
