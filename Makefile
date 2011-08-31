@@ -8,4 +8,3 @@ SOURCES += listRecords.c
 SOURCES += updateMenuConvert.c
 SOURCES += addScan.c
 SOURCES_vxWorks += bootNotify.c
-SOURCES_vxWorks += iocCheck.c
