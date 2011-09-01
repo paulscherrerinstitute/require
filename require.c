@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2011/07/21 14:57:25 $
+* $Date: 2011/09/01 07:20:25 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -341,7 +341,7 @@ int require(const char* module, const char* vers)
             end = strchr(p, sep[0]);
             if (end)
             {
-                sprintf (libdir, "%.*s", end-p, p);
+                sprintf (libdir, "%.*s", (int)(end-p), p);
                 end++;
             }
             else
