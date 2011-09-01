@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2011/09/01 07:20:25 $
+* $Date: 2011/09/01 07:21:38 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -476,7 +476,7 @@ int require(const char* module, const char* vers)
             if (end)
             {
                 sprintf(fulldbdname, "%s%.*s" DIRSEP "%s",
-                    libdir, end-p, p, dbdname);
+                    libdir, (int)(end-p), p, dbdname);
                 end++;
             }
             else
