@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.80 2011/07/20 09:41:27 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.81 2011/09/19 08:52:12 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -162,7 +162,7 @@ endif
 
 VERSIONCHECKFILES = ${SOURCES} ${SOURCES_3.13} ${SOURCES_3.14} ${DBDS} ${DBDS_3.13} ${DBD_3.14}
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONCHECKFILES}
-LIBVERSION_YES := $(shell ${VERSIONCHECKCMD} 2>/dev/null)
+LIBVERSION_YES = $(shell ${VERSIONCHECKCMD} 2>/dev/null)
 LIBVERSION_Yes = $(LIBVERSION_YES)
 LIBVERSION_yes = $(LIBVERSION_YES)
 LIBVERSION = ${LIBVERSION_${USE_LIBVERSION}}
@@ -317,7 +317,7 @@ SRCS = $(if ${SOURCES},$(filter-out -none-,${SOURCES}),${AUTOSRCS})
 SRCS += ${SOURCES_${EPICS_BASETYPE}}
 export SRCS
 
-DBDFILES = $(if ${DBDS},${DBDS},$(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
+DBDFILES = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
 DBDFILES += ${DBDS_${EPICS_BASETYPE}}
 DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 ifeq (${EPICS_BASETYPE},3.14)
@@ -328,7 +328,7 @@ PROJECTDBD=${PRJ}${LIBVERSIONSTR}.dbd
 export DBDFILES PROJECTDBD     
 
 RECORDS1 = $(patsubst %Record.dbd,%,$(notdir $(filter %Record.dbd, ${DBDS})))
-RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBDFILES}))) ${DBDS})
+RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBDFILES}))) $(realpath ${DBDS}))
 RECORDS = $(sort ${RECORDS1} ${RECORDS2})
 export RECORDS
 
@@ -597,7 +597,7 @@ PRODUCT_OBJS = ${LIBOBJS}
 LOADABLE_LIBRARY=$(if ${LIBOBJS},${PRJ}${LIBVERSIONSTR},)
 LIBRARY_OBJS = ${LIBOBJS}
 ifneq ($(words $(filter %.st %.stt,${SRCS})),0)
-# now srq is a normal module found by require
+# now seq is a normal module found by require
 #SHRLIB_SEARCH_DIRS += $(EPICS_LOCATION)/seq/lib/$(T_A)
 #LIB_LIBS += pv seq
 endif # .st  or .stt
@@ -667,7 +667,7 @@ ifeq (${EPICS_BASETYPE},3.13)
 USR_INCLUDES += $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
 build:: PROJECTINFOS ${PROJECTDBD} $(addsuffix Record.h,${RECORDS}) ${PROJECTLIB}
 .PHONY:: PROJECTINFOS
-ifneq ($(filter %.cc %.cpp,${SRCS}),)
+ifneq ($(filter %.cc %.cpp %.C,${SRCS}),)
 ifneq (${T_A},T1-ppc604)
 #add munched library for C++ code (does not work for T1-ppc604)
 PROD += ${PROJECTLIB}.munch
@@ -754,7 +754,7 @@ RELEASE_INCLUDES = -I ${EPICS_BASE}/include -I ${EPICS_BASE}/include/os/${OS_CLA
 INSTALL_LOADABLE_SHRLIBS=
 include ${EPICS_BASE}/configure/RULES
 RULES_TOP=${EPICS_BASE}/../seq
-include ${RULES_TOP}/configure/RULES_BUILD
+-include ${RULES_TOP}/configure/RULES_BUILD
 SNC_CFLAGS=-I ${RULES_TOP}/include
 install: ${INSTALL_DOCUS} ${INSTALL_PROJECTDBD} ${INSTALL_LIBRARY} ${INSTALL_DEP}
 endif # 3.14
