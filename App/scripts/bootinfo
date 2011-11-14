@@ -30,7 +30,7 @@ function help() {
 
 function version() {
     echo 'Author: D. Zimoch'
-    echo '$Date: 2010/10/27 10:04:48 $'
+    echo '$Date: 2011/11/14 14:31:23 $'
     echo '$Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $'
     exit 0
 }
@@ -100,7 +100,7 @@ COLUMN VXWORKS FORMAT A7;
 COLUMN ARCH FORMAT A15;
 
 SELECT ${HSEL} ${SEL}
-FROM HOSTS.${TABLE}
+FROM EPICS.${TABLE}
 WHERE  SYSTEM         LIKE UPPER('$pattern') OR
        BOOTPC         LIKE '$pattern' OR
        SLSBASE        LIKE '$pattern' OR
@@ -114,7 +114,7 @@ ORDER BY ${ORDER};
 EXIT
 EOF
 # $Name:  $
-# $Id: bootinfo,v 1.25 2010/10/27 10:04:48 zimoch Exp $
+# $Id: bootinfo,v 1.26 2011/11/14 14:31:23 lutz_h Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/bootinfo,v $
-# $Revision: 1.25 $
+# $Revision: 1.26 $
 
