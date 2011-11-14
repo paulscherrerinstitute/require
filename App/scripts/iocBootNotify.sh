@@ -11,7 +11,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: lutz_h $'
-    echo '$Date: 2011/05/19 12:31:26 $'
+    echo '$Date: 2011/11/14 14:24:17 $'
     exit
 fi
 
@@ -123,7 +123,7 @@ if [ -z "$ORACLE_HOME" ] ; then
 fi
 
 sqlplus -s gfa_public/pub01@GFAPRD << EOF &
-INSERT INTO HOSTS.IOC_BOOTLOG
+INSERT INTO EPICS.IOC_BOOTLOG
        (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
         SLSBASE, BOOTFILE, SCRIPT, VXWORKS, EPICSVER,
         VXWORKSVER, ETHADDR)
@@ -133,6 +133,6 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
 EXIT
 EOF
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.20 2011/05/19 12:31:26 lutz_h Exp $
+# $Id: iocBootNotify.sh,v 1.21 2011/11/14 14:24:17 lutz_h Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.20 $
+# $Revision: 1.21 $
