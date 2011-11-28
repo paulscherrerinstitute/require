@@ -1,0 +1,257 @@
+#!/bin/bash
+SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
+REVISION='$Revision: 1.1 $'
+DATE='$Date: 2011/11/28 14:18:37 $'
+
+rp() {
+  ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
+}    
+
+# Either EPICS or EPICS_BASE should be set to the install directory
+if [ -z "$EPICS_BASE" ]
+then
+    if [ -z "$EPICS" ]
+    then
+        for EPICS in /epics /opt/epics /usr/local/epics
+        do
+            if [ -d $EPICS ]
+            then
+                break 2
+            fi
+            echo "Cannot find EPICS installation directory." >&2
+            exit 1
+        done
+    fi
+    EPICS_BASE=$EPICS/base-3.14.12
+    if [ ! -d $EPICS_BASE ]
+    then
+        EPICS_BASE=$(rp $EPICS/base)
+    fi  
+fi
+if [ ! -d $EPICS_BASE ]
+then
+    echo "Cannot find EPICS base directory." >&2
+    exit 1
+fi
+
+# Check revision
+if [ -r $EPICS_BASE/configure/CONFIG_BASE_VERSION ]
+then
+BASE=$(awk -F '[[:space:]]*=[[:space:]]*' '
+    /^EPICS_VERSION[[:space:]]*=[[:space:]]*/ {v=$2}
+    /^EPICS_REVISION[[:space:]]*=[[:space:]]*/ {r=$2}
+    /^EPICS_MODIFICATION[[:space:]]*=[[:space:]]*/ {m=$2}
+    END {print v"."r"."m}' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
+else
+BASE=$(basename $(rp $EPICS_BASE))
+BASE=${BASE#*base-}
+fi
+
+if [ "${BASE#3.14.}" = "$BASE" ]
+then
+    echo "Do not find an EPICS 3.14 version" >&2
+    exit 1
+fi
+export BASE
+
+# IOC name derives from hostname
+# (trailing possible '\r' under cygwin)
+IOC=$(hostname|tr -d '\r')
+# trailing possible domain name
+IOC=${IOC%%.*}
+# or get IOC name from start directory following PSI convention
+if [ $(basename $(dirname $PWD)) = "ioc" ]
+then
+    IOC=$(basename $PWD)
+fi
+export IOC
+
+# setup search path for require
+ODIR=O.${BASE}_$EPICS_HOST_ARCH
+EPICS_DRIVER_PATH=.:bin:snl:../snl:$ODIR:src/$ODIR:snl/$ODIR:../snl/$ODIR:${EPICS_DRIVER_PATH#:}
+
+#Special PSI: find installation base for libs from working directory
+D=$(rp $PWD)
+I=${D%/iocBoot/*}
+if [ $I != $D ]
+then
+    INSTBASE=$I
+    export INSTBASE
+fi
+
+if [ -z "$INSTBASE" ]
+then
+    INSTBASE=/work
+fi
+EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH%:}:$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH
+
+# convert for win32-x86 arch
+if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
+then 
+    EPICS_DRIVER_PATH=$(cygpath -wp $EPICS_DRIVER_PATH)
+    DBD=$(cygpath -wp $DBD)
+fi
+if [ ${EPICS_HOST_ARCH#cygwin-} != $EPICS_HOST_ARCH ]
+then 
+    DBD=$(cygpath -wp $DBD)
+fi
+
+export EPICS_DRIVER_PATH
+
+loadFiles () {
+while [ "$#" -gt 0 ]
+do
+  file=$1
+  case $file in
+    ( @* )              
+        loadFiles $(cat ${file#@})
+        ;;
+    ( *.db | *.template)
+        subst=""
+        while [ "$#" -gt 1 ]
+        do
+            case $2 in 
+                ( *=* )
+                    subst="$subst,$2"; shift
+                    ;;
+                ( * )
+                    break
+                    ;;
+            esac
+        done
+        echo "dbLoadRecords \"$file\",\"${subst#,}\""
+        ;;
+    ( *.subs | *.subst )
+        echo "dbLoadTemplate \"$file\""
+        ;;
+    ( *.dbd )
+        # some dbd files must be loaded before main to take effect
+        echo "dbLoadDatabase \"$file\",\"$DBD\""
+        ;;
+    ( *.so )             
+        echo "ld \"$file\""
+        ;;
+    ( -c )               
+        shift
+        echo $1
+        ;;
+    ( -r )               
+        shift
+        echo "require $1"
+        ;;
+    ( -n )
+        shift
+        IOC="$1"
+        ;;
+    ( -h | "-?" | -help | --help )
+        {
+        echo "usage: iocsh [options] [files]"
+        echo "Start an EPICS iocsh and load files"
+        echo "Recognized filetypes: *.db *.dbt *.template *.subs *.subst *.dbd *.so"
+        echo
+        echo "Possible options:"
+        echo " -? or -h or --help : show this page and exit"
+        echo " -v or --version : show version and exit"
+        echo " -c: The next string is executed as a command by the EPICS iocsh."
+        echo " -r: The next string is a module, loaded via require."
+        echo " -n: The next string is the IOC name (used for prompt)"
+        echo "     default: dirname if parent dir is \"ioc\" otherwise hostname"
+        echo
+        echo "Supported filetypes:"
+        echo "*.db, *.dbt and *.template are loaded via dbLoadRecords"
+        echo "After the filename, you can specify substitutions like MACRO=value."
+        echo
+        echo "*.subs and *.subst are loaded via dbLoadTemplate"
+        echo
+        echo "*.dbd is loaded via dbLoadDatabase"
+        echo
+        echo "*.so is loaded via ld"
+        echo
+        echo "If a file is @filename, more arguments are read from filename."
+        echo
+        echo "All other files are executed as startup scripts by the EPICS iocsh."
+        } >&2
+        exit
+        ;;
+    ( -v | -ver | --ver | -version | --version )
+        {
+        echo "iocsh by Dirk Zimoch"
+        echo $SOURCE
+        echo $REVISION
+        echo $DATE
+        } >&2
+        exit
+        ;;
+    ( -* )
+        {
+        echo "unknown option $1"
+        echo "try: $(basename $0) --help"
+        } >&2
+        exit 1
+       ;;
+    ( * )                
+        echo "< \"$file\""
+        if grep -q iocInit $file; then init=NO; fi
+        ;;
+  esac
+  shift
+done
+}
+
+startup=/tmp/iocsh.startup.$$
+trap "rm -f $startup" EXIT TERM KILL
+{
+
+echo "#date=$(date)"
+echo "#user=${USER:-$(whoami)}"
+echo "#PWD=$PWD"
+echo "#EPICS_CA_ADDR_LIST=$EPICS_CA_ADDR_LIST"
+echo "#EPICS_DRIVER_PATH=$EPICS_DRIVER_PATH"
+if [ ${BASE#3.14.} -ge 12 ]
+then
+    EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
+    ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
+    # load "require" command
+    REQUIRE=misc
+    LIBPREFIX=lib
+    LIBPOSTFIX=.so
+    echo "dlload $INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}"
+    echo "dbLoadDatabase $INSTBASE/iocBoot/R$BASE/dbd/${REQUIRE}.dbd"
+    echo "${REQUIRE%-*}_registerRecordDeviceDriver"
+#    STDLIBS="exec disctools"
+else
+    APP=ioc
+    EXE=$EPICS_EXTENSIONS/bin/$EPICS_HOST_ARCH/$APP
+    DBD=$EPICS_EXTENSIONS/dbd
+    echo "dbLoadDatabase \"$APP.dbd\",\"$DBD\""
+    echo "${APP}_registerRecordDeviceDriver(pdbbase)"
+fi
+for i in $STDLIBS; do echo "require $i"; done
+loadFiles "$@"
+if [ "$init" != NO ]
+then
+    echo "iocInit"
+fi
+if [ "$SHELLBOX" ]
+then
+  PATH=$PATH:/home/ioc/bin
+  echo 'dbl "","RTYP DESC" > /home/ioc/${SHELLBOX}.dbl'
+  echo "! dbl2odb.sh ${SHELLBOX} $(/sbin/ifconfig eth0 | awk -F '[ :]+' '/Bcast/ {print $6}') $EPICS_CA_SERVER_PORT"
+fi
+echo 'epicsEnvSet IOCSH_PS1,"${IOC}> "'
+} > $startup
+
+# convert startup script file name for win32-x86
+if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
+then
+    startup=`cygpath -w $startup`
+fi
+
+if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH -o ${EPICS_HOST_ARCH#cygwin-} != $EPICS_HOST_ARCH ]
+then 
+    PATH=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH:$EPIC_BASE/bin/$EPICS_HOST_ARCH:$EPICS_BASE/../seq/bin/$EPICS_HOST_ARCH:$PATH
+fi
+
+echo $EXE $ARGS $startup
+eval "$EXE" $ARGS "$startup" 2>&1
+echo

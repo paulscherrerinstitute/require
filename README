@@ -8,14 +8,30 @@ require "<lib>" [,"<version>"]
  load a library and its dbd file
 
 updateMenuConvert
- shell function
- add all breakpoint tables found on this ioc to menu convert
+ startup script function
+ add all loaded breakpoint tables found on this ioc to menu convert
+ to be called before iocInit
  
+addScan rate
+ startup script function
+ create a new scan rate (seconds) and add it to menuScan
+ to be called before iocInit
+
 bootNotify
  startup script function
  call a script on the boot pc and tell it a lot of boot infos
  
-iocCheck / iocCheckInit
- subroutine record function
- set record to 0 if any task dies
- reset record to 1 when 1 is written to A
+dir / ls / ll / mkdir / rmdir / rm / mv / umask / chmod
+ shell functions
+ make disc functions available in iocsh
+ not needed on vxWorks
+
+exec / !
+ execute an externel command from iocsh
+ shell function
+ not available on vxWorks
+ 
+listRecords filename fields
+ shell function
+ wrapper for dbl to get same syntax in 3.13 and 3.14
+ 
