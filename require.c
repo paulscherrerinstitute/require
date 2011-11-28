@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2011/09/01 07:21:38 $
+* $Date: 2011/11/28 15:31:27 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -499,6 +499,23 @@ int require(const char* module, const char* vers)
                 fprintf (stderr, "require: can't load %s\n", fulldbdname);
                 return -1;
             }
+            
+            /* when dbd is loaded call register function for 3.14 */
+#ifdef EPICS_3_14
+            sprintf (symbolname, "%s_registerRecordDeviceDriver", module);
+            printf ("Calling %s function\n", symbolname);
+#ifdef __vxworks
+            {
+                FUNCPTR f;
+                if (symFindByName(sysSymTbl, symbolname, (char**)&f, &type) == 0)
+                    f(pdbbase);
+                else
+                    fprintf (stderr, "require: can't find %s function\n", symbolname);
+            }        
+#else
+            iocshCmd(symbolname);
+#endif
+#endif        
         }
         else
         {
@@ -520,23 +537,6 @@ int require(const char* module, const char* vers)
             loadedModules = m;
         }
 
-#ifdef EPICS_3_14
-        /* call register function for R3.14 */
-        /* call register function */
-        sprintf (symbolname, "%s_registerRecordDeviceDriver", module);
-        printf ("Calling %s function\n", symbolname);
-#ifdef __vxworks
-        {
-            FUNCPTR f;
-            if (symFindByName(sysSymTbl, symbolname, (char**)&f, &type) == 0)
-                f(pdbbase);
-            else
-                fprintf (stderr, "require: can't find %s function\n", symbolname);
-        }        
-#else
-        iocshCmd(symbolname);
-#endif
-#endif        
         return 0;
     }
 }
