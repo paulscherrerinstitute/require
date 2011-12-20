@@ -1,36 +1,61 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.0 $'
-DATE='$Date: 2011/11/28 14:21:23 $'
+REVISION='$Revision: 3.1 $'
+DATE='$Date: 2011/12/20 16:22:39 $'
 
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
 }    
+
+case $1 in
+    ( -3.14.* )
+        BASE=${1#-}
+        shift
+    ;;
+esac
 
 # Either EPICS or EPICS_BASE should be set to the install directory
 if [ -z "$EPICS_BASE" ]
 then
     if [ -z "$EPICS" ]
     then
-        for EPICS in /epics /opt/epics /usr/local/epics
+        for EPICS in /usr/local/epics /opt/epics /epics
         do
             if [ -d $EPICS ]
             then
                 break 2
             fi
             echo "Cannot find EPICS installation directory." >&2
+            echo "Try setting EPICS_BASE environment variable to full path" >&2
             exit 1
         done
     fi
-    EPICS_BASE=$EPICS/base-3.14.12
-    if [ ! -d $EPICS_BASE ]
+    if [ -n "$BASE" ]
     then
+        EPICS_BASE=$EPICS/base-$BASE
+        if [ ! -d $EPICS_BASE ]
+        then
+            echo "Cannot find $EPICS/$BASE directory." >&2
+            exit 1
+        fi
+    else    
         EPICS_BASE=$(rp $EPICS/base)
-    fi  
+        if [ ! -d $EPICS_BASE ]
+        then
+            for ((R=15;R>0;R--))
+            do
+                EPICS_BASE=$EPICS/base-3.14.$R
+                if [ -d $EPICS_BASE ]
+                then break;
+                fi
+            done
+        fi
+    fi
 fi
 if [ ! -d $EPICS_BASE ]
 then
-    echo "Cannot find EPICS base directory." >&2
+    echo "Cannot find EPICS_BASE directory." >&2
+    echo "Try setting EPICS_BASE environment variable to full path" >&2
     exit 1
 fi
 
@@ -49,7 +74,8 @@ fi
 
 if [ "${BASE#3.14.}" = "$BASE" ]
 then
-    echo "Do not find an EPICS 3.14 version" >&2
+    echo "Cannot find any EPICS 3.14 version" >&2
+    echo "Try setting EPICS_BASE environment variable to full path" >&2
     exit 1
 fi
 export BASE
@@ -156,19 +182,15 @@ do
         echo " -r: The next string is a module, loaded via require."
         echo " -n: The next string is the IOC name (used for prompt)"
         echo "     default: dirname if parent dir is \"ioc\" otherwise hostname"
+        echo " -3.14.xx: Set EPICS base version"
         echo
         echo "Supported filetypes:"
         echo "*.db, *.dbt and *.template are loaded via dbLoadRecords"
-        echo "After the filename, you can specify substitutions like MACRO=value."
-        echo
+        echo "  After the filename, you can specify substitutions like MACRO=value."
         echo "*.subs and *.subst are loaded via dbLoadTemplate"
-        echo
         echo "*.dbd is loaded via dbLoadDatabase"
-        echo
         echo "*.so is loaded via ld"
-        echo
         echo "If a file is @filename, more arguments are read from filename."
-        echo
         echo "All other files are executed as startup scripts by the EPICS iocsh."
         } >&2
         exit
@@ -181,6 +203,9 @@ do
         echo $DATE
         } >&2
         exit
+        ;;
+    ( -3.14.* )
+        echo "Version $file must be first argument" >&2
         ;;
     ( -* )
         {
@@ -232,12 +257,7 @@ if [ "$init" != NO ]
 then
     echo "iocInit"
 fi
-if [ "$SHELLBOX" ]
-then
-  PATH=$PATH:/home/ioc/bin
-  echo 'dbl "","RTYP DESC" > /home/ioc/${SHELLBOX}.dbl'
-  echo "! dbl2odb.sh ${SHELLBOX} $(/sbin/ifconfig eth0 | awk -F '[ :]+' '/Bcast/ {print $6}') $EPICS_CA_SERVER_PORT"
-fi
+PATH=$PATH:/home/ioc/bin
 echo 'epicsEnvSet IOCSH_PS1,"${IOC}> "'
 } > $startup
 
