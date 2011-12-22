@@ -16,6 +16,7 @@ while {[llength $argv]} {
         "-r"    { set recordtypes 1; set quiet 1 }
         "-I"    { lappend seachpath [lindex $argv 1]; set argv [lreplace $argv 0 1]; continue }
         "-I*"   { lappend seachpath [string range [lindex $argv 0] 2 end] }
+        "--"    { set argv [lreplace $argv 0 0]; break }
         "-*"    { puts stderr "Unknown option [lindex $argv 0] ignored" }
         default { break }
     }
@@ -39,16 +40,24 @@ scanmatch $global_context {^[ \t]*(#|%|$)} {
 } 
 
 if {$recordtypes} {
-    scanmatch $global_context {include[ \t]+"?(.*)Record.dbd"?} {
-    puts $matchInfo(submatch0)
+    scanmatch $global_context {include[ \t]+"?((.*)Record.dbd)"?} {
+    if ![catch {
+        close [opendbd $matchInfo(submatch0)]
+    }] {
+        puts $matchInfo(submatch1)
+    }
     continue
 }
 
 } else {
 
-    scanmatch $global_context {(registrar|variable|function)[ \t]*\(} {
+    scanmatch $global_context {(registrar|variable|function)[ \t]*\([ \t]*"?([a-zA-Z0-9_]+)"?[ \t]*\)} {
         global epicsversion
-        if {$epicsversion == 3.14} {puts $matchInfo(line)}
+        if {$epicsversion == 3.14} {puts $matchInfo(submatch0)($matchInfo(submatch1))}
+    }
+    scanmatch $global_context {variable[ \t]*\([ \t]*"?([a-zA-Z0-9_]+)"?[ \t]*,[ \t]*"?([a-zA-Z0-9_]+)"?[ \t]*\)} {
+        global epicsversion
+        if {$epicsversion == 3.14} {puts variable($matchInfo(submatch0),$matchInfo(submatch1))}
     }
 
     scanmatch $global_context {
@@ -87,4 +96,4 @@ foreach filename $argv {
     close $file
 }
 
-# $Header: /cvs/G/DRV/misc/App/tools/expandDBD.tcl,v 1.3 2011/06/14 16:00:55 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/expandDBD.tcl,v 1.4 2011/12/22 10:33:20 zimoch Exp $
