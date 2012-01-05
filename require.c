@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2011/11/28 15:31:27 $
+* $Date: 2012/01/05 15:33:13 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -276,11 +276,11 @@ int require(const char* module, const char* vers)
     if (vers) strncpy(version, vers, sizeof(version));
     
     loaded = getLibVersion(module);
-    if (requireDebug)
-        printf("require: loaded version of %s is %s\n",
-            module, loaded);
     if (loaded)
     {
+        if (requireDebug)
+            printf("require: loaded version of %s is %s\n",
+                module, loaded);
         /* Library already loaded. Check Version. */
         if (validate(version, loaded) != 0)
         {
@@ -368,14 +368,14 @@ int require(const char* module, const char* vers)
                 printf("require: looking for %s\n", fulldepname);
             if (stat(fulldepname, &filestat) == 0) break;
         }
-        if (requireDebug)
-            printf("require: found in %s\n", p);
         if (!p)
         {
             fprintf(stderr, "Library %s not found in EPICS_DRIVER_PATH=%s\n",
                 libname, driverpath);
             return -1;
         }
+        if (requireDebug)
+            printf("require: found in %s\n", p);
         
         /* parse dependency file if exists */
         if (stat(fulldepname, &filestat) == 0)
