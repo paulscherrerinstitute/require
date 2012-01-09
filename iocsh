@@ -1,7 +1,7 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.1 $'
-DATE='$Date: 2011/12/20 16:22:39 $'
+REVISION='$Revision: 3.2 $'
+DATE='$Date: 2012/01/09 14:08:08 $'
 
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
@@ -91,6 +91,18 @@ then
     IOC=$(basename $PWD)
 fi
 export IOC
+
+if [ -z "$EPICS_HOST_ARCH" ]
+then
+    echo "EPICS_HOST_ARCH is not set"
+    EPICS_HOST_ARCH=$(basename $(dirname $(rp $(which caRepeater))))
+    if [ -n "$EPICS_HOST_ARCH" ]
+    then
+        echo "Guessing $EPICS_HOST_ARCH"
+    else
+        exit 1
+    fi
+fi
 
 # setup search path for require
 ODIR=O.${BASE}_$EPICS_HOST_ARCH
