@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/01/05 15:33:13 $
+* $Date: 2012/01/10 15:58:03 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -220,7 +220,6 @@ If require is called from the iocsh before iocInit and fails,
 it calls epicsExit to abort the application.
 */
 
-#ifdef __vxworks
 /* wrapper to abort statup script */
 static int require_priv(const char* module, const char* ver);
 
@@ -230,16 +229,17 @@ int require(const char* module, const char* ver)
     {
         /* require failed in startup script before iocInit */
         fprintf(stderr, "Aborting startup script\n");
+#ifdef __vxworks
         shellScriptAbort();
+#else
+        epicsExit(1);
+#endif
         return -1;
     }
     return 0;
 }
-#define require require_priv
-static
-#endif
 
-int require(const char* module, const char* vers)
+static int require_priv(const char* module, const char* vers)
 {
     char* driverpath = ".";
     char version[20];
