@@ -1,7 +1,7 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.2 $'
-DATE='$Date: 2012/01/09 14:08:08 $'
+REVISION='$Revision: 3.3 $'
+DATE='$Date: 2012/01/30 10:40:52 $'
 
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
@@ -255,7 +255,6 @@ then
     echo "dlload $INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}"
     echo "dbLoadDatabase $INSTBASE/iocBoot/R$BASE/dbd/${REQUIRE}.dbd"
     echo "${REQUIRE%-*}_registerRecordDeviceDriver"
-#    STDLIBS="exec disctools"
 else
     APP=ioc
     EXE=$EPICS_EXTENSIONS/bin/$EPICS_HOST_ARCH/$APP
@@ -263,13 +262,17 @@ else
     echo "dbLoadDatabase \"$APP.dbd\",\"$DBD\""
     echo "${APP}_registerRecordDeviceDriver(pdbbase)"
 fi
-for i in $STDLIBS; do echo "require $i"; done
 loadFiles "$@"
 if [ "$init" != NO ]
 then
     echo "iocInit"
 fi
-PATH=$PATH:/home/ioc/bin
+if [ "$SHELLBOX" ]
+then
+  PATH=$PATH:/home/ioc/bin
+  echo 'dbl "","RTYP DESC" > /tmp/${SHELLBOX}.dbl'
+  echo "! dbl2odb.sh ${SHELLBOX} $(/sbin/ifconfig eth0 | awk -F '[ :]+' '/Bcast/ {print $6}') $EPICS_CA_SERVER_PORT"
+fi
 echo 'epicsEnvSet IOCSH_PS1,"${IOC}> "'
 } > $startup
 
