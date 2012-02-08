@@ -1,7 +1,7 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.3 $'
-DATE='$Date: 2012/01/30 10:40:52 $'
+REVISION='$Revision: 3.4 $'
+DATE='$Date: 2012/02/08 12:45:01 $'
 
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
@@ -104,6 +104,20 @@ then
     fi
 fi
 
+case $1 in
+    ( -32 )
+        EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
+        shift
+    ;;
+esac
+
+# Check for 64 bit versions, default to 32 bit
+if [ ! -d $EPICS_BASE/lib/${EPICS_HOST_ARCH} -a -d $EPICS_BASE/lib/${EPICS_HOST_ARCH%_64} ]
+then
+    echo "No 64 bit EPICS installation found. Defaulting to 32 bit"
+    EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
+fi
+
 # setup search path for require
 ODIR=O.${BASE}_$EPICS_HOST_ARCH
 EPICS_DRIVER_PATH=.:bin:snl:../snl:$ODIR:src/$ODIR:snl/$ODIR:../snl/$ODIR:${EPICS_DRIVER_PATH#:}
@@ -188,13 +202,14 @@ do
         echo "Recognized filetypes: *.db *.dbt *.template *.subs *.subst *.dbd *.so"
         echo
         echo "Possible options:"
+        echo " -3.14.xx: Set EPICS base version"
+        echo " -32: Force 32 bit version"
         echo " -? or -h or --help : show this page and exit"
         echo " -v or --version : show version and exit"
-        echo " -c: The next string is executed as a command by the EPICS iocsh."
+        echo " -c: The next string is executed as a command by the EPICS shell."
         echo " -r: The next string is a module, loaded via require."
         echo " -n: The next string is the IOC name (used for prompt)"
         echo "     default: dirname if parent dir is \"ioc\" otherwise hostname"
-        echo " -3.14.xx: Set EPICS base version"
         echo
         echo "Supported filetypes:"
         echo "*.db, *.dbt and *.template are loaded via dbLoadRecords"
@@ -203,7 +218,7 @@ do
         echo "*.dbd is loaded via dbLoadDatabase"
         echo "*.so is loaded via ld"
         echo "If a file is @filename, more arguments are read from filename."
-        echo "All other files are executed as startup scripts by the EPICS iocsh."
+        echo "All other files are executed as startup scripts by the EPICS shell."
         } >&2
         exit
         ;;
@@ -218,6 +233,11 @@ do
         ;;
     ( -3.14.* )
         echo "Version $file must be first argument" >&2
+        exit 1
+        ;;
+    ( -32 )
+        echo "-32 option must come before all others (except -3.14.xx)" >&2
+        exit 1
         ;;
     ( -* )
         {
@@ -238,12 +258,12 @@ done
 startup=/tmp/iocsh.startup.$$
 trap "rm -f $startup" EXIT TERM KILL
 {
-
-echo "#date=$(date)"
-echo "#user=${USER:-$(whoami)}"
-echo "#PWD=$PWD"
-echo "#EPICS_CA_ADDR_LIST=$EPICS_CA_ADDR_LIST"
-echo "#EPICS_DRIVER_PATH=$EPICS_DRIVER_PATH"
+echo "#date=\"$(date)\""
+echo "#user=\"${USER:-$(whoami)}\""
+for var in PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER_PATH
+do
+    echo "#$var=\"${!var}\""
+done
 if [ ${BASE#3.14.} -ge 12 ]
 then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
@@ -256,6 +276,9 @@ then
     echo "dbLoadDatabase $INSTBASE/iocBoot/R$BASE/dbd/${REQUIRE}.dbd"
     echo "${REQUIRE%-*}_registerRecordDeviceDriver"
 else
+    # get rid of the compiled-in rpath because at PSI that is a link pointing to current EPICS version.
+    LOADER=/lib/ld-linux.so.2
+    LOADERARGS="--library-path $EPICS_BASE/lib/$EPICS_HOST_ARCH --inhibit-rpath ''"
     APP=ioc
     EXE=$EPICS_EXTENSIONS/bin/$EPICS_HOST_ARCH/$APP
     DBD=$EPICS_EXTENSIONS/dbd
@@ -288,5 +311,5 @@ then
 fi
 
 echo $EXE $ARGS $startup
-eval "$EXE" $ARGS "$startup" 2>&1
+eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
 echo
