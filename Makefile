@@ -9,5 +9,6 @@ SOURCES += updateMenuConvert.c
 SOURCES += addScan.c
 SOURCES += disctools.c
 SOURCES += exec.c
+SOURCES += mlock.c
 
 SOURCES_vxWorks += bootNotify.c
