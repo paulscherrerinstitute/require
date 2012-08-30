@@ -1,14 +1,14 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.4 $'
-DATE='$Date: 2012/02/08 12:45:01 $'
+REVISION='$Revision: 3.5 $'
+DATE='$Date: 2012/08/30 08:05:39 $'
 
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
 }    
 
 case $1 in
-    ( -3.14.* )
+    ( -3.* )
         BASE=${1#-}
         shift
     ;;
@@ -35,7 +35,7 @@ then
         EPICS_BASE=$EPICS/base-$BASE
         if [ ! -d $EPICS_BASE ]
         then
-            echo "Cannot find $EPICS/$BASE directory." >&2
+            echo "Cannot find $EPICS/base-$BASE directory." >&2
             exit 1
         fi
     else    
@@ -71,14 +71,16 @@ else
 BASE=$(basename $(rp $EPICS_BASE))
 BASE=${BASE#*base-}
 fi
-
-if [ "${BASE#3.14.}" = "$BASE" ]
+if [ "${BASE#3.14.}" = "$BASE" -a "${BASE#3.15.}" = "$BASE" ]
 then
-    echo "Cannot find any EPICS 3.14 version" >&2
+    echo "Cannot find any EPICS 3.14 or 3.15 version" >&2
     echo "Try setting EPICS_BASE environment variable to full path" >&2
     exit 1
 fi
 export BASE
+BASEMINOR=${BASE#3.}
+BASEPATCH=${BASEMINOR#*.}
+BASEMINOR=${BASEMINOR%.*}
 
 # IOC name derives from hostname
 # (trailing possible '\r' under cygwin)
@@ -181,7 +183,12 @@ do
         echo "dbLoadDatabase \"$file\",\"$DBD\""
         ;;
     ( *.so )             
-        echo "ld \"$file\""
+        if [ $BASEMINOR -ge 15 -o $BASEPATCH -ge 12 ]
+        then
+            echo "dlload \"$file\""
+        else
+            echo "ld \"$file\""
+        fi
         ;;
     ( -c )               
         shift
@@ -202,22 +209,22 @@ do
         echo "Recognized filetypes: *.db *.dbt *.template *.subs *.subst *.dbd *.so"
         echo
         echo "Possible options:"
-        echo " -3.14.xx: Set EPICS base version"
-        echo " -32: Force 32 bit version"
-        echo " -? or -h or --help : show this page and exit"
-        echo " -v or --version : show version and exit"
+        echo " -3.xx.yy: Set EPICS base version."
+        echo " -32: Force 32 bit version (on 64 bit systems)."
+        echo " -? or -h or --help: Show this page and exit."
+        echo " -v or --version: Show version and exit."
         echo " -c: The next string is executed as a command by the EPICS shell."
-        echo " -r: The next string is a module, loaded via require."
-        echo " -n: The next string is the IOC name (used for prompt)"
-        echo "     default: dirname if parent dir is \"ioc\" otherwise hostname"
+        echo " -r: The next string is a module, loaded via 'require'."
+        echo " -n: The next string is the IOC name (used for prompt)."
+        echo "     Default: dirname if parent dir is \"ioc\" otherwise hostname."
         echo
         echo "Supported filetypes:"
-        echo "*.db, *.dbt and *.template are loaded via dbLoadRecords"
+        echo "*.db, *.dbt and *.template are loaded via 'dbLoadRecords'."
         echo "  After the filename, you can specify substitutions like MACRO=value."
-        echo "*.subs and *.subst are loaded via dbLoadTemplate"
-        echo "*.dbd is loaded via dbLoadDatabase"
-        echo "*.so is loaded via ld"
-        echo "If a file is @filename, more arguments are read from filename."
+        echo "*.subs and *.subst are loaded via 'dbLoadTemplate'."
+        echo "*.dbd is loaded via 'dbLoadDatabase'."
+        echo "*.so is loaded via 'ld' or 'dlload' (3.14.12 or higer)."
+        echo "If an argument is @file, more arguments are read from that file."
         echo "All other files are executed as startup scripts by the EPICS shell."
         } >&2
         exit
@@ -231,12 +238,12 @@ do
         } >&2
         exit
         ;;
-    ( -3.14.* )
+    ( -3.* )
         echo "Version $file must be first argument" >&2
         exit 1
         ;;
     ( -32 )
-        echo "-32 option must come before all others (except -3.14.xx)" >&2
+        echo "-32 option must come before all others (except -3.xx.yy)" >&2
         exit 1
         ;;
     ( -* )
@@ -264,7 +271,7 @@ for var in PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER_PAT
 do
     echo "#$var=\"${!var}\""
 done
-if [ ${BASE#3.14.} -ge 12 ]
+if [ $BASEMINOR -ge 15 -o $BASEPATCH -ge 12 ]
 then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
     ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
@@ -272,9 +279,15 @@ then
     REQUIRE=misc
     LIBPREFIX=lib
     LIBPOSTFIX=.so
-    echo "dlload $INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}"
-    echo "dbLoadDatabase $INSTBASE/iocBoot/R$BASE/dbd/${REQUIRE}.dbd"
-    echo "${REQUIRE%-*}_registerRecordDeviceDriver"
+    LIBFILE=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}
+    if [ ! -f $LIBFILE ]
+    then
+        echo "Library ${LIBPREFIX}${REQUIRE}${LIBPOSTFIX} not found. Command 'require' is not available." >&2
+    else
+        echo "dlload $INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}"
+        echo "dbLoadDatabase $INSTBASE/iocBoot/R$BASE/dbd/${REQUIRE}.dbd"
+        echo "${REQUIRE%-*}_registerRecordDeviceDriver"
+    fi
 else
     # get rid of the compiled-in rpath because at PSI that is a link pointing to current EPICS version.
     LOADER=/lib/ld-linux.so.2
