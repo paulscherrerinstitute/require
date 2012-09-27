@@ -21,7 +21,7 @@ if {[lindex [file split $dir] 1] == "prod"} {
         link -sym $target $link
     }
     proc rmlink {link} {
-        #puts "removing link $link"
+        puts "removing link $link"
         file delete $link
     }
 }
@@ -59,4 +59,4 @@ foreach name $names {
     }
 }
 
-# $Header: /cvs/G/DRV/misc/App/tools/setLinks.tcl,v 1.2 2010/08/03 08:42:40 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/setLinks.tcl,v 1.3 2012/09/27 08:30:42 zimoch Exp $
