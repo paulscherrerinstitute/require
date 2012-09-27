@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.81 2011/09/19 08:52:12 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.82 2012/09/27 08:30:27 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -269,14 +269,24 @@ else # EPICSVERSION
 # EPICSVERSION defined 
 # second or third turn (see T_A branch below)
 
+EPICS_BASE=${EPICS_LOCATION}/base-${EPICSVERSION}
+
 ifneq ($(filter 3.14.%,$(EPICSVERSION)),)
 EPICS_BASETYPE=3.14
+
+# There is no 64 bit support before 3.14.12 
+ifneq ($(filter %_64,$(EPICS_HOST_ARCH)),)
+ifeq ($(wildcard $(EPICS_BASE)/lib/$(EPICS_HOST_ARCH)),)
+EPICS_HOST_ARCH:=$(patsubst %_64,%,$(EPICS_HOST_ARCH))
+export USR_CFLAGS_$(EPICS_HOST_ARCH) += -m32
+export USR_CXXFLAGS_$(EPICS_HOST_ARCH) += -m32
+export USR_LDFLAGS_$(EPICS_HOST_ARCH) += -m32
+endif
+endif
 endif # 3.14
 ifneq ($(filter 3.13.%,$(EPICSVERSION)),)
 EPICS_BASETYPE=3.13
 endif # 3.13
-
-EPICS_BASE=${EPICS_LOCATION}/base-${EPICSVERSION}
 
 # Is a version requested which is not installed?
 # Look if ${EPICS_BASE}/config/CONFIG file exists.
@@ -300,6 +310,7 @@ TOP:=${EPICS_BASE}
 -include ${EPICS_BASE}/configure/CONFIG
 EPICS_BASE:=${EB}
 SHRLIB_VERSION=
+COMMON_DIR = O.${EPICSVERSION}_Common
 endif # 3.14
 INSTALL_LOCATION= ${INSTALL_ROOT}/R${EPICSVERSION}
 
@@ -327,7 +338,7 @@ endif # 3.14
 PROJECTDBD=${PRJ}${LIBVERSIONSTR}.dbd
 export DBDFILES PROJECTDBD     
 
-RECORDS1 = $(patsubst %Record.dbd,%,$(notdir $(filter %Record.dbd, ${DBDS})))
+RECORDS1 = $(patsubst %Record.dbd,%,$(notdir $(filter %Record.dbd, ${DBDFILES})))
 RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBDFILES}))) $(realpath ${DBDS}))
 RECORDS = $(sort ${RECORDS1} ${RECORDS2})
 export RECORDS
@@ -338,7 +349,7 @@ export MENUS
 BPTS = $(patsubst %.data,%.dbd,$(wildcard bpt*.data))
 export BPTS
 
-HDRS = ${HEADERS} $(addsuffix Record.h,${RECORDS})
+HDRS = ${HEADERS} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
 export HDRS
 
 TEMPLS = ${TEMPLATES}
@@ -391,6 +402,11 @@ install build install-headers debug:: .cvsignore
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
 # Delete old build if INSTBASE has changed.
 # Create build dirs (and links) if necessary 
+ifeq (${EPICS_BASETYPE},3.14)
+	@if [ ! -d O.${EPICSVERSION}_Common ]; then \
+            mkdir -p O.${EPICSVERSION}_Common; \
+        fi
+endif
 	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
             echo ${INSTBASE} | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RMDIR) O.${EPICSVERSION}_$$ARCH; \
 	    if [ ! -d O.${EPICSVERSION}_$$ARCH ]; then \
@@ -419,13 +435,26 @@ else # T_A
 # still in source directory for uninstall, install-doc, install-templates
 
 ifeq ($(filter ${OS_CLASS},${OS_CLASS_LIST}),)
+# Just print note if this OS_CLASS is not one of BUILDCLASSES
 
 build%: build
 build:
-	@echo skipping ${T_A} because ${OS_CLASS} is not in BUILDCLASSES
+	@echo Skipping ${T_A} because ${OS_CLASS} is not in BUILDCLASSES
 %:
 	@true
-else # OS_CLASS in BUILDCLASSES
+
+else ifeq ($(wildcard $(firstword ${CC})),)
+# Print warning if compiler is not installed on this machine.
+
+install% : build
+install: build
+build%: build
+build:
+	@echo Warning: Skipping ${T_A} because cross compiler ${CC} is not installed
+%:
+	@true
+
+else
 
 CFLAGS += ${EXTRA_CFLAGS}
 INSTALL_BIN = ${INSTALL_LOCATION}/${T_A}
@@ -443,8 +472,12 @@ DEPFILE = ${PRJ}${LIBVERSIONSTR}.dep
 INSTALLDIRS = ${INSTALL_LOCATION} ${INSTALL_INCLUDE} ${INSTALL_BIN} 
 INSTALLDIRS += ${INSTALL_DBD} ${INSTALL_DOC} ${INSTALL_DOC}/${PRJ}
 INSTALLDIRS += ${INSTALL_TEMPL} 
- 
-DBDLINKS = ${INSTALL_BIN}/dbd
+
+ifeq (${EPICS_BASETYPE},3.14)
+COMMON_DIR = ../O.${EPICSVERSION}_Common
+else
+COMMON_DIR = .
+endif
 
 ifeq ($(words ${DBDFILES}),0)
 PROJECTDBD=
@@ -473,9 +506,9 @@ debug::
 	@echo "DBDFILES = ${DBDFILES}"
 
 ifeq (${EPICS_BASETYPE},3.13)
-install:: build ${INSTALLDIRS} ${DBDLINKS} ${INSTALL_HDRS} ${INSTALL_TEMPLATES}
+install:: build ${INSTALLDIRS} ${INSTALL_HDRS} ${INSTALL_TEMPLATES}
 else # 3.14
-install: build ${INSTALLDIRS} ${DBDLINKS} ${INSTALL_HDRS} ${INSTALL_TEMPLATES}
+install: build ${INSTALLDIRS} ${INSTALL_HDRS} ${INSTALL_TEMPLATES}
 endif # 3.14
 
 install-headers:: ${INSTALL_LOCATION} ${INSTALL_INCLUDE}
@@ -483,11 +516,15 @@ install-headers:: ${INSTALL_HDRS}
 install-templates:: ${INSTALL_TEMPLATES}
 install-doc:: ${INSTALL_LOCATION} ${INSTALL_DOC} ${INSTALL_DOC}/${PRJ} ${INSTALL_DOCUS}
 
+#link only non-test versions
+ifneq (${LIBVERSION},test)
+SETLINKS=${MAKEHOME}setLinks.tcl
+else
+SETLINKS=@\#
+endif
+
 ${INSTALLDIRS}:
 	mkdir -m 775 $@
-
-${INSTALL_BIN}/dbd:
-	${LN} ../dbd $@
 
 ${INSTALL_DOC}/${PRJ}/%: %
 	@echo "Installing documentation $@"
@@ -501,8 +538,7 @@ ${INSTALL_TEMPL}/%${LIBVERSIONSTR}.template: %.template
 	echo "#${PRJ}Lib ${LIBVERSION}" > $@
 	cat $^ >> $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_TEMPL} .template $(basename $(notdir $^))
+	$(SETLINKS) ${INSTALL_TEMPL} .template $(basename $(notdir $^))
 
 ${INSTALL_TEMPL}/%${LIBVERSIONSTR}.db: %.db
 	@echo "Installing template file $@"
@@ -510,8 +546,7 @@ ${INSTALL_TEMPL}/%${LIBVERSIONSTR}.db: %.db
 	echo "#${PRJ}Lib ${LIBVERSION}" > $@
 	cat $^ >> $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_TEMPL} .db $(basename $(notdir $^))
+	$(SETLINKS) ${INSTALL_TEMPL} .db $(basename $(notdir $^))
 
 ifeq ($(filter O.%,$(notdir ${CURDIR})),)
 # still in source directory, third run
@@ -529,17 +564,14 @@ uninstall::
 	@for i in ${RMFILES}; \
 	    do ${EXISTS} $$i && echo "Uninstalling $$i" && $(RM) $$i; \
 	done; true
-	@if [ "${LIBVERSION}" != "test" ]; \
-	then  \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} "" ${PRJ}Lib; \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} .munch ${PRJ}Lib; \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} .so lib${PRJ}; \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} .dep ${PRJ}; \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_DBD} .dbd ${INSTALL_PROJECTDBD:%${LIBVERSIONSTR}.dbd=%}; \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_INCLUDE} .h $(notdir ${HDRS:%.h=%}); \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_TEMPL} .template $(notdir ${TEMPLS:%.template=%}); \
-	    ${MAKEHOME}/setLinks.tcl ${INSTALL_TEMPL} .db $(notdir ${TEMPLS:%.db=%}); \
-	fi
+	$(SETLINKS) ${INSTALL_BIN} "" ${PRJ}Lib;
+	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib;
+	$(SETLINKS) ${INSTALL_BIN} .so lib${PRJ};
+	$(SETLINKS) ${INSTALL_BIN} .dep ${PRJ};
+	$(SETLINKS) ${INSTALL_DBD} .dbd ${INSTALL_PROJECTDBD:%${LIBVERSIONSTR}.dbd=%};
+	$(SETLINKS) ${INSTALL_INCLUDE} .h $(notdir ${HDRS:%.h=%});
+	$(SETLINKS) ${INSTALL_TEMPL} .template $(notdir ${TEMPLS:%.template=%});
+	$(SETLINKS) ${INSTALL_TEMPL} .db $(notdir ${TEMPLS:%.db=%});
 
 ${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h: %.h
 	@echo "Installing header file $@"
@@ -547,8 +579,7 @@ ${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h: %.h
 	echo "#define __${PRJ}Lib__ ${MAJOR}.${MINOR}" > $@
 	cat $^ >> $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_INCLUDE} .h $(basename $(notdir $^))
+	$(SETLINKS) ${INSTALL_INCLUDE} .h $(basename $(notdir $^))
 
 vpath %.db $(sort $(dir ${TEMPLS}))
 vpath %.template $(sort $(dir ${TEMPLS}))
@@ -632,27 +663,25 @@ ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
 PREREQUISITES = $(shell ${MAKEHOME}/getPrerequisites.tcl ${INSTALL_INCLUDE} | grep -vw ${PRJ})
 ifeq (${OS_CLASS}, vxWorks)
 PROVIDES = ${ALLMINORS:%=--defsym __${PRJ}Lib_${MAJOR}.%=0}
-#REQUIRES = ${PREREQUISITES:%=-u __%}
 endif # vxWorks
 ifeq (${OS_CLASS}, Linux)
-REQUIRES = ${PREREQUISITES:%=-Wl,-u,%}
 PROVIDES = ${ALLMINORS:%=-Wl,--defsym,${PRJ}Lib_${MAJOR}.%=0}
 endif # Linux
 endif # !test
 endif # LIBVERSION defined
 
-LDFLAGS += ${PROVIDES} ${REQUIRES}
+LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
 
 # Create and include dependency files
 CPPFLAGS += -MD
-# 3.14.12 uses -MDD instead. Remove it
+# 3.14.12 already defines -MDD here:
 HDEPENDSCFLAGS =
 -include *.d
 
 # Setup searchpaths from all used files
 vpath % ..
 vpath % $(sort $(dir ${SRCS:%=../%}))
-vpath %.h $(sort $(dir ${HDRS:%=../%}))
+vpath %.h $(addprefix ../,$(sort $(dir $(filter-out /%,${HDRS})))) $(dir $(filter /%,${HDRS}))
 vpath %.template $(sort $(dir ${TEMPLS:%=../%}))
 vpath %.db $(sort $(dir ${TEMPLS:%=../%}))
 vpath %.dbd $(sort $(dir ${DBDFILES:%=../%}))
@@ -665,7 +694,7 @@ USR_DBDFLAGS += $(DBDEXPANDPATH)
 
 ifeq (${EPICS_BASETYPE},3.13)
 USR_INCLUDES += $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
-build:: PROJECTINFOS ${PROJECTDBD} $(addsuffix Record.h,${RECORDS}) ${PROJECTLIB}
+build:: PROJECTINFOS ${PROJECTDBD} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS})) ${PROJECTLIB}
 .PHONY:: PROJECTINFOS
 ifneq ($(filter %.cc %.cpp %.C,${SRCS}),)
 ifneq (${T_A},T1-ppc604)
@@ -674,10 +703,12 @@ PROD += ${PROJECTLIB}.munch
 endif # T1-ppc604
 endif # .cc or .cpp found
 else # 3.14
+
 # different macros for 3.14.12 and earlier versions
 SRC_INCLUDES = $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
 GENERIC_SRC_INCLUDES = $(SRC_INCLUDES)
-build: PROJECTINFOS ${PROJECTDBD} $(addsuffix Record.h,${RECORDS})
+
+build: PROJECTINFOS ${PROJECTDBD} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
 .PHONY: PROJECTINFOS
 EXPANDARG = -3.14
 ifneq ($(words $(filter %.c %.cc %.C %.cpp, $(SRCS))),0)
@@ -703,33 +734,28 @@ ${INSTALL_BIN}/${PROJECTLIB}.munch: ${PROJECTLIB}.munch
 	$(RM) $@
 	cp $^ $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} .munch ${PRJ}Lib
+	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib
 
 ${INSTALL_BIN}/${PROJECTLIB}: ${PROJECTLIB}
 	@echo "Installing library $@"
 	$(RM) $@
 	cp $^ $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} "" ${PRJ}Lib
-	${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} .so lib${PRJ}
+	$(SETLINKS) ${INSTALL_BIN} .so lib${PRJ} 
 
 ${INSTALL_BIN}/${DEPFILE}: ${DEPFILE}
 	@echo "Installing dependency file $@"
 	$(RM) $@
 	cp $^ $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_BIN} .dep ${PRJ}
+	$(SETLINKS) ${INSTALL_BIN} .dep ${PRJ}
 
 ${INSTALL_DBD}/%.dbd: %.dbd
 	@echo "Installing dbd file $@"
 	$(RM) $@
 	cp $^ $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_DBD} .dbd ${^:%${LIBVERSIONSTR}.dbd=%}
+	$(SETLINKS) ${INSTALL_DBD} .dbd ${^:%${LIBVERSIONSTR}.dbd=%}
 
 # Add a #define so that users of the header know the version.
 ${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h: %.h
@@ -738,8 +764,7 @@ ${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h: %.h
 	echo "#define __${PRJ}Lib__ ${MAJOR}.${MINOR}" > $@
 	cat $^ >> $@
 	chmod 444 $@
-	@[ "${LIBVERSION}" == "test" ] || \
-	${MAKEHOME}/setLinks.tcl ${INSTALL_INCLUDE} .h $(basename $(notdir $^))
+	$(SETLINKS) ${INSTALL_INCLUDE} .h $(basename $(notdir $^))
 
 
 # Include default EPICS Makefiles (version dependent)
@@ -747,7 +772,6 @@ ifeq (${EPICS_BASETYPE},3.13)
 include ${EPICS_BASE}/config/RULES.Vx
 install:: ${INSTALL_DOCUS} ${INSTALL_PROJECTDBD} ${INSTALL_DEP}
 else # 3.14
-COMMON_DIR = .
 RELEASE_DBDFLAGS = -I ${EPICS_BASE}/dbd
 RELEASE_INCLUDES = -I ${EPICS_BASE}/include -I ${EPICS_BASE}/include/os/${OS_CLASS}
 # avoid library installation when doing 'make build'
@@ -810,7 +834,7 @@ ${SUBFUNCFILE}: $(filter %.c %.cc %.C %.cpp, $(SRCS))
 # Check object code for wrong argument types in va_arg.
 # Some compilers seem to have problems with this.
 %$(OBJ): %.c
-	@echo "Compiling $<"
+	@echo "Compiling $< to $@"
 	$(RM) $@
 	$(COMPILE.c) $<
 	@$(NM) $@ | if grep -q __va_arg_type_violation; \
@@ -822,12 +846,10 @@ ${SUBFUNCFILE}: $(filter %.c %.cc %.C %.cpp, $(SRCS))
 
 # The original 3.13 munching rule does not really work well
 
-MUNCH = $(PERL) $(EPICS_LOCATION)/base/bin/$(EPICS_HOST_ARCH)/munch.pl
-%.munch: %
-	$(RM) $*_ctct.o $*_ctdt.c
-	$(NM) $< | $(MUNCH) > $*_ctdt.c
-	$(GCC) -traditional $(CFLAGS) -fdollars-in-identifiers -c $(SOURCE_FLAG) $*_ctdt.c
-	$(LINK.c) $@ $< $*_ctdt.o
+ifeq (${EPICS_BASETYPE},3.13)
+%.munch: %.out
+	mv $< $@
+endif
 
 ${VERSIONFILE}:
 ifneq (${LIBVERSION},test)
@@ -867,8 +889,8 @@ END {for (name in func_missing) if (!func_found[name]) { \
 	print "void " name "();"; \
 	print "epicsRegisterFunction(" name ");"} \
      for (name in reg_missing) if (!reg_found[name]) { \
-	print "REGISTRYFUNCTION " name ";"; \
-	print "epicsRegisterFunction(" name ");"} \
+	print "extern REGISTRYFUNCTION " name ";"; \
+	print "epicsExportRegistrar(" name ");"} \
      for (name in var_missing) if (!var_found[name]) { \
         type = var_missing[name]; \
 	print "extern " type " " name ";"; \
@@ -877,11 +899,18 @@ END {for (name in func_missing) if (!func_found[name]) { \
 endef
  
 CORELIB = ${CORELIB_${OS_CLASS}}
-CORELIB_vxWorks = ${EPICS_BASE}/bin/${T_A}/iocCoreLibrary.o
+CORELIB_vxWorks = ${EPICS_BASE}/bin/${T_A}/iocCoreLibrary.munch
+ 
+ifeq (${OS_CLASS},vxWorks)
+SHARED_LIBRARIES=NO
+endif
+LSUFFIX_YES=$(SHRLIB_SUFFIX)
+LSUFFIX_NO=$(LIB_SUFFIX)
+LSUFFIX=$(LSUFFIX_$(SHARED_LIBRARIES))
  
 ${EXPORTFILE}: $(filter-out $(basename ${EXPORTFILE})$(OBJ),${LIBOBJS})
 	$(RM) $@
-	$(NM) $^ ${BASELIBS:%=${EPICS_BASE}/lib/${T_A}/lib%.a} ${CORELIB} | awk '$(makexportfile)' > $@
+	$(NM) $^ ${BASELIBS:%=${EPICS_BASE}/lib/${T_A}/$(LIB_PREFIX)%$(LSUFFIX)} ${CORELIB} | awk '$(makexportfile)' > $@
 
 # Create dependency file for recursive requires
 ${PROJECTLIB}: ${DEPFILE}
