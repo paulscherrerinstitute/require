@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.82 2012/09/27 08:30:27 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.83 2012/09/27 08:44:03 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -564,14 +564,14 @@ uninstall::
 	@for i in ${RMFILES}; \
 	    do ${EXISTS} $$i && echo "Uninstalling $$i" && $(RM) $$i; \
 	done; true
-	$(SETLINKS) ${INSTALL_BIN} "" ${PRJ}Lib;
-	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib;
-	$(SETLINKS) ${INSTALL_BIN} .so lib${PRJ};
-	$(SETLINKS) ${INSTALL_BIN} .dep ${PRJ};
-	$(SETLINKS) ${INSTALL_DBD} .dbd ${INSTALL_PROJECTDBD:%${LIBVERSIONSTR}.dbd=%};
-	$(SETLINKS) ${INSTALL_INCLUDE} .h $(notdir ${HDRS:%.h=%});
-	$(SETLINKS) ${INSTALL_TEMPL} .template $(notdir ${TEMPLS:%.template=%});
-	$(SETLINKS) ${INSTALL_TEMPL} .db $(notdir ${TEMPLS:%.db=%});
+	$(SETLINKS) ${INSTALL_BIN} "" ${PRJ}Lib
+	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib
+	$(SETLINKS) ${INSTALL_BIN} .so lib${PRJ}
+	$(SETLINKS) ${INSTALL_BIN} .dep ${PRJ}
+	$(SETLINKS) ${INSTALL_DBD} .dbd ${INSTALL_PROJECTDBD:%${LIBVERSIONSTR}.dbd=%}
+	$(SETLINKS) ${INSTALL_INCLUDE} .h $(notdir ${HDRS:%.h=%})
+	$(SETLINKS) ${INSTALL_TEMPL} .template $(notdir ${TEMPLS:%.template=%})
+	$(SETLINKS) ${INSTALL_TEMPL} .db $(notdir ${TEMPLS:%.db=%})
 
 ${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h: %.h
 	@echo "Installing header file $@"
