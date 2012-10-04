@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.84 2012/09/27 08:59:06 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.85 2012/10/04 11:54:56 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -736,12 +736,21 @@ ${INSTALL_BIN}/${PROJECTLIB}.munch: ${PROJECTLIB}.munch
 	chmod 444 $@
 	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib
 
+ifeq (${EPICS_BASETYPE},3.14)
 ${INSTALL_BIN}/${PROJECTLIB}: ${PROJECTLIB}
 	@echo "Installing library $@"
 	$(RM) $@
 	cp $^ $@
 	chmod 444 $@
-	$(SETLINKS) ${INSTALL_BIN} .so lib${PRJ} 
+	$(SETLINKS) ${INSTALL_BIN} .so lib${PRJ}
+else
+${INSTALL_BIN}/${PROJECTLIB}: ${PROJECTLIB}
+	@echo "Installing library $@"
+	$(RM) $@
+	cp $^ $@
+	chmod 444 $@
+	$(SETLINKS) ${INSTALL_BIN} "" ${PRJ}Lib
+endif
 
 ${INSTALL_BIN}/${DEPFILE}: ${DEPFILE}
 	@echo "Installing dependency file $@"
