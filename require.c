@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/10/05 11:42:46 $
+* $Date: 2012/10/05 11:44:15 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -307,7 +307,7 @@ static int require_priv(const char* module, const char* vers)
         /* user may give a minimal version (e.g. "1.2.4+")
            load highest matching version (here "1.2") and check later
         */
-        if (isdigit((signed char)version[0]) && version[strlen(version)-1] == '+')
+        if (isdigit((unsigned char)version[0]) && version[strlen(version)-1] == '+')
         {
             char* p = strrchr(version, '.');
             if (!p) p = version;
