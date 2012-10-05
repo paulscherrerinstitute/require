@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/01/10 15:58:03 $
+* $Date: 2012/10/05 11:42:46 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -174,7 +174,7 @@ const char* getLibVersion(const char* libname)
     return NULL;
 }
 
-static int validate(const char* version, const char* loaded)
+static int validate(const char* module, const char* version, const char* loaded)
 {
     int lmajor, lminor, lpatch, lmatches;
     int major, minor, patch, matches;
@@ -184,11 +184,11 @@ static int validate(const char* version, const char* loaded)
         /* no version requested or exact match */
         return 0;
     }
-    if (strcmp(loaded, "test") == 0)
+    if (!isdigit((unsigned char)loaded[0]))
     {
         /* test version already loaded */
-        printf("Warning: version is test where %s was requested\n",
-            version);
+        printf("Warning: %s test version %s already loaded where %s was requested\n",
+            module, loaded, version);
         return 0;
     }
     /* non-numerical versions must match exactly
@@ -282,7 +282,7 @@ static int require_priv(const char* module, const char* vers)
             printf("require: loaded version of %s is %s\n",
                 module, loaded);
         /* Library already loaded. Check Version. */
-        if (validate(version, loaded) != 0)
+        if (validate(module, version, loaded) != 0)
         {
             printf("Conflict between requested %s version %s\n"
                 "and already loaded version %s.\n",
@@ -307,7 +307,7 @@ static int require_priv(const char* module, const char* vers)
         /* user may give a minimal version (e.g. "1.2.4+")
            load highest matching version (here "1.2") and check later
         */
-        if (version[strlen(version)-1] == '+')
+        if (isdigit((signed char)version[0]) && version[strlen(version)-1] == '+')
         {
             char* p = strrchr(version, '.');
             if (!p) p = version;
@@ -388,7 +388,7 @@ static int require_priv(const char* module, const char* vers)
             if (requireDebug)
                 printf("require: parsing dependency file %s\n", fulldepname);
             depfile = fopen(fulldepname, "r");
-            while (fgets(buffer, sizeof(buffer), depfile))
+            while (fgets(buffer, sizeof(buffer)-1, depfile))
             {
                 rmodule = buffer;
                 /* ignore leading spaces */
@@ -459,7 +459,7 @@ static int require_priv(const char* module, const char* vers)
             loaded = "(no version)";
         }
 
-        if (validate(vers, loaded) != 0)
+        if (validate(module, vers, loaded) != 0)
         {
             fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
                 module, vers, loaded);
