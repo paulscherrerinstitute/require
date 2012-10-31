@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/10/05 11:44:15 $
+* $Date: 2012/10/31 15:46:55 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -53,11 +53,17 @@ int requireDebug=0;
     #undef  INFIX
     #define INFIX "Lib"
     #define EXT ".munch"
+    
+    #define getAddress(module,name) __extension__ \
+        ({SYM_TYPE t; char* a=NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
 
-#elif defined (UNIX)
+#elif defined (__unix)
 
+    #define __USE_GNU
     #include <dlfcn.h>
     #define HMODULE void *
+
+    #define getAddress(module,name) (dlsym(module, name))
 
     #ifdef CYGWIN32
 
@@ -80,6 +86,7 @@ int requireDebug=0;
     #define PATHSEP ";"
     #define EXT ".dll"
 
+    #define getAddress(module,name) (GetProcAddress(module, name))
 #else
 
     #error unknwn OS
@@ -100,7 +107,7 @@ static HMODULE loadlib(const char* libname)
         return NULL;
     }
 
-#if defined (UNIX)
+#if defined (__unix)
     if (!(libhandle = dlopen(libname, RTLD_NOW|RTLD_GLOBAL)))
     {
         fprintf (stderr, "Loading %s library failed: %s\n",
@@ -160,6 +167,89 @@ typedef struct moduleitem
 
 moduleitem* loadedModules = NULL;
 
+static void registerModule(const char* module, const char* version)
+{
+    moduleitem* m = (moduleitem*) calloc(sizeof (moduleitem),1);
+    if (!m)
+    {
+        printf ("require: out of memory\n");
+    }
+    else
+    {
+        strncpy (m->name, module, sizeof(m->name));
+        strncpy (m->version, version, sizeof(m->version));
+        m->next = loadedModules;
+        loadedModules = m;
+    }
+}
+
+#if defined (__vxworks)
+BOOL findLibRelease (
+    char      *name,  /* symbol name       */
+    int       val,    /* value of symbol   */
+    SYM_TYPE  type,   /* symbol type       */
+    int       arg,    /* user-supplied arg */
+    UINT16    group   /* group number      */
+) {
+    char libname [20];
+    int e;
+    if (name[0] != '_') return TRUE;
+    e = strlen(name) - 10;
+    if (e <= 0 || e > 20) return TRUE;
+    if (strcmp(name+e, "LibRelease") != 0) return TRUE;
+    strncpy(libname, name+1, e-1);
+    libname[e-1]=0;
+    if (!getLibVersion(libname))
+    {
+        registerModule(libname, (char*)val);
+    }
+    return TRUE;
+}
+
+void registerExternalModules()
+{
+    symEach(sysSymTbl, (FUNCPTR)findLibRelease, 0);
+}
+
+#elif defined (__linux)
+#include <link.h>
+
+int findLibRelease (
+    struct dl_phdr_info *info, /* shared library info */
+    size_t size,               /* size of info structure */
+    void *data                 /* user-supplied arg */
+) {
+    void *handle;
+    char symname [80];
+    const char* p;
+    char* q;
+    char* version;
+    
+    if (!info->dlpi_name || !info->dlpi_name[0]) return 0;
+    p = strrchr(info->dlpi_name, '/');
+    if (p) p+=4; else p=info->dlpi_name + 3;
+    symname[0] = '_';
+    for (q=symname+1; *p && *p != '.' && *p != '-' && q < symname+11; p++, q++) *q=*p;
+    strcpy(q, "LibRelease");
+    handle = dlopen(info->dlpi_name, RTLD_NOW|RTLD_GLOBAL);
+    version = dlsym(handle, symname);
+    dlclose(handle);
+    *q = 0;
+    if (version)
+    {
+        registerModule(symname+1, version);
+    }
+    return 0;
+}
+
+void registerExternalModules()
+{
+    dl_iterate_phdr(findLibRelease, NULL);
+}
+
+#endif
+
+
 const char* getLibVersion(const char* libname)
 {
     moduleitem* m;
@@ -172,6 +262,18 @@ const char* getLibVersion(const char* libname)
         }
     }
     return NULL;
+}
+
+int libversionShow(const char* pattern)
+{
+    moduleitem* m;
+
+    for (m = loadedModules; m; m=m->next)
+    {
+        if (pattern && !strstr(m->name, pattern)) return 0;
+        printf("%15s %s\n", m->name, m->version);
+    }
+    return 0;
 }
 
 static int validate(const char* module, const char* version, const char* loaded)
@@ -244,15 +346,11 @@ static int require_priv(const char* module, const char* vers)
     char* driverpath = ".";
     char version[20];
     const char* loaded;
-    moduleitem* m;
     struct stat filestat;
     HMODULE libhandle;
     char* p;
     char *end; /* end of string */
     const char sep[1] = PATHSEP;
-#ifdef __vxworks
-    SYM_TYPE type;
-#endif    
     
     if (requireDebug)
         printf("require: checking module %s version %s\n",
@@ -441,14 +539,7 @@ static int require_priv(const char* module, const char* vers)
         
         /* now check if we got what we wanted (with original version number) */
         sprintf (symbolname, "_%sLibRelease", module);
-#if defined (UNIX)
-        loaded = (char*) dlsym(libhandle, symbolname);
-#elif defined (_WIN32)
-        loaded = (char*) GetProcAddress(libhandle, symbolname);
-#elif defined (__vxworks)
-        loaded = NULL;
-        symFindByName(sysSymTbl, symbolname, (char**)&loaded, &type);
-#endif
+        loaded = getAddress(libhandle, symbolname);
         if (loaded)
         {
             printf("Loading %s (version %s)\n", fulllibname, loaded);
@@ -506,8 +597,8 @@ static int require_priv(const char* module, const char* vers)
             printf ("Calling %s function\n", symbolname);
 #ifdef __vxworks
             {
-                FUNCPTR f;
-                if (symFindByName(sysSymTbl, symbolname, (char**)&f, &type) == 0)
+                FUNCPTR f = (FUNCPTR) getAddress(NULL, symbolname);
+                if (f)
                     f(pdbbase);
                 else
                     fprintf (stderr, "require: can't find %s function\n", symbolname);
@@ -523,34 +614,9 @@ static int require_priv(const char* module, const char* vers)
             printf("no dbd file %s\n", dbdname);
         }
         
-        /* register module */
-        m = (moduleitem*) calloc(sizeof (moduleitem),1);
-        if (!m)
-        {
-            printf ("require: out of memory\n");
-        }
-        else
-        {
-            strncpy (m->name, module, sizeof(m->name));
-            strncpy (m->version, loaded, sizeof(m->version));
-            m->next = loadedModules;
-            loadedModules = m;
-        }
-
+        registerModule(module, loaded);
         return 0;
     }
-}
-
-int libversionShow(const char* pattern)
-{
-    moduleitem* m;
-
-    for (m = loadedModules; m; m=m->next)
-    {
-        if (pattern && !strstr(m->name, pattern)) return 0;
-        printf("%15s %s\n", m->name, m->version);
-    }
-    return 0;
 }
 
 #ifdef EPICS_3_14
@@ -588,6 +654,7 @@ static void requireRegister(void)
         iocshRegister (&requireDef, requireFunc);
         firstTime = 0;
     }
+    registerExternalModules();
 }
 
 epicsExportRegistrar(requireRegister);
