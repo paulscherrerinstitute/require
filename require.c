@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/11/07 10:06:12 $
+* $Date: 2012/11/07 10:13:47 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -206,7 +206,7 @@ BOOL findLibRelease (
     return TRUE;
 }
 
-void registerExternalModules()
+static void registerExternalModules()
 {
     symEach(sysSymTbl, (FUNCPTR)findLibRelease, 0);
 }
@@ -242,7 +242,7 @@ int findLibRelease (
     return 0;
 }
 
-void registerExternalModules()
+static void registerExternalModules()
 {
     dl_iterate_phdr(findLibRelease, NULL);
 }
@@ -267,6 +267,12 @@ const char* getLibVersion(const char* libname)
 int libversionShow(const char* pattern)
 {
     moduleitem* m;
+    
+    if (firstTime)
+    {
+        firstTime=0;
+        registerExternalModules();
+    }
 
     for (m = loadedModules; m; m=m->next)
     {
@@ -322,15 +328,16 @@ If require is called from the iocsh before iocInit and fails,
 it calls epicsExit to abort the application.
 */
 
+static int firstTime = 1;
+
 /* wrapper to abort statup script */
 static int require_priv(const char* module, const char* ver);
 
 int require(const char* module, const char* ver)
 {
-    static int first=1;
-    if (first)
+    if (firstTime)
     {
-        first=0;
+        firstTime=0;
         registerExternalModules();
     }
     
@@ -654,12 +661,12 @@ static void ldFunc (const iocshArgBuf *args)
 
 static void requireRegister(void)
 {
-    static int firstTime = 1;
     if (firstTime) {
+        firstTime = 0;
         iocshRegister (&ldDef, ldFunc);
         iocshRegister (&libversionShowDef, libversionShowFunc);
         iocshRegister (&requireDef, requireFunc);
-        firstTime = 0;
+        registerExternalModules();
     }
 }
 
