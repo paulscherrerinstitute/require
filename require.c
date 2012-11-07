@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/10/31 15:46:55 $
+* $Date: 2012/11/07 10:06:12 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -327,6 +327,13 @@ static int require_priv(const char* module, const char* ver);
 
 int require(const char* module, const char* ver)
 {
+    static int first=1;
+    if (first)
+    {
+        first=0;
+        registerExternalModules();
+    }
+    
     if (require_priv(module, ver) != 0 && !interruptAccept)
     {
         /* require failed in startup script before iocInit */
@@ -654,7 +661,6 @@ static void requireRegister(void)
         iocshRegister (&requireDef, requireFunc);
         firstTime = 0;
     }
-    registerExternalModules();
 }
 
 epicsExportRegistrar(requireRegister);
