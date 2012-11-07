@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/11/07 10:13:47 $
+* $Date: 2012/11/07 10:17:28 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -30,6 +30,8 @@ extern int iocshCmd (const char *cmd);
 #include "require.h"
 
 int requireDebug=0;
+
+static int firstTime = 1;
 
 #define DIRSEP "/"
 #define PATHSEP ":"
@@ -327,8 +329,6 @@ and call <module>_registerRecordDeviceDriver function.
 If require is called from the iocsh before iocInit and fails,
 it calls epicsExit to abort the application.
 */
-
-static int firstTime = 1;
 
 /* wrapper to abort statup script */
 static int require_priv(const char* module, const char* ver);
