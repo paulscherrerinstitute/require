@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.86 2012/11/07 08:40:27 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.87 2012/11/08 10:10:31 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -139,7 +139,7 @@ VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONCHECKFILES}
 LIBVERSION_YES = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 LIBVERSION_Yes = $(LIBVERSION_YES)
 LIBVERSION_yes = $(LIBVERSION_YES)
-LIBVERSION := ${LIBVERSION_${USE_LIBVERSION}}
+LIBVERSION = ${LIBVERSION_${USE_LIBVERSION}}
 
 # Default project name is name of current directory.
 # But don't use "src" or "snl", go up directory tree instead.
@@ -194,6 +194,7 @@ debug::
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
 	@echo "USE_LIBVERSION = ${USE_LIBVERSION}"
 	@echo "LIBVERSION = ${LIBVERSION}"
+	@echo "VERSIONCHECKFILES = ${VERSIONCHECKFILES}"
 
 # Loop over all EPICS versions for second run.
 build install uninstall install-headers install-doc install-templates debug::
@@ -821,11 +822,12 @@ ${SUBFUNCFILE}: $(filter %.c %.cc %.C %.cpp, $(SRCS))
 # The original 3.13 munching rule does not really work well
 ifeq (${EPICS_BASETYPE},3.13)
 MUNCH=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
+%.munch: CMPLR=TRAD
 %.munch: %
 	@echo Munching $<
 	@ $(RM) ctct.o ctdt.c
 	$(NM) $< | $(MUNCH) > ctdt.c
-	$(COMPILE.c) -traditional ctdt.c
+	$(COMPILE.c) ctdt.c
 	$(LINK.c) $@ $< ctdt.o
 endif
 
