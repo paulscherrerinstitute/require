@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.87 2012/11/08 10:10:31 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.88 2012/11/08 16:43:57 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -595,14 +595,12 @@ endif # .cc or .cpp found
 else # only 3.14 from here
 
 ifeq (${OS_CLASS},vxWorks)
-SHRLIB_SUFFIX=.munch
-LIB_PREFIX=
-LIB_INFIX=Lib
 # only install the munched lib
 INSTALL_PROD=
+PROJECTLIB = $(if ${LIBOBJS},${PRJ}Lib${LIBVERSIONSTR}.munch,)
+else
+PROJECTLIB = $(if ${LIBOBJS},${LIB_PREFIX}${PRJ}${LIBVERSIONSTR}${SHRLIB_SUFFIX},)
 endif
-
-PROJECTLIB = $(if ${LIBOBJS},${LIB_PREFIX}${PRJ}${LIB_INFIX}${LIBVERSIONSTR}${SHRLIB_SUFFIX},)
 
 # vxWorks
 PROD_vxWorks=${PROJECTLIB}
@@ -717,7 +715,11 @@ ${INSTALL_BIN}/${PROJECTLIB}: ${PROJECTLIB}
 	$(RM) $@
 	cp $^ $@
 	chmod 444 $@
-	$(SETLINKS) ${INSTALL_BIN} ${SHRLIB_SUFFIX} ${LIB_PREFIX}${PRJ}${LIB_INFIX}
+ifeq (${OS_CLASS},vxWorks)
+	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib
+else
+	$(SETLINKS) ${INSTALL_BIN} ${SHRLIB_SUFFIX} ${LIB_PREFIX}${PRJ}
+endif
 else
 ${INSTALL_BIN}/${PROJECTLIB}.munch: ${PROJECTLIB}.munch
 	@echo "Installing munched library $@"
@@ -890,7 +892,7 @@ LSUFFIX=$(LSUFFIX_$(SHARED_LIBRARIES))
  
 ${EXPORTFILE}: $(filter-out $(basename ${EXPORTFILE})$(OBJ),${LIBOBJS})
 	$(RM) $@
-	$(NM) $^ ${BASELIBS:%=${EPICS_BASE}/lib/${T_A}/$(LIB_PREFIX)%$(LSUFFIX)} ${CORELIB} | awk '$(makexportfile)' > $@
+	$(NM) $^ ${BASELIBS:%=${EPICS_BASE}/lib/${T_A}/${LIB_PREFIX}%$(LSUFFIX)} ${CORELIB} | awk '$(makexportfile)' > $@
 
 # Create dependency file for recursive requires
 ${DEPFILE}: ${LIBOBJS}
