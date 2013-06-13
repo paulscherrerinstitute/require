@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2012/11/07 10:17:28 $
+* $Date: 2013/06/13 14:36:54 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -22,7 +22,7 @@ extern volatile int interruptAccept;
 #define EPICS_3_14
 #include <iocsh.h>
 #include <dbAccess.h>
-extern int iocshCmd (const char *cmd);
+epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
 #include <epicsExit.h>
 #include <epicsExport.h>
 #endif
@@ -38,7 +38,7 @@ static int firstTime = 1;
 #define PREFIX
 #define INFIX
 
-#if defined (__vxworks)
+#if defined (vxWorks)
 
     #include <symLib.h>
     #include <sysSymTbl.h>
@@ -91,7 +91,8 @@ static int firstTime = 1;
     #define getAddress(module,name) (GetProcAddress(module, name))
 #else
 
-    #error unknwn OS
+    #warning unknwn OS
+    #define getAddress(module,name) NULL
 
 #endif
 
@@ -132,7 +133,7 @@ static HMODULE loadlib(const char* libname)
             libname, lpMsgBuf);
         LocalFree(lpMsgBuf);
     }
-#elif defined (__vxworks)
+#elif defined (vxWorks)
     {
         int fd, loaderror;
         fd = open(libname, O_RDONLY, 0);
@@ -185,7 +186,7 @@ static void registerModule(const char* module, const char* version)
     }
 }
 
-#if defined (__vxworks)
+#if defined (vxWorks)
 BOOL findLibRelease (
     char      *name,  /* symbol name       */
     int       val,    /* value of symbol   */
@@ -249,6 +250,19 @@ static void registerExternalModules()
     dl_iterate_phdr(findLibRelease, NULL);
 }
 
+#elif defined (_WIN32)
+
+static void registerExternalModules()
+{
+    ;
+}
+
+
+#else
+static void registerExternalModules()
+{
+    ;
+}
 #endif
 
 
@@ -345,7 +359,7 @@ int require(const char* module, const char* ver)
     {
         /* require failed in startup script before iocInit */
         fprintf(stderr, "Aborting startup script\n");
-#ifdef __vxworks
+#ifdef vxWorks
         shellScriptAbort();
 #else
         epicsExit(1);
@@ -384,7 +398,7 @@ static int require_priv(const char* module, const char* vers)
         return -1;
     }
     
-    bzero(version, sizeof(version));
+    memset(version, 0, sizeof(version));
     if (vers) strncpy(version, vers, sizeof(version));
     
     loaded = getLibVersion(module);
@@ -468,7 +482,7 @@ static int require_priv(const char* module, const char* vers)
             if (requireDebug)
                 printf("require: looking for %s\n", fulllibname);
             if (stat(fulllibname, &filestat) == 0) break;
-#ifdef __vxworks
+#ifdef vxWorks
             /* now without the .munch */
             fulllibname[strlen(fulllibname)-6] = 0;
             if (requireDebug)
@@ -609,7 +623,7 @@ static int require_priv(const char* module, const char* vers)
 #ifdef EPICS_3_14
             sprintf (symbolname, "%s_registerRecordDeviceDriver", module);
             printf ("Calling %s function\n", symbolname);
-#ifdef __vxworks
+#ifdef vxWorks
             {
                 FUNCPTR f = (FUNCPTR) getAddress(NULL, symbolname);
                 if (f)
