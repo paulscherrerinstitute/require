@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2011/11/28 14:18:37 $
+* $Date: 2013/07/03 08:48:35 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -55,9 +55,8 @@ static void execFunc (const iocshArgBuf *args)
         fprintf (stderr, "%s killed by signal %d: %s\n",
             args[0].sval, WTERMSIG(status), strsignal(WTERMSIG(status)));
 #else
-        fprintf (stderr, "%s killed by signal %d: statuscode %d\n",
-            args[0].sval, WTERMSIG(status), WTERMSIG(status));
-
+        fprintf (stderr, "%s killed by signal %d\n",
+            args[0].sval, WTERMSIG(status));
 #endif
     }
     if (WEXITSTATUS(status))
