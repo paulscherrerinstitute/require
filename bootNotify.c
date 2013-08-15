@@ -5,6 +5,9 @@
 *  $Author: zimoch $
 *
 *  $Log: bootNotify.c,v $
+*  Revision 1.4  2013/08/15 09:50:07  zimoch
+*  strip off leading strings from vxWorksVersion
+*
 *  Revision 1.3  2006/03/03 13:30:33  zimoch
 *  made epicsver compatible to 3.14
 *
@@ -39,6 +42,7 @@ int bootNotify (char* script, char* script2)
 {
     char command[256];
     char epicsver[15];
+    char* vxver = vxWorksVersion;
     
     if (script == NULL)
     {
@@ -53,8 +57,11 @@ int bootNotify (char* script, char* script2)
     {
         sprintf (command, "%s", script);
     }
+    /* strip off any leading non-numbers */
+    while (vxver && (*vxver < '0' || *vxver > '9')) vxver++;
+    
     sprintf (epicsver, "%d.%d.%d",
         EPICS_VERSION, EPICS_REVISION, EPICS_MODIFICATION);
     return rsh (bootHost(), command, bootInfo("%T %e %n %d %F %s"),
-        vxWorksVersion, epicsver, etherAddr(ifName()), 0);
+        vxver, epicsver, etherAddr(ifName()), 0);
 }
