@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.88 2012/11/08 16:43:57 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.89 2013/12/17 16:48:57 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -336,7 +336,7 @@ export DOCU
 ifeq (${EPICS_BASETYPE},3.14)
 CROSS_COMPILER_TARGET_ARCHS += ${EPICS_HOST_ARCH}
 endif # 3.14
-CROSS_BUILDS = $(filter-out $(addprefix %,${EXCLUDE_ARCHS}),$(filter-out $(addsuffix %,${EXCLUDE_ARCHS}),${CROSS_COMPILER_TARGET_ARCHS}))
+CROSS_BUILDS = $(filter-out $(addprefix %,${EXCLUDE_ARCHS}),$(filter-out $(addsuffix %,${EXCLUDE_ARCHS}),$(if ${ARCH_FILTER},$(filter ${ARCH_FILTER},${CROSS_COMPILER_TARGET_ARCHS}),${CROSS_COMPILER_TARGET_ARCHS})))
 
 SRCS_Linux = ${SOURCES_Linux}
 SRCS_Linux += ${SOURCES_${EPICS_BASETYPE}_Linux}
@@ -417,7 +417,7 @@ install%: build
 install: build
 build%: build
 build:
-	@echo Skipping ${T_A} because $(if ${OS_CLASS},${OS_CLASS} is not in BUILDCLASSES = ${BUILDCLASSES},it is not included in this installation.)
+	@echo Skipping ${T_A} because $(if ${OS_CLASS},${OS_CLASS} is not in BUILDCLASSES = ${BUILDCLASSES},it is not available for R$(EPICSVERSION).)
 %:
 	@true
 
@@ -694,7 +694,7 @@ SNC_CFLAGS=-I ${SNCSEQ}/include
 
 endif # 3.14
 
-${BUILDRULE} PROJECTINFOS ${PROJECTDBD} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS})) ${DEPFILE}
+${BUILDRULE} PROJECTINFOS $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS})) ${PROJECTDBD} ${DEPFILE}
 
 PROJECTINFOS:
 	@echo ${PRJ} > PROJECTNAME
