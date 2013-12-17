@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.89 2013/12/17 16:48:57 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.90 2013/12/17 17:00:40 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -388,10 +388,6 @@ endif
             echo ${INSTBASE} | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RMDIR) O.${EPICSVERSION}_$$ARCH; \
 	    if [ ! -d O.${EPICSVERSION}_$$ARCH ]; then \
 	        mkdir -p O.${EPICSVERSION}_$$ARCH; \
-	        if [ -z "${LIBVERSION}" ]; then \
-	            ${EXISTS} O.${EPICSVERSION}.syncTS_$$ARCH || ${LN} O.${EPICSVERSION}_$$ARCH O.${EPICSVERSION}.syncTS_$$ARCH; \
-	            ${EXISTS} O.${EPICSVERSION}_$${ARCH/-/-test-} || ${LN} O.${EPICSVERSION}_$$ARCH O.${EPICSVERSION}_$${ARCH/-/-test-}; \
-	        fi; \
 	    fi; \
 	    ${MAKE} -C O.${EPICSVERSION}_$$ARCH -f ../${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
