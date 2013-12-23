@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.90 2013/12/17 17:00:40 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.91 2013/12/23 13:04:54 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -376,19 +376,30 @@ debug::
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "RELEASE_TOPS = ${RELEASE_TOPS}"
 
-install build install-headers debug:: .cvsignore
-# Delete old build if INSTBASE has changed.
-# Create build dirs (and links) if necessary 
+
+# Create build dirs (and links) if necessary
+LINK_eldk52-e500v2 = eldk52-rt-e500v2 eldk52-xenomai-e500v2
+
+BUILDDIRS = $(addprefix O.${EPICSVERSION}_, ${CROSS_BUILDS})
 ifeq (${EPICS_BASETYPE},3.14)
-	@if [ ! -d O.${EPICSVERSION}_Common ]; then \
-            mkdir -p O.${EPICSVERSION}_Common; \
-        fi
+    BUILDDIRS += O.${EPICSVERSION}_Common
 endif
+
+${BUILDDIRS}:
+	mkdir $@
+
+define MAKELINKDIRS
+LINKDIRS+=O.${EPICSVERSION}_$1
+O.${EPICSVERSION}_$1:
+	$(LN) O.${EPICSVERSION}_$2 O.${EPICSVERSION}_$1
+endef 
+
+$(foreach a,${CROSS_BUILDS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
+
+install build install-headers debug:: .cvsignore ${BUILDDIRS} ${LINKDIRS}
+# Delete old build if INSTBASE has changed.
 	@for ARCH in ${CROSS_BUILDS}; do \
-            echo ${INSTBASE} | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RMDIR) O.${EPICSVERSION}_$$ARCH; \
-	    if [ ! -d O.${EPICSVERSION}_$$ARCH ]; then \
-	        mkdir -p O.${EPICSVERSION}_$$ARCH; \
-	    fi; \
+            echo ${INSTBASE} | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RM) O.${EPICSVERSION}_$$ARCH/*; \
 	    ${MAKE} -C O.${EPICSVERSION}_$$ARCH -f ../${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
