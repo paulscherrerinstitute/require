@@ -1,7 +1,7 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.5 $'
-DATE='$Date: 2012/08/30 08:05:39 $'
+REVISION='$Revision: 3.6 $'
+DATE='$Date: 2014/02/11 16:50:54 $'
 
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
@@ -192,7 +192,28 @@ do
         ;;
     ( -c )               
         shift
+        case $1 in
+        ( seq* )
+            if [ "$init" != NO ]
+            then
+                echo "iocInit"
+                init=NO
+            fi
+            ;;
+        ( iocInit )
+            init=NO
+            ;;
+        esac
         echo $1
+        ;;
+    ( -s )
+        shift
+        if [ "$init" != NO ]
+        then
+            echo "iocInit"
+            init=NO
+        fi
+        echo seq $1
         ;;
     ( -r )               
         shift
@@ -214,7 +235,9 @@ do
         echo " -? or -h or --help: Show this page and exit."
         echo " -v or --version: Show version and exit."
         echo " -c: The next string is executed as a command by the EPICS shell."
-        echo " -r: The next string is a module, loaded via 'require'."
+        echo " -s: The next string is a sequencer program (and arguments), run with 'seq'."
+        echo "     This forces an 'iocInit' before running the program."
+        echo " -r: The next string is a module (and version), loaded via 'require'."
         echo " -n: The next string is the IOC name (used for prompt)."
         echo "     Default: dirname if parent dir is \"ioc\" otherwise hostname."
         echo
