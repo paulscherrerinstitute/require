@@ -1,14 +1,61 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.6 $'
-DATE='$Date: 2014/02/11 16:50:54 $'
+REVISION='$Revision: 3.7 $'
+DATE='$Date: 2014/02/12 10:49:00 $'
 
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
 }    
 
+help () {
+    {
+    echo "usage: iocsh [options] [files]"
+    echo "Start an EPICS iocsh and load files"
+    echo "Recognized filetypes: *.db *.dbt *.template *.subs *.subst *.dbd *.so"
+    echo
+    echo "Possible options:"
+    echo " -3.xx.yy: Set EPICS base version."
+    echo " -32: Force 32 bit version (on 64 bit systems)."
+    echo " -? or -h or --help: Show this page and exit."
+    echo " -v or --version: Show version and exit."
+    echo " -c: The next string is executed as a command by the EPICS shell."
+    echo " -s: The next string is a sequencer program (and arguments), run with 'seq'."
+    echo "     This forces an 'iocInit' before running the program."
+    echo " -r: The next string is a module (and version), loaded via 'require'."
+    echo " -n: The next string is the IOC name (used for prompt)."
+    echo "     Default: dirname if parent dir is \"ioc\" otherwise hostname."
+    echo
+    echo "Supported filetypes:"
+    echo "*.db, *.dbt and *.template are loaded via 'dbLoadRecords'."
+    echo "  After the filename, you can specify substitutions like MACRO=value."
+    echo "*.subs and *.subst are loaded via 'dbLoadTemplate'."
+    echo "*.dbd is loaded via 'dbLoadDatabase'."
+    echo "*.so is loaded via 'ld' or 'dlload' (3.14.12 or higer)."
+    echo "If an argument is @file, more arguments are read from that file."
+    echo "All other files are executed as startup scripts by the EPICS shell."
+    } >&2
+    exit
+}
+
+version () {
+    {
+    echo "iocsh by Dirk Zimoch"
+    echo $SOURCE
+    echo $REVISION
+    echo $DATE
+    } >&2
+    exit
+}
+
 case $1 in
+    ( -h | "-?" | -help | --help )
+        help
+        ;;
+    ( -v | -ver | --ver | -version | --version )
+        version
+        ;;
     ( -3.* )
+        unset EPICS_BASE
         BASE=${1#-}
         shift
     ;;
@@ -152,11 +199,33 @@ fi
 
 export EPICS_DRIVER_PATH
 
+subst () {
+    subst=""
+    while [ "$#" -gt 1 ]
+    do
+        case $2 in 
+            ( *=* )
+                subst="$subst,$2"; shift
+                ;;
+            ( * )
+                break
+                ;;
+        esac
+    done
+    echo ${subst#,}
+}
+
 loadFiles () {
 while [ "$#" -gt 0 ]
 do
   file=$1
   case $file in
+    ( -h | "-?" | -help | --help )
+        help
+        ;;
+    ( -v | -ver | --ver | -version | --version )
+        version
+        ;;
     ( @* )              
         loadFiles $(cat ${file#@})
         ;;
@@ -213,7 +282,7 @@ do
             echo "iocInit"
             init=NO
         fi
-        echo seq $1
+        echo "seq $1"
         ;;
     ( -r )               
         shift
@@ -222,44 +291,6 @@ do
     ( -n )
         shift
         IOC="$1"
-        ;;
-    ( -h | "-?" | -help | --help )
-        {
-        echo "usage: iocsh [options] [files]"
-        echo "Start an EPICS iocsh and load files"
-        echo "Recognized filetypes: *.db *.dbt *.template *.subs *.subst *.dbd *.so"
-        echo
-        echo "Possible options:"
-        echo " -3.xx.yy: Set EPICS base version."
-        echo " -32: Force 32 bit version (on 64 bit systems)."
-        echo " -? or -h or --help: Show this page and exit."
-        echo " -v or --version: Show version and exit."
-        echo " -c: The next string is executed as a command by the EPICS shell."
-        echo " -s: The next string is a sequencer program (and arguments), run with 'seq'."
-        echo "     This forces an 'iocInit' before running the program."
-        echo " -r: The next string is a module (and version), loaded via 'require'."
-        echo " -n: The next string is the IOC name (used for prompt)."
-        echo "     Default: dirname if parent dir is \"ioc\" otherwise hostname."
-        echo
-        echo "Supported filetypes:"
-        echo "*.db, *.dbt and *.template are loaded via 'dbLoadRecords'."
-        echo "  After the filename, you can specify substitutions like MACRO=value."
-        echo "*.subs and *.subst are loaded via 'dbLoadTemplate'."
-        echo "*.dbd is loaded via 'dbLoadDatabase'."
-        echo "*.so is loaded via 'ld' or 'dlload' (3.14.12 or higer)."
-        echo "If an argument is @file, more arguments are read from that file."
-        echo "All other files are executed as startup scripts by the EPICS shell."
-        } >&2
-        exit
-        ;;
-    ( -v | -ver | --ver | -version | --version )
-        {
-        echo "iocsh by Dirk Zimoch"
-        echo $SOURCE
-        echo $REVISION
-        echo $DATE
-        } >&2
-        exit
         ;;
     ( -3.* )
         echo "Version $file must be first argument" >&2
