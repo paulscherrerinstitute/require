@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.91 2013/12/23 13:04:54 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.92 2014/02/19 10:54:29 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -696,7 +696,8 @@ endif
 
 # snc location in 3.14
 #-include ${SNCSEQ}/configure/RULES_BUILD # incompatible to 3.15
-SNC=${SNCSEQ}/bin/$(EPICS_HOST_ARCH)/snc
+SNCPATH=$(firstword $(realpath ${SNCSEQ}/bin/$(EPICS_HOST_ARCH)) $(realpath ${SNCSEQ}/bin/$(EPICS_HOST_ARCH:_64=)))
+SNC=${SNCPATH}/snc
 SNC_CFLAGS=-I ${SNCSEQ}/include
 
 endif # 3.14

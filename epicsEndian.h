@@ -1,6 +1,9 @@
 #ifndef INC_epicsEndian_H
 #define INC_epicsEndian_H
 
+#define EPICS_ENDIAN_LITTLE   1234
+#define EPICS_ENDIAN_BIG      4321
+
 #if defined (vxWorks)
 
 #include <types/vxArch.h>
