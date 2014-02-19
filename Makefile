@@ -29,3 +29,6 @@ SOURCES_3.14 += mlock.c
 DBDS_3.14    += mlock.dbd
 
 SOURCES_vxWorks += bootNotify.c
+
+HEADERS_3.13 += epicsEndian.h
+HEADERS_3.14.8 += epicsEndian.h
