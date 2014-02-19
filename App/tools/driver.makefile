@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.92 2014/02/19 10:54:29 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.93 2014/02/19 12:24:08 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -150,6 +150,9 @@ export PRJ
 OS_CLASS_LIST = $(BUILDCLASSES)
 export OS_CLASS_LIST
 
+export ARCH_FILTER
+export EXCLUDE_ARCHS
+
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules)
 build::
@@ -195,6 +198,7 @@ debug::
 	@echo "USE_LIBVERSION = ${USE_LIBVERSION}"
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "VERSIONCHECKFILES = ${VERSIONCHECKFILES}"
+	@echo "ARCH_FILTER = ${ARCH_FILTER}"
 
 # Loop over all EPICS versions for second run.
 build install uninstall install-headers install-doc install-templates debug::
@@ -203,7 +207,7 @@ build install uninstall install-headers install-doc install-templates debug::
 
 # Handle cases where user requests 3.13 or 3.14 
 # make <action>.3.13 or make <action>.3.14 instead of make <action> or
-# make 3.13 or make 3.14 instread of make
+# make 3.13 or make 3.14 instead of make
 
 define VERSIONRULES
 $(1):
@@ -298,10 +302,12 @@ ifndef T_A
 AUTOSRCS := $(filter-out ~%,$(wildcard *.c) $(wildcard *.cc) $(wildcard *.cpp) $(wildcard *.st) $(wildcard *.stt) $(wildcard *.gt))
 SRCS = $(if ${SOURCES},$(filter-out -none-,${SOURCES}),${AUTOSRCS})
 SRCS += ${SOURCES_${EPICS_BASETYPE}}
+SRCS += ${SOURCES_${EPICSVERSION}}
 export SRCS
 
 DBDFILES = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
 DBDFILES += ${DBDS_${EPICS_BASETYPE}}
+DBDFILES += ${DBDS_${EPICSVERSION}}
 DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 ifeq (${EPICS_BASETYPE},3.14)
 DBDFILES += $(patsubst %.st,%_snl.dbd,$(notdir $(filter %.st,${SRCS})))
@@ -321,9 +327,13 @@ BPTS = $(patsubst %.data,%.dbd,$(wildcard bpt*.data))
 export BPTS
 
 HDRS = ${HEADERS} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
+HDRS += ${HEADERS_${EPICS_BASETYPE}}
+HDRS += ${HEADERS_${EPICSVERSION}}
 export HDRS
 
 TEMPLS = ${TEMPLATES}
+TEMPLS += ${TEMPLATES_${EPICS_BASETYPE}}
+TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
 
 DOCUDIR = .
@@ -696,8 +706,7 @@ endif
 
 # snc location in 3.14
 #-include ${SNCSEQ}/configure/RULES_BUILD # incompatible to 3.15
-SNCPATH=$(firstword $(realpath ${SNCSEQ}/bin/$(EPICS_HOST_ARCH)) $(realpath ${SNCSEQ}/bin/$(EPICS_HOST_ARCH:_64=)))
-SNC=${SNCPATH}/snc
+SNC=${SNCSEQ}/bin/$(EPICS_HOST_ARCH)/snc
 SNC_CFLAGS=-I ${SNCSEQ}/include
 
 endif # 3.14
