@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.95 2014/04/07 13:22:25 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.96 2014/06/05 12:51:35 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -788,7 +788,10 @@ RELEASE_INCLUDES = -I${EPICS_BASE}/include
 RELEASE_INCLUDES += -I${EPICS_BASE}/include/compiler/${CMPLR_CLASS}
 RELEASE_INCLUDES += -I${EPICS_BASE}/include/os/${OS_CLASS}
 
+#relax 3.13 cross compilers (default is STRICT)
 CMPLR=ANSI
+CXXCMPLR=ANSI
+G++_ANSI = $(G++) -ansi
 
 ${INSTALLRULE} ${INSTALL_DOCUS} ${INSTALL_PROJECTDBD} ${INSTALL_LIBRARY} ${INSTALL_DEP}
 
