@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.96 2014/06/05 12:51:35 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.97 2014/06/05 14:25:13 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -346,7 +346,7 @@ export DOCU
 ifeq (${EPICS_BASETYPE},3.14)
 CROSS_COMPILER_TARGET_ARCHS += ${EPICS_HOST_ARCH}
 endif # 3.14
-CROSS_BUILDS = $(filter-out $(addprefix %,${EXCLUDE_ARCHS}),$(filter-out $(addsuffix %,${EXCLUDE_ARCHS}),$(if ${ARCH_FILTER},$(filter ${ARCH_FILTER},${CROSS_COMPILER_TARGET_ARCHS}),${CROSS_COMPILER_TARGET_ARCHS})))
+CROSS_COMPILER_TARGET_ARCHS := $(filter-out $(addprefix %,${EXCLUDE_ARCHS}),$(filter-out $(addsuffix %,${EXCLUDE_ARCHS}),$(if ${ARCH_FILTER},$(filter ${ARCH_FILTER},${CROSS_COMPILER_TARGET_ARCHS}),${CROSS_COMPILER_TARGET_ARCHS})))
 
 SRCS_Linux = ${SOURCES_Linux}
 SRCS_Linux += ${SOURCES_${EPICS_BASETYPE}_Linux}
@@ -381,7 +381,6 @@ debug::
 	@echo "EPICS_BASETYPE = ${EPICS_BASETYPE}" 
 	@echo "CROSS_COMPILER_TARGET_ARCHS = ${CROSS_COMPILER_TARGET_ARCHS}"
 	@echo "EXCLUDE_ARCHS = ${EXCLUDE_ARCHS}"
-	@echo "CROSS_BUILDS = ${CROSS_BUILDS}"
 	@echo "INSTALL_LOCATION = ${INSTALL_LOCATION}"
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "RELEASE_TOPS = ${RELEASE_TOPS}"
@@ -390,7 +389,7 @@ debug::
 # Create build dirs (and links) if necessary
 LINK_eldk52-e500v2 = eldk52-rt-e500v2 eldk52-xenomai-e500v2
 
-BUILDDIRS = $(addprefix O.${EPICSVERSION}_, ${CROSS_BUILDS})
+BUILDDIRS = $(addprefix O.${EPICSVERSION}_, ${CROSS_COMPILER_TARGET_ARCHS})
 ifeq (${EPICS_BASETYPE},3.14)
     BUILDDIRS += O.${EPICSVERSION}_Common
 endif
@@ -404,11 +403,11 @@ O.${EPICSVERSION}_$1:
 	$(LN) O.${EPICSVERSION}_$2 O.${EPICSVERSION}_$1
 endef 
 
-$(foreach a,${CROSS_BUILDS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
+$(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
 install build install-headers debug:: .cvsignore ${BUILDDIRS} ${LINKDIRS}
 # Delete old build if INSTBASE has changed.
-	@for ARCH in ${CROSS_BUILDS}; do \
+	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
             echo ${INSTBASE} | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RM) O.${EPICSVERSION}_$$ARCH/*; \
 	    ${MAKE} -C O.${EPICSVERSION}_$$ARCH -f ../${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
@@ -419,7 +418,7 @@ install build install-headers debug:: .cvsignore ${BUILDDIRS} ${LINKDIRS}
 # No need to create O.${T_A} subdirectory here:
 uninstall install-doc install-templates::
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
-	for ARCH in ${CROSS_BUILDS}; do \
+	for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
 	${MAKEVERSION} T_A=$$ARCH $@; done
 
 else # T_A
