@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.98 2014/08/19 09:11:04 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.99 2014/08/19 09:19:13 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -837,11 +837,10 @@ SNCFLAGS += -r
 
 # Create dbd file with references to all subRecord functions
 ${SUBFUNCFILE}: $(filter %.c %.cc %.C %.cpp, $(SRCS))
-	@echo generating $@
 	awk '/^[\t ]*static/ {next} /\([\t ]*(struct)?[\t ]*(genSub|sub|aSub)Record[\t ]*\*[\t ]*\w+[\t ]*\)/ {\
-            match ($$0,/(\w+)[\t ]*\([\t ]*(struct)?[\t ]*\w+Record[\t ]*\*[\t ]*\w+[\t ]*\)/, a);\
-            print "function (" a[1] ")"\
-        }' $^ > $@
+		match ($$0,/(\w+)[\t ]*\([\t ]*(struct)?[\t ]*\w+Record[\t ]*\*[\t ]*\w+[\t ]*\)/, a);\
+		n=a[1];if(!f[n]){f[n]=1;print "function (" n ")"}\
+	}' $^ > $@
 
 # The original 3.13 munching rule does not really work well
 ifeq (${EPICS_BASETYPE},3.13)
