@@ -10,8 +10,8 @@ PATH=$PATH:/bin:/usr/bin
 if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
-    echo '$Author: lutz_h $'
-    echo '$Date: 2013/08/14 08:54:08 $'
+    echo '$Author: lauk $'
+    echo '$Date: 2014/09/24 13:15:49 $'
     exit
 fi
 
@@ -32,6 +32,9 @@ then
 } >&2
     exit 0
 fi
+
+DO_ORACLE=1
+DO_WEBSERVICE=1
 
 SYSTEM=$1
 IPADDR=${2/-/$(hostname -i)}
@@ -78,7 +81,7 @@ case $SYSTEM in
     ( *-CRIO* ) ;;
     ( * ) echo "ERROR: $SYSTEM is not an acceptable system name."
           echo "Rename your system and 'target name' to match *-VME* or *-CV* or *-IFC* or *-CRIO*."
-          exit 1 ;;
+          DO_ORACLE=0 ;;
 esac
 link=$(readlink /ioc/$SYSTEM)
 SLSBASE=${link%%/iocBoot*}
@@ -100,11 +103,16 @@ if [ "$7" = "-" ]
 then
 VXWORKSVER=NULL
 VXWORKS=NULL
+OS=
+OSVERSION=
 else
+OS=$VXWORKS
+OSVERSION=$VXWORKSVER
 VXWORKSVER="'$VXWORKSVER'"
 VXWORKS="'$VXWORKS'"
 fi
 
+if [ $DO_ORACLE -eq 1 ]; then
 echo "I will put the following values to the database:"
 echo "SYSTEM=$SYSTEM"
 echo "IPADDR=$IPADDR"
@@ -118,12 +126,14 @@ echo "VXWORKS=$VXWORKS"
 echo "EPICSVER=$EPICSVER"
 echo "VXWORKSVER=$VXWORKSVER"
 echo "ETHADDR=$ETHADDR"
+fi
 
 if [ -z "$ORACLE_HOME" ] ; then
     echo "ORACLE_HOME not defined" >&2
-    exit 1
+    DO_ORACLE=0
 fi
 
+if [ $DO_ORACLE -eq 1 ]; then
 sqlplus -s gfa_public/pub01@GFAPRD << EOF &
 INSERT INTO EPICS.IOC_BOOTLOG
        (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
@@ -134,7 +144,17 @@ VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
         $VXWORKSVER, '$ETHADDR');
 EXIT
 EOF
+fi
+
+if [ $DO_WEBSERVICE -eq 1 ]; then
+  boot_info="--boot-device $DEVICE --boot-file $BOOTFILE --boot-pc $BOOTPC --epics-version $EPICSVER --ethernet-address $ETHADDR --ioc $SYSTEM --ip-address $IPADDR --port-number $PROCNUM --sls-base $SLSBASE --startup-script $SCRIPT"
+  if [ -n "$OS" ]; then
+    boot_info="$boot_info --os $OS --os-version $OSVERSION"
+  fi
+  echo "Uploading boot info to web service: $boot_info"
+  $(dirname $0)/upload_bootinfo.py $boot_info
+fi
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.23 2013/08/14 08:54:08 lutz_h Exp $
+# $Id: iocBootNotify.sh,v 1.24 2014/09/24 13:15:49 lauk Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.23 $
+# $Revision: 1.24 $
