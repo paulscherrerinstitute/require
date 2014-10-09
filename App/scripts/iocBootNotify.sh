@@ -11,7 +11,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: lauk $'
-    echo '$Date: 2014/09/24 13:15:49 $'
+    echo '$Date: 2014/10/09 05:51:29 $'
     exit
 fi
 
@@ -152,9 +152,9 @@ if [ $DO_WEBSERVICE -eq 1 ]; then
     boot_info="$boot_info --os $OS --os-version $OSVERSION"
   fi
   echo "Uploading boot info to web service: $boot_info"
-  $(dirname $0)/upload_bootinfo.py $boot_info
+  $(dirname $0)/upload_bootinfo.py $boot_info &
 fi
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.24 2014/09/24 13:15:49 lauk Exp $
+# $Id: iocBootNotify.sh,v 1.25 2014/10/09 05:51:29 lauk Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.24 $
+# $Revision: 1.25 $
