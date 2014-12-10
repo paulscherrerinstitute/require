@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.99 2014/08/19 09:19:13 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.100 2014/12/10 14:15:29 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -837,10 +837,11 @@ SNCFLAGS += -r
 
 # Create dbd file with references to all subRecord functions
 ${SUBFUNCFILE}: $(filter %.c %.cc %.C %.cpp, $(SRCS))
-	awk '/^[\t ]*static/ {next} /\([\t ]*(struct)?[\t ]*(genSub|sub|aSub)Record[\t ]*\*[\t ]*\w+[\t ]*\)/ {\
+	awk '/static/ {static=1} \
+                /\([\t ]*(struct)?[\t ]*(genSub|sub|aSub)Record[\t ]*\*[\t ]*\w+[\t ]*\)/ {\
 		match ($$0,/(\w+)[\t ]*\([\t ]*(struct)?[\t ]*\w+Record[\t ]*\*[\t ]*\w+[\t ]*\)/, a);\
-		n=a[1];if(!f[n]){f[n]=1;print "function (" n ")"}\
-	}' $^ > $@
+		n=a[1];if(!static && !f[n]){f[n]=1;print "function (" n ")"}}\
+                /[;{}]/ {static=0}' $^ > $@
 
 # The original 3.13 munching rule does not really work well
 ifeq (${EPICS_BASETYPE},3.13)
@@ -864,7 +865,7 @@ endif
 # Create file to fill registry from dbd file.
 ${REGISTRYFILE}: ${PROJECTDBD}
 	$(RM) $@ temp.cpp
-	$(PERL) $(EPICS_BASE_HOST_BIN)/registerRecordDeviceDriver.pl $< $(basename $@) > temp.cpp
+	$(PERL) $(EPICS_BASE_HOST_BIN)/registerRecordDeviceDriver.pl $< $(basename $@) | grep -v iocshRegisterCommon > temp.cpp
 	$(MV) temp.cpp $@
 
 # 3.14.12 complains if this rule is not overwritten
