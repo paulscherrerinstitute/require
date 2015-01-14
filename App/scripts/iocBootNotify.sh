@@ -11,7 +11,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: lauk $'
-    echo '$Date: 2014/10/09 05:51:29 $'
+    echo '$Date: 2015/01/14 11:49:45 $'
     exit
 fi
 
@@ -32,9 +32,6 @@ then
 } >&2
     exit 0
 fi
-
-DO_ORACLE=1
-DO_WEBSERVICE=1
 
 SYSTEM=$1
 IPADDR=${2/-/$(hostname -i)}
@@ -70,8 +67,14 @@ if [ ! -L /ioc/$SYSTEM ]
 then
   echo "ERROR: No symbolic link /ioc/$SYSTEM on $BOOTPC."
   echo "Rename 'target name' to your system name!"
-  exit 1
+
+  # No link available, so the next best thing is to
+  # extract SLSBASE from the path to the startup.script
+  link=$(dirname $SCRIPT)
+else
+  link=$(readlink /ioc/$SYSTEM)
 fi
+SLSBASE=${link%%/iocBoot*}
 case $SYSTEM in
     ( *-VME* ) ;;
     ( *-CV* ) ;;
@@ -80,11 +83,9 @@ case $SYSTEM in
     ( *-IFC* ) ;;
     ( *-CRIO* ) ;;
     ( * ) echo "ERROR: $SYSTEM is not an acceptable system name."
-          echo "Rename your system and 'target name' to match *-VME* or *-CV* or *-IFC* or *-CRIO*."
-          DO_ORACLE=0 ;;
+          echo "Rename your system and 'target name' to match *-VME* or *-CV* or *-PC* or *-CP* or *-IFC* or *-CRIO*."
+		  ;;
 esac
-link=$(readlink /ioc/$SYSTEM)
-SLSBASE=${link%%/iocBoot*}
 if [ -L $BOOTFILE ]
 then
   link=$(readlink $BOOTFILE)
@@ -112,49 +113,15 @@ VXWORKSVER="'$VXWORKSVER'"
 VXWORKS="'$VXWORKS'"
 fi
 
-if [ $DO_ORACLE -eq 1 ]; then
-echo "I will put the following values to the database:"
-echo "SYSTEM=$SYSTEM"
-echo "IPADDR=$IPADDR"
-echo "PROCNUM=$PROCNUM"
-echo "DEVICE=$DEVICE"
-echo "BOOTPC=$BOOTPC"
-echo "SLSBASE=$SLSBASE"
-echo "BOOTFILE=$BOOTFILE"
-echo "SCRIPT=$SCRIPT"
-echo "VXWORKS=$VXWORKS"
-echo "EPICSVER=$EPICSVER"
-echo "VXWORKSVER=$VXWORKSVER"
-echo "ETHADDR=$ETHADDR"
-fi
 
-if [ -z "$ORACLE_HOME" ] ; then
-    echo "ORACLE_HOME not defined" >&2
-    DO_ORACLE=0
+boot_info="--boot-device $DEVICE --boot-file $BOOTFILE --boot-pc $BOOTPC --epics-version $EPICSVER --ethernet-address $ETHADDR --ioc $SYSTEM --ip-address $IPADDR --port-number $PROCNUM --sls-base $SLSBASE --startup-script $SCRIPT"
+if [ -n "$OS" ]; then
+  boot_info="$boot_info --os $OS --os-version $OSVERSION"
 fi
+echo "Uploading boot info to web service: $boot_info"
+$(dirname $0)/upload_bootinfo.py $boot_info &
 
-if [ $DO_ORACLE -eq 1 ]; then
-sqlplus -s gfa_public/pub01@GFAPRD << EOF &
-INSERT INTO EPICS.IOC_BOOTLOG
-       (SYSTEM, IPADDR, PROCNUM, DEVICE, BOOTPC,
-        SLSBASE, BOOTFILE, SCRIPT, VXWORKS, EPICSVER,
-        VXWORKSVER, ETHADDR)
-VALUES ('$SYSTEM', '$IPADDR', '$PROCNUM', '$DEVICE', '$BOOTPC',
-        '$SLSBASE', '$BOOTFILE', '$SCRIPT', $VXWORKS, '$EPICSVER',
-        $VXWORKSVER, '$ETHADDR');
-EXIT
-EOF
-fi
-
-if [ $DO_WEBSERVICE -eq 1 ]; then
-  boot_info="--boot-device $DEVICE --boot-file $BOOTFILE --boot-pc $BOOTPC --epics-version $EPICSVER --ethernet-address $ETHADDR --ioc $SYSTEM --ip-address $IPADDR --port-number $PROCNUM --sls-base $SLSBASE --startup-script $SCRIPT"
-  if [ -n "$OS" ]; then
-    boot_info="$boot_info --os $OS --os-version $OSVERSION"
-  fi
-  echo "Uploading boot info to web service: $boot_info"
-  $(dirname $0)/upload_bootinfo.py $boot_info &
-fi
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.25 2014/10/09 05:51:29 lauk Exp $
+# $Id: iocBootNotify.sh,v 1.26 2015/01/14 11:49:45 lauk Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.25 $
+# $Revision: 1.26 $
