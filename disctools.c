@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2011/11/28 14:18:37 $
+* $Date: 2015/02/16 16:09:22 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -75,7 +75,7 @@ static void llFunc(const iocshArgBuf *args)
         else type='?';
         localtime_r(&filestat.st_mtime, &time);
         strftime(timestr, 20, "%b %e %Y %H:%M", &time);
-        printf("%c%c%c%c%c%c%c%c%c%c %4d",
+        printf("%c%c%c%c%c%c%c%c%c%c %4lu",
             type,
             filestat.st_mode & S_IRUSR ? 'r' : '-',
             filestat.st_mode & S_IWUSR ? 'w' : '-',
@@ -89,7 +89,7 @@ static void llFunc(const iocshArgBuf *args)
             filestat.st_mode & S_IWOTH ? 'w' : '-',
             filestat.st_mode & S_ISVTX ? 't' :
             filestat.st_mode & S_IXOTH ? 'x' : '-',
-            filestat.st_nlink);
+            (unsigned long) filestat.st_nlink);
         user=getpwuid(filestat.st_uid);
         if (user) printf(" %-8s", user->pw_name);
         else printf(" %-8d", filestat.st_uid);
