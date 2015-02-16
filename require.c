@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2013/06/13 14:36:54 $
+* $Date: 2015/02/16 16:19:51 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -16,6 +16,7 @@
 #include <epicsVersion.h>
 #ifdef BASE_VERSION
 #define EPICS_3_13
+#define epicsStdoutPrintf printf
 int dbLoadDatabase(char *filename, char *path, char *substitutions);
 extern volatile int interruptAccept;
 #else
@@ -24,6 +25,7 @@ extern volatile int interruptAccept;
 #include <dbAccess.h>
 epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
 #include <epicsExit.h>
+#include <epicsStdio.h>
 #include <epicsExport.h>
 #endif
 
@@ -293,7 +295,7 @@ int libversionShow(const char* pattern)
     for (m = loadedModules; m; m=m->next)
     {
         if (pattern && !strstr(m->name, pattern)) return 0;
-        printf("%15s %s\n", m->name, m->version);
+        epicsStdoutPrintf("%15s %s\n", m->name, m->version);
     }
     return 0;
 }
