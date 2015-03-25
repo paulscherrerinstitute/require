@@ -11,7 +11,7 @@ if [ "$1" = "-v" ]
 then
     echo '$Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $'
     echo '$Author: lauk $'
-    echo '$Date: 2015/01/14 11:49:45 $'
+    echo '$Date: 2015/03/25 08:57:14 $'
     exit
 fi
 
@@ -75,17 +75,6 @@ else
   link=$(readlink /ioc/$SYSTEM)
 fi
 SLSBASE=${link%%/iocBoot*}
-case $SYSTEM in
-    ( *-VME* ) ;;
-    ( *-CV* ) ;;
-    ( *-PC* ) ;;
-    ( *-CP* ) ;;
-    ( *-IFC* ) ;;
-    ( *-CRIO* ) ;;
-    ( * ) echo "ERROR: $SYSTEM is not an acceptable system name."
-          echo "Rename your system and 'target name' to match *-VME* or *-CV* or *-PC* or *-CP* or *-IFC* or *-CRIO*."
-		  ;;
-esac
 if [ -L $BOOTFILE ]
 then
   link=$(readlink $BOOTFILE)
@@ -122,6 +111,6 @@ echo "Uploading boot info to web service: $boot_info"
 $(dirname $0)/upload_bootinfo.py $boot_info &
 
 # $Name:  $
-# $Id: iocBootNotify.sh,v 1.26 2015/01/14 11:49:45 lauk Exp $
+# $Id: iocBootNotify.sh,v 1.27 2015/03/25 08:57:14 lauk Exp $
 # $Source: /cvs/G/DRV/misc/App/scripts/iocBootNotify.sh,v $
-# $Revision: 1.26 $
+# $Revision: 1.27 $
