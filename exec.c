@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2013/07/03 08:48:35 $
+* $Date: 2015/04/09 13:42:42 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -43,10 +43,25 @@ static void execFunc (const iocshArgBuf *args)
         fprintf(stderr, "missing command\n");
         return;
     }
-    p += sprintf(p, "\"%s\"", args[0].sval);
+    p += snprintf(p, sizeof(commandline), "\"%s\"", args[0].sval);
     for (i = 1; i < args[1].aval.ac; i++)
     {
-        p += sprintf(p, " \"%s\"", args[1].aval.av[i]);
+        if (p - commandline >= sizeof(commandline))
+        {
+            fprintf (stderr, "command line too long\n");
+            return;
+        }
+        if ((args[1].aval.av[i][0] == '|'
+          || args[1].aval.av[i][0] == ';'
+          || args[1].aval.av[i][0] == '&'
+          ) && args[1].aval.av[i][1] == 0)
+            /* do not quote single | & ; */
+            p += snprintf(p, p - commandline + sizeof(commandline),
+                " %s", args[1].aval.av[i]);
+        else
+            /* quote words to protect special chars (e.g. spaces) */
+            p += snprintf(p, p - commandline + sizeof(commandline),
+                " \"%s\"", args[1].aval.av[i]);
     }
     status = system(commandline);
     if (WIFSIGNALED(status))
