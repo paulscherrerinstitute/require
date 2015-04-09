@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2015/02/16 16:19:51 $
+* $Date: 2015/04/09 13:18:13 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -448,19 +448,16 @@ static int require_priv(const char* module, const char* vers)
         {
             sprintf(libname, PREFIX "%s" INFIX "-%s" EXT, module, version);
             sprintf(depname, "%s-%s.dep", module, version);
-            sprintf(dbdname, "%s-%s.dbd", module, version);
         }
         else
         {
             sprintf(libname, PREFIX "%s" INFIX EXT, module);
             sprintf(depname, "%s.dep", module);
-            sprintf(dbdname, "%s.dbd", module);
         }
         if (requireDebug)
         {
             printf("require: libname is %s\n", libname);
             printf("require: depname is %s\n", depname);
-            printf("require: dbdname is %s\n", dbdname);
         }
 
         /* search for library in driverpath */
@@ -585,6 +582,13 @@ static int require_priv(const char* module, const char* vers)
             fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
                 module, vers, loaded);
             return -1;
+        }
+        
+        /* make sure we get the dbd that matches the library version */
+        sprintf(dbdname, "%s-%s.dbd", module, loaded);
+        if (requireDebug)
+        {
+            printf("require: dbdname is %s\n", dbdname);
         }
         
         /* look for dbd in . ./dbd ../dbd ../../dbd (relative to lib dir) */
