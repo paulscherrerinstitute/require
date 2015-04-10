@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2015/04/09 13:42:42 $
+* $Date: 2015/04/10 13:30:29 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -33,37 +33,46 @@ static const iocshFuncDef exclDef = { "!", 2, execArgs }; /* alias */
 
 static void execFunc (const iocshArgBuf *args)
 {
+    char commandline [256];
     int i;
     int status;
-    char commandline [256];
+    int len;
     char *p = commandline;
+    char *arg;
+    char special;
 
     if (args[0].sval == NULL)
     {
-        fprintf(stderr, "missing command\n");
+        system(getenv("SHELL"));
         return;
     }
-    p += snprintf(p, sizeof(commandline), "\"%s\"", args[0].sval);
-    for (i = 1; i < args[1].aval.ac; i++)
+    else
     {
-        if (p - commandline >= sizeof(commandline))
+        for (i = 0; i < args[1].aval.ac; i++)
         {
-            fprintf (stderr, "command line too long\n");
-            return;
-        }
-        if ((args[1].aval.av[i][0] == '|'
-          || args[1].aval.av[i][0] == ';'
-          || args[1].aval.av[i][0] == '&'
-          ) && args[1].aval.av[i][1] == 0)
-            /* do not quote single | & ; */
-            p += snprintf(p, p - commandline + sizeof(commandline),
-                " %s", args[1].aval.av[i]);
-        else
+            arg = args[1].aval.av[i];
+            len = strlen(arg);
+            special = 0;
+            if (len) {
+                special = arg[len-1];
+                if (special == '|' || special == ';' || special == '&') len--;
+                else special = 0;
+            }
+
+            if (p - commandline + len + 4 >= sizeof(commandline))
+            {
+                fprintf (stderr, "command line too long\n");
+                return;
+            }
+
             /* quote words to protect special chars (e.g. spaces) */
-            p += snprintf(p, p - commandline + sizeof(commandline),
-                " \"%s\"", args[1].aval.av[i]);
+            p += sprintf(p, " \"%.*s\"", len, arg);
+
+            /* add unquoted special chars | ; & */
+            if (special) p += sprintf(p, "%c", special);
+        }
+        status = system(commandline);
     }
-    status = system(commandline);
     if (WIFSIGNALED(status))
     {
 #ifdef __USE_GNU
