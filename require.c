@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2015/04/09 13:18:13 $
+* $Date: 2015/04/10 10:06:44 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -567,13 +567,17 @@ static int require_priv(const char* module, const char* vers)
         /* now check if we got what we wanted (with original version number) */
         sprintf (symbolname, "_%sLibRelease", module);
         loaded = getAddress(libhandle, symbolname);
+
         if (loaded)
         {
             printf("Loading %s (version %s)\n", fulllibname, loaded);
+            /* make sure we get the dbd that matches the library version */
+            sprintf(dbdname, "%s-%s.dbd", module, loaded);
         }
         else
         {
             printf("Loading %s (no version)\n", fulllibname);
+            sprintf(dbdname, "%s.dbd", module);
             loaded = "(no version)";
         }
 
@@ -584,13 +588,10 @@ static int require_priv(const char* module, const char* vers)
             return -1;
         }
         
-        /* make sure we get the dbd that matches the library version */
-        sprintf(dbdname, "%s-%s.dbd", module, loaded);
         if (requireDebug)
         {
             printf("require: dbdname is %s\n", dbdname);
         }
-        
         /* look for dbd in . ./dbd ../dbd ../../dbd (relative to lib dir) */
         p = PATHSEP DIRSEP "dbd"
             PATHSEP DIRSEP ".." DIRSEP "dbd"
