@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2015/04/10 10:06:44 $
+* $Date: 2015/05/18 10:50:45 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -578,7 +578,7 @@ static int require_priv(const char* module, const char* vers)
         {
             printf("Loading %s (no version)\n", fulllibname);
             sprintf(dbdname, "%s.dbd", module);
-            loaded = "(no version)";
+            loaded = "";
         }
 
         if (validate(module, vers, loaded) != 0)
