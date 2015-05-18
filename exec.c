@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2015/04/10 13:30:29 $
+* $Date: 2015/05/18 10:46:32 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -36,7 +36,7 @@ static void execFunc (const iocshArgBuf *args)
     char commandline [256];
     int i;
     int status;
-    int len;
+    size_t len;
     char *p = commandline;
     char *arg;
     char special;
@@ -66,7 +66,7 @@ static void execFunc (const iocshArgBuf *args)
             }
 
             /* quote words to protect special chars (e.g. spaces) */
-            p += sprintf(p, " \"%.*s\"", len, arg);
+            p += sprintf(p, " \"%.*s\"", (int)len, arg);
 
             /* add unquoted special chars | ; & */
             if (special) p += sprintf(p, "%c", special);
