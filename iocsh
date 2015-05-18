@@ -1,11 +1,7 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.9 $'
-DATE='$Date: 2015/05/18 11:59:07 $'
-
-rp() {
-  ( realpath $1 || readlink -f $1 || readlink $1 || echo $1 ) 2>/dev/null
-}    
+REVISION='$Revision: 3.10 $'
+DATE='$Date: 2015/05/18 14:53:43 $'
 
 help () {
     {
@@ -61,43 +57,63 @@ case $1 in
     ;;
 esac
 
+# realpath and readlink are not available on all systems, let's try what works...
+rp() {
+  ( realpath $1 || readlink -f $1 || readlink $1 || (cd -P $1 && echo $PWD) || (x=$(\ls -ld $1) && echo ${x##* }) || echo $1 ) 2>/dev/null
+}    
+
+# if EPICS_HOST_ARCH is not set guess it
+if [ -z "$EPICS_HOST_ARCH" ]
+then
+    echo "EPICS_HOST_ARCH is not set"
+    EPICS_HOST_ARCH=$(basename $(dirname $(rp $(which caRepeater))))
+    if [ -n "$EPICS_HOST_ARCH" ]
+    then
+        echo "Guessing EPICS_HOST_ARCH=$EPICS_HOST_ARCH"
+    else
+        exit 1
+    fi
+fi
+
+# check if user requested 32 bit version on a 64 bit system
+case $1 in
+    ( -32 )
+        EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
+        shift
+    ;;
+esac
+
 # Either EPICS or EPICS_BASE should be set to the install directory
 if [ -z "$EPICS_BASE" ]
 then
     if [ -z "$EPICS" ]
     then
+        # look for some standard install directories
         for EPICS in /usr/local/epics /opt/epics /epics
         do
             if [ -d $EPICS ]
             then
                 break 2
             fi
-            echo "Cannot find EPICS installation directory." >&2
+            echo "Cannot find any EPICS installation directory." >&2
             echo "Try setting EPICS_BASE environment variable to full path" >&2
             exit 1
         done
     fi
-    if [ -n "$BASE" ]
+    # find highest (requested) EPICS version that supports our architecture (or its 32 bit version)
+    EPICS_BASE=$(\ls -1vrd $EPICS/base*$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
+    if [ -z $EPICS_BASE ]
     then
-        EPICS_BASE=$EPICS/base-$BASE
-        if [ ! -d $EPICS_BASE ]
-        then
-            echo "Cannot find $EPICS/base-$BASE directory." >&2
-            exit 1
-        fi
-    else    
-        EPICS_BASE=$(rp $EPICS/base)
-        if [ ! -d $EPICS_BASE ]
-        then
-            for ((R=15;R>0;R--))
-            do
-                EPICS_BASE=$EPICS/base-3.14.$R
-                if [ -d $EPICS_BASE ]
-                then break;
-                fi
-            done
-        fi
+        echo Cannot find any $BASE EPICS version for $EPICS_HOST_ARCH. >&2
+        exit 1
     fi
+    # maybe we need to change from 64 bit to 32 bit
+    if [ $EPICS_HOST_ARCH != ${EPICS_BASE#*/bin/} ]
+    then
+        EPICS_HOST_ARCH=${EPICS_BASE#*/bin/}
+        echo "No 64 bit version in ${EPICS_BASE%bin*}. Switch to 32 bit version $EPICS_HOST_ARCH"
+    fi
+    EPICS_BASE=$(rp ${EPICS_BASE%bin*})
 fi
 if [ ! -d $EPICS_BASE ]
 then
@@ -109,10 +125,10 @@ fi
 # Check revision
 if [ -r $EPICS_BASE/configure/CONFIG_BASE_VERSION ]
 then
-BASE=$(awk -F '[[:space:]]*=[[:space:]]*' '
-    /^EPICS_VERSION[[:space:]]*=[[:space:]]*/ {v=$2}
-    /^EPICS_REVISION[[:space:]]*=[[:space:]]*/ {r=$2}
-    /^EPICS_MODIFICATION[[:space:]]*=[[:space:]]*/ {m=$2}
+BASE=$(awk -F '[ \t]*=[ \t]*' '
+    /^[ \t]*EPICS_VERSION[ \t]*=/ {v=$2}
+    /^[ \t]*EPICS_REVISION[ \t]*=/ {r=$2}
+    /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2}
     END {print v"."r"."m}' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
 else
 BASE=$(basename $(rp $EPICS_BASE))
@@ -140,25 +156,6 @@ then
     IOC=$(basename $PWD)
 fi
 export IOC
-
-if [ -z "$EPICS_HOST_ARCH" ]
-then
-    echo "EPICS_HOST_ARCH is not set"
-    EPICS_HOST_ARCH=$(basename $(dirname $(rp $(which caRepeater))))
-    if [ -n "$EPICS_HOST_ARCH" ]
-    then
-        echo "Guessing $EPICS_HOST_ARCH"
-    else
-        exit 1
-    fi
-fi
-
-case $1 in
-    ( -32 )
-        EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
-        shift
-    ;;
-esac
 
 # Check for 64 bit versions, default to 32 bit
 if [ ! -d $EPICS_BASE/lib/${EPICS_HOST_ARCH} -a -d $EPICS_BASE/lib/${EPICS_HOST_ARCH%_64} ]
