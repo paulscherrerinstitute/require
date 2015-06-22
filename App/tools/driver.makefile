@@ -1,6 +1,6 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.100 2014/12/10 14:15:29 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.101 2015/06/22 07:42:01 zimoch Exp $
 #
 # This generic makefile compiles EPICS code (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
@@ -83,7 +83,7 @@ DOCUEXT = txt html htm doc pdf ps tex dvi gif jpg png
 DOCUEXT += TXT HTML HTM DOC PDF PS TEX DVI GIF JPG PNG
 DOCUEXT += template db dbt subs subst substitutions script
 
-GLOBALPROJECTS = /PROJECTS/drivers/ /DRV/ /IOCMON/ /CRLOGIC/
+LOCALPROJECTS = /X/ /A/ /F/ /P/ /S/ /Z/
 
 #override config here
 -include ${MAKEHOME}/config
@@ -102,8 +102,9 @@ GLOBALPROJECTS = /PROJECTS/drivers/ /DRV/ /IOCMON/ /CRLOGIC/
 # User can overwrite USE_LIBVERSION in the Makefile.
 
 # Where are we in CVS (or in PWD if no CVS is around)?
-THISDIR := $(if $(wildcard CVS/Repository),$(shell cat CVS/Repository),${PWD})
-USE_LIBVERSION = $(if $(strip $(foreach d,${GLOBALPROJECTS},$(findstring $d,${THISDIR}))),YES,NO)
+THISDIR := $(if $(wildcard CVS/Repository),/$(shell cat CVS/Repository),${PWD})
+# Do not use versions on known local projects (IOC projects)
+USE_LIBVERSION := $(if $(strip $(foreach d,${LOCALPROJECTS},$(findstring $d,${THISDIR}))),NO,YES)
 
 # Some shortcuts
 MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION}
@@ -121,6 +122,14 @@ REGISTRYFILE = ${PRJ}_registerRecordDeviceDriver.cpp
 EXPORTFILE = ${PRJ}_exportAddress.c
 SUBFUNCFILE = ${PRJ}_subRecordFunctions.dbd
 
+# Default target is "build" for all versions.
+# Don't install anything (different from default EPICS make rules)
+default: build
+
+IGNOREFILES = .cvsignore .gitignore
+${IGNOREFILES}:
+	@echo -e "O.*\n.cvsignore\n.gitignore" > $@
+        
 ifndef EPICSVERSION
 ## RUN 1
 # in source directory, first run
@@ -134,12 +143,14 @@ EPICS_VERSIONS_3.13 = $(filter 3.13.%,${BUILD_EPICS_VERSIONS})
 EPICS_VERSIONS_3.14 = $(filter 3.14.%,${BUILD_EPICS_VERSIONS})
 EPICS_VERSIONS_3.15 = $(filter 3.15.%,${BUILD_EPICS_VERSIONS})
 
+#check only what is needed to build the lib? But what is that?
 VERSIONCHECKFILES = ${SOURCES} ${DBDS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v})
-VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONCHECKFILES}
+VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
 LIBVERSION_YES = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 LIBVERSION_Yes = $(LIBVERSION_YES)
 LIBVERSION_yes = $(LIBVERSION_YES)
 LIBVERSION = ${LIBVERSION_${USE_LIBVERSION}}
+VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 
 # Default project name is name of current directory.
 # But don't use "src" or "snl", go up directory tree instead.
@@ -152,10 +163,6 @@ export OS_CLASS_LIST
 
 export ARCH_FILTER
 export EXCLUDE_ARCHS
-
-# Default target is "build" for all versions.
-# Don't install anything (different from default EPICS make rules)
-build::
 
 clean::
 	$(RMDIR) O.*
@@ -181,11 +188,12 @@ help:
 	@echo "  TEMPLATES        ()"
 	@echo "  DBDS             (*.dbd)"
 	@echo "  EXCLUDE_VERSIONS () [versions not to build, e.g. 3.14]"
-	@echo "  EXCLUDE_ARCHS    () [target architectures not to build, e.g. embeddedlinux]"
+	@echo "  EXCLUDE_ARCHS    () [target architectures not to build, e.g. eldk]"
+	@echo "  ARCH_FILTER      () [target architectures to build, e.g. eldk-%]"
 	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"
 
 # "make version" shows the version and why it is how it is.       
-version:
+version: ${IGNOREFILES}
 	@${VERSIONCHECKCMD}
 
 debug::
@@ -201,7 +209,7 @@ debug::
 	@echo "ARCH_FILTER = ${ARCH_FILTER}"
 
 # Loop over all EPICS versions for second run.
-build install uninstall install-headers install-doc install-templates debug::
+build install uninstall install-headers install-doc install-templates debug:: ${IGNOREFILES}
 	for VERSION in ${BUILD_EPICS_VERSIONS}; do \
 	${MAKEVERSION} EPICSVERSION=$$VERSION $@ || exit; done
 
@@ -405,15 +413,12 @@ endef
 
 $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
-install build install-headers debug:: .cvsignore ${BUILDDIRS} ${LINKDIRS}
+install build install-headers debug:: ${BUILDDIRS} ${LINKDIRS}
 # Delete old build if INSTBASE has changed.
 	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
             echo ${INSTBASE} | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RM) O.${EPICSVERSION}_$$ARCH/*; \
 	    ${MAKE} -C O.${EPICSVERSION}_$$ARCH -f ../${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
-
-.cvsignore:
-	echo "O.* .cvsignore" > .cvsignore
 
 # No need to create O.${T_A} subdirectory here:
 uninstall install-doc install-templates::
@@ -453,7 +458,7 @@ CFLAGS += ${EXTRA_CFLAGS}
 
 LIBVERSIONSTR = $(if ${LIBVERSION},-${LIBVERSION})
 TESTVERSION := $(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$")
-PROJECTDBD=${if ${DBDFILES},${PRJ}${LIBVERSIONSTR}.dbd}
+PROJECTDBD=${if $(strip ${DBDFILES}),${PRJ}${LIBVERSIONSTR}.dbd}
 DEPFILE = ${PRJ}${LIBVERSIONSTR}.dep
 
 INSTALL_BIN = ${INSTALL_LOCATION}/${T_A}
@@ -632,9 +637,7 @@ LIBRARY_OBJS = ${LIBOBJS}
 
 # Handle registry stuff automagically if we have a dbd file.
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
-ifdef PROJECTDBD
-LIBOBJS += $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE}))
-endif # PROJECTDBD
+LIBOBJS += $(if $(PROJECTDBD),$(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
 
 endif # both, 3.13 and 3.14 from here
 
@@ -699,9 +702,20 @@ SRC_INCLUDES = $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
 GENERIC_SRC_INCLUDES = $(SRC_INCLUDES)
 
 EXPANDARG = -3.14
-ifneq ($(words $(filter %.c %.cc %.C %.cpp, $(SRCS))),0)
-DBDFILES+=${SUBFUNCFILE}
-endif
+
+# Create dbd file with references to all subRecord functions
+# Problem: functions may be commented out. Better preprocess, but then generate headers first.
+
+#define maksubfuncfile
+#/static/ {static=1} \
+#/\([\t ]*(struct)?[\t ]*(genSub|sub|aSub)Record[\t ]*\*[\t ]*\w+[\t ]*\)/ { \
+#    match ($$0,/(\w+)[\t ]*\([\t ]*(struct)?[\t ]*\w+Record[\t ]*\*[\t ]*\w+[\t ]*\)/, a); \
+#    n=a[1];if(!static && !f[n]){f[n]=1;print "function (" n ")"}} \
+#/[;{}]/ {static=0}
+#endef 
+#
+#$(shell awk '$(maksubfuncfile)' $(addprefix ../,$(filter %.c %.cc %.C %.cpp, $(SRCS))) > ${SUBFUNCFILE})
+#DBDFILES += $(if $(shell cat ${SUBFUNCFILE}),${SUBFUNCFILE})
 
 # snc location in 3.14
 #-include ${SNCSEQ}/configure/RULES_BUILD # incompatible to 3.15
@@ -834,14 +848,6 @@ SNCFLAGS += -r
 	@echo "Converting $*.gt"
 	${LN} $< $(*F).gt
 	gdc $(*F).gt
-
-# Create dbd file with references to all subRecord functions
-${SUBFUNCFILE}: $(filter %.c %.cc %.C %.cpp, $(SRCS))
-	awk '/static/ {static=1} \
-                /\([\t ]*(struct)?[\t ]*(genSub|sub|aSub)Record[\t ]*\*[\t ]*\w+[\t ]*\)/ {\
-		match ($$0,/(\w+)[\t ]*\([\t ]*(struct)?[\t ]*\w+Record[\t ]*\*[\t ]*\w+[\t ]*\)/, a);\
-		n=a[1];if(!static && !f[n]){f[n]=1;print "function (" n ")"}}\
-                /[;{}]/ {static=0}' $^ > $@
 
 # The original 3.13 munching rule does not really work well
 ifeq (${EPICS_BASETYPE},3.13)
