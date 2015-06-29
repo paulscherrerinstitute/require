@@ -1,7 +1,7 @@
 #!/bin/bash
 SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.10 $'
-DATE='$Date: 2015/05/18 14:53:43 $'
+REVISION='$Revision: 3.11 $'
+DATE='$Date: 2015/06/29 09:47:00 $'
 
 help () {
     {
@@ -327,16 +327,18 @@ then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
     ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
     # load "require" command
-    REQUIRE=misc
+    [ -z "$REQUIRE" ] && REQUIRE=misc
     LIBPREFIX=lib
     LIBPOSTFIX=.so
-    LIBFILE=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}
-    if [ ! -f $LIBFILE ]
+    [ -z "$REQUIRE_LIB" ] && REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}
+    [ -z "$REQUIRE_DBD" ] && REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/${REQUIRE}.dbd
+    if [ ! -f $REQUIRE_LIB ]
     then
-        echo "Library ${LIBPREFIX}${REQUIRE}${LIBPOSTFIX} not found. Command 'require' is not available." >&2
+        echo "Library $REQUIRE_LIB not found." >&2
+        echo "Command 'require' is not available." >&2
     else
-        echo "dlload $INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/${LIBPREFIX}${REQUIRE}${LIBPOSTFIX}"
-        echo "dbLoadDatabase $INSTBASE/iocBoot/R$BASE/dbd/${REQUIRE}.dbd"
+        echo "dlload $REQUIRE_LIB"
+        echo "dbLoadDatabase $REQUIRE_DBD"
         echo "${REQUIRE%-*}_registerRecordDeviceDriver"
     fi
 else
