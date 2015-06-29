@@ -4,6 +4,8 @@ include /ioc/tools/driver.makefile
 USR_INCLUDES_Linux=-idirafter ${EPICS_BASE}/include 
 USR_INCLUDES+=$(USR_INCLUDES_$(OS_CLASS))
 
+USR_CFLAGS=-DEPICS_RELEASE=$(EPICS_VERSION) -DT_A=$(T_A)
+
 HEADERS += require.h
 BUILDCLASSES += Linux
 

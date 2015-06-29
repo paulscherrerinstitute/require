@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2015/05/18 10:50:45 $
+* $Date: 2015/06/29 09:47:30 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <dirent.h>
 
 #include <epicsVersion.h>
 #ifdef BASE_VERSION
@@ -60,6 +61,8 @@ static int firstTime = 1;
     
     #define getAddress(module,name) __extension__ \
         ({SYM_TYPE t; char* a=NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
+        
+    #define snprintf(s, n, f, args...) sprintf(s, f, ## args)
 
 #elif defined (__unix)
 
@@ -97,6 +100,11 @@ static int firstTime = 1;
     #define getAddress(module,name) NULL
 
 #endif
+
+#define toStr2(x) x
+#define toStr(x) toStr2(#x) 
+const char epicsRelease[] = toStr(EPICS_RELEASE);
+const char targetArch[] = toStr(T_A);
 
 /* loadlib (library)
 Find a loadable library by name and load it.
@@ -300,39 +308,35 @@ int libversionShow(const char* pattern)
     return 0;
 }
 
-static int validate(const char* module, const char* version, const char* loaded)
-{
-    int lmajor, lminor, lpatch, lmatches;
-    int major, minor, patch, matches;
-    
-    if (!version || !*version || strcmp(loaded, version) == 0)
-    {
-        /* no version requested or exact match */
-        return 0;
-    }
-    if (!isdigit((unsigned char)loaded[0]))
-    {
-        /* test version already loaded */
-        printf("Warning: %s test version %s already loaded where %s was requested\n",
-            module, loaded, version);
-        return 0;
-    }
-    /* non-numerical versions must match exactly
-       numerical versions must have exact match in major version and
-       backward-compatible match in minor version and patch level
-    */
+#define MISMATCH -1
+#define EXACT 0
+#define MATCH 1
+#define COMPATIBLE 2
+#define TESTVERS 3
 
-    lmatches = sscanf(loaded, "%d.%d.%d", &lmajor, &lminor, &lpatch);
-    matches = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
-    if (((matches == 0 || lmatches == 0) &&
-            strcmp(loaded, version) != 0)             
-        || major != lmajor
-        || (matches >= 2 && minor > lminor)
-        || (matches > 2 && minor == lminor && patch > lpatch))
-    {
-        return -1;
-    }
-    return 0;
+static int compareVersions(const char* request, const char* found)
+{
+    int found_major, found_minor=0, found_patch=0, found_parts;
+    int req_major, req_minor, req_patch, req_parts;
+    
+    if (!request || !*request)       return MATCH;      /* No particular version request. */
+    if (strcmp(found, request) == 0) return EXACT;      /* Exact match. */
+
+    /* Numerical version compare. Format is major.minor.patch
+       Numerical requests must have exact match in major and
+       backward-compatible number in minor and patch
+    */
+    req_parts = sscanf(request, "%d.%d.%d", &req_major, &req_minor, &req_patch);
+    if (req_parts == 0)              return MISMATCH;   /* Test version request not found */
+    found_parts = sscanf(found, "%d.%d.%d", &found_major, &found_minor, &found_patch);
+    if (found_parts == 0)            return TESTVERS;   /* Test version found */
+    if (found_major != req_major)    return MISMATCH;   /* major mismatch */
+    if (req_parts == 1)              return MATCH;      /* only major requested matches */
+    if (found_minor < req_minor)     return MISMATCH;   /* minor too small */
+    if (found_minor > req_minor)     return COMPATIBLE; /* minor larger than required */
+    if (req_parts == 2)              return MATCH;      /* major and minor requested matches */
+    if (found_patch < req_patch)     return MISMATCH;   /* patch level too small */
+    return COMPATIBLE;                                  /* patch level higher or equal but "+" requested */
 }
 
 /* require (module)
@@ -347,9 +351,9 @@ it calls epicsExit to abort the application.
 */
 
 /* wrapper to abort statup script */
-static int require_priv(const char* module, const char* ver);
+static int require_priv(const char* module, const char* ver, const char* args);
 
-int require(const char* module, const char* ver)
+int require(const char* module, const char* ver, const char* args)
 {
     if (firstTime)
     {
@@ -357,7 +361,18 @@ int require(const char* module, const char* ver)
         registerExternalModules();
     }
     
-    if (require_priv(module, ver) != 0 && !interruptAccept)
+    if (!module)
+    {
+        printf("Usage: require \"<module>\" [, \"<version>\"] [, \"<args>\"]\n");
+        printf("Loads " PREFIX "<module>" INFIX "[-<version>]" EXT " and dbd/<libname>[-<version>].dbd\n");
+#ifdef EPICS_3_14
+        printf("And calls <module>_registerRecordDeviceDriver\n");
+#endif
+        printf("If available, runs startup script snippet or loads substitution file with args\n");
+        return -1;
+    }
+    
+    if (require_priv(module, ver, args) != 0 && !interruptAccept)
     {
         /* require failed in startup script before iocInit */
         fprintf(stderr, "Aborting startup script\n");
@@ -371,67 +386,185 @@ int require(const char* module, const char* ver)
     return 0;
 }
 
-static int require_priv(const char* module, const char* vers)
+static int checkLoadedVersion(const char* module, const char* version)
 {
-    char* driverpath = ".";
-    char version[20];
     const char* loaded;
+
+    if (requireDebug)
+        printf("require: checking module %s version %s\n",
+            module, vers);
+
+    found = getLibVersion(module);
+    if (loaded)
+    {
+        if (requireDebug)
+            printf("require: %s version %s already loaded\n",
+                module, found);
+        /* Library already loaded. Check Version. */
+        switch (compareVersions(version, loaded))
+        {
+            case MISMATCH:
+                printf("Conflict between requested %s version %s\n"
+                    "and already loaded version %s.\n",
+                    module, version, loaded);
+                return -1;
+            case TESTVERS:
+                printf("Warning: %s test version %s already loaded where %s was requested\n",
+                    module, loaded, version);
+                break;
+            default: /* EXACT or MATCH or COMPATIBLE */
+                printf ("%s %s already loaded\n", module, loaded);
+        }
+        /* Already loaded version is ok */
+        return 0;
+    }
+}
+
+static int require_priv(const char* module, const char* vers, const char* args)
+{
+    char version[20];
+    const char* found;
     struct stat filestat;
     HMODULE libhandle;
     char* p;
     char *end; /* end of string */
     const char sep[1] = PATHSEP;
-    
-    if (requireDebug)
-        printf("require: checking module %s version %s\n",
-            module, vers);
-    driverpath = getenv("EPICS_DRIVER_PATH");
-    if (requireDebug)
-        printf("require: searchpath=%s\n",
-            driverpath);
-    if (!module)
-    {
-        printf("Usage: require \"<module>\" [, \"<version>\"]\n");
-        printf("Loads " PREFIX "<module>" INFIX "[-<version>]" EXT " and dbd/<libname>[-<version>].dbd\n");
-#ifdef EPICS_3_14
-        printf("And calls <module>_registerRecordDeviceDriver\n");
-#endif
-        printf("Search path is %s\n", driverpath);
-        return -1;
-    }
-    
+    char* driverpath;
+
     memset(version, 0, sizeof(version));
     if (vers) strncpy(version, vers, sizeof(version));
     
-    loaded = getLibVersion(module);
-    if (loaded)
+    if (checkLoadedVersion(module, version) == 0) return 0;
+    
+
+    driverpath = getenv("EPICS_DRIVER_PATH");
+    if (!driverpath) driverpath = ".";
+
+    if (requireDebug)
+        printf("require: searchpath=%s\n", driverpath);
+
+    /* NEW */
+
+    /* Search for module in driverpath */
+    for (p = driverpath; p != NULL; p = end)
+    {
+        char libdir[256];
+        char fulllibdir[256];
+        char foundlibdir[256];
+        DIR* dir;
+        struct dirent* dirent;
+
+        end = strchr(p, sep[0]);
+        snprintf(libdir, sizeof(libdir), "%.*s" DIRSEP "%s", 
+            (int)(end?(end++-p):sizeof(libdir)), p, module);
+
+        /* Ignore empty driverpath elements */
+        if (libdir[0] == 0) continue;
+
+        /* Does the module directory exist? */
+        dir = opendir(libdir);
+        if (requireDebug)
+            printf("require: directory candidate %s %sfound\n", libdir, dir?"":"not ");
+        if (!dir) continue;
+
+        /* Found module directory in driverpath. Now look for versions. */
+        while ((dirent = readdir(dir)) != NULL)
+        {
+            #ifdef _DIRENT_HAVE_D_TYPE
+            if (dirent->d_type != DT_DIR && dirent->d_type != DT_UNKNOWN) continue; /* not a directories */
+            #endif
+            if (dirent->d_name[0] == '.') continue;  /* ignore hidden directories */
+
+            /* Look for highest matching version. */
+            if (requireDebug)
+                printf("require: checking %s against %s\n",
+                        dirent->d_name, version);
+            switch (compareVersions(version, dirent->d_name))
+            {
+                int i;
+                case MISMATCH:
+                    if (requireDebug)
+                        printf("require: %s %s does not match %s\n",
+                            module, dirent->d_name, version);
+                    continue;
+                case MATCH:
+                    snprintf(foundlibdir, sizeof(foundlibdir), "%s" DIRSEP "%n%s",
+                        libdir, &i, dirent->d_name);
+                    found = foundlibdir + i;
+                    if (requireDebug)
+                        printf("require: %s %s matches %s exactly\n",
+                            module, found, version);
+                    /* We are done. */
+                    end = NULL;
+                    break;
+                case COMPATIBLE:  /* Potential version found. */
+                    if (requireDebug)
+                        printf("require: %s %s may match %s\n",
+                            module, dirent->d_name, version);
+
+                    /* Check if it has our EPICS version and architecture. */
+                    snprintf(fulllibdir, sizeof(fulllibdir),
+                        "%s" DIRSEP "%s" DIRSEP "%s" DIRSEP "lib" DIRSEP  "%s" DIRSEP,
+                        libdir, dirent->d_name, epicsRelease, targetArch);
+                    if (stat(fulllibdir, &filestat) == 0)
+                    {
+                         if (requireDebug)
+                            printf("require: %s %s has no support for %s %s\n",
+                                module, dirent->d_name, epicsRelease, targetArch);
+                        continue;
+                    }
+
+                    /* Is it higher than the one we found before? */
+                    if (compareVersions(found, dirent->d_name) == 1)
+                    {
+                        if (requireDebug)
+                            printf("require: %s %s looks promising\n",
+                                module, dirent->d_name);
+                        snprintf(foundlibdir, sizeof(foundlibdir), "%s" DIRSEP "%n%s",
+                            libdir, &i, dirent->d_name);
+                        found = foundlibdir + i;
+                    }
+                    /* Keep trying */;
+                    continue;
+            }
+            break;
+        }
+        closedir(dir);
+        if (!found && requireDebug)
+            printf("require: No matching version in %s\n", libdir);
+    }
+    if (found)
     {
         if (requireDebug)
-            printf("require: loaded version of %s is %s\n",
-                module, loaded);
-        /* Library already loaded. Check Version. */
-        if (validate(module, version, loaded) != 0)
-        {
-            printf("Conflict between requested %s version %s\n"
-                "and already loaded version %s.\n",
-                module, version, loaded);
-            return -1;
-        }
-        /* Loaded version is ok */
-        printf ("%s %s already loaded\n", module, loaded);
-        return 0;
-    }
-    else
-    {
-        char libname[256];
-        char dbdname[256];
-        char depname[256];
-        char libdir[256];
-        char fulllibname[256];
-        char fulldbdname[256];
-        char fulldepname[256];
-        char symbolname[256];
+            printf("require: found module in %s\n", foundlibdir);
 
+        /* check dependencies */
+
+        /* load library */
+
+        /* load dbd file */
+
+        /* call register function */
+
+        /* load startup script */
+
+        /* load substitution file */
+
+
+        return -1;
+    }
+    char libname[256];
+    char dbdname[256];
+    char depname[256];
+    char fulllibname[256];
+    char fulldbdname[256];
+    char fulldepname[256];
+    char symbolname[256];
+        
+        if (requireDebug)
+            printf("require: trying the old way\n");
+        /* OLD */
+        
         /* user may give a minimal version (e.g. "1.2.4+")
            load highest matching version (here "1.2") and check later
         */
@@ -581,7 +714,7 @@ static int require_priv(const char* module, const char* vers)
             loaded = "";
         }
 
-        if (validate(module, vers, loaded) != 0)
+        if (compareVersions(vers, loaded) == -1)
         {
             fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
                 module, vers, loaded);
@@ -651,7 +784,6 @@ static int require_priv(const char* module, const char* vers)
         
         registerModule(module, loaded);
         return 0;
-    }
 }
 
 #ifdef EPICS_3_14
