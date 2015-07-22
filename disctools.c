@@ -3,7 +3,7 @@
 *
 * $Author: zimoch $
 * $ID$
-* $Date: 2015/02/16 16:09:22 $
+* $Date: 2015/07/22 12:25:23 $
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
@@ -19,6 +19,8 @@
 #include <malloc.h>
 #include <pwd.h>
 #include <grp.h>
+#include <glob.h>
+#include <errno.h>
 #endif
 #include <epicsExport.h>
 
@@ -195,23 +197,88 @@ static void rmdirFunc(const iocshArgBuf *args)
 }
 
 /* rm */
-static const iocshArg rmArg0 = { "file", iocshArgString };
+static const iocshArg rmArg0 = { "[-rf] files", iocshArgArgv};
 static const iocshArg * const rmArgs[1] = { &rmArg0 };
 static const iocshFuncDef rmDef = { "rm", 1, rmArgs };
 
-static void rmFunc(const iocshArgBuf *args)
+static int globerr (const char *epath, int eerrno)
+{
+    fprintf(stderr, "rm: %s %s\n", epath, strerror(eerrno));
+    return 0;
+}
+
+struct rmflags_t {
+    unsigned int r : 1;
+    unsigned int f : 1;
+    unsigned int endflags : 1;
+};
+
+static void rmPriv(char* pattern, struct rmflags_t flags)
 {
     char* filename;
+    int j;
+    glob_t globresult;
 
-    filename = args[0].sval;
-    if (!filename)
+    glob(pattern, GLOB_NOSORT|GLOB_NOMAGIC
+#ifdef  GLOB_BRACE
+            |GLOB_BRACE|GLOB_TILDE
+#endif
+            ,globerr, &globresult);
+    for (j = 0; j < globresult.gl_pathc; j++)
     {
-        fprintf(stderr, "missing file name\n");
-        return;
+        filename = globresult.gl_pathv[j];
+        if (unlink(filename))
+        {
+            if (errno == ENOENT && flags.f) continue;
+            if (errno == EISDIR && flags.r)
+            {
+                char* p=malloc(strlen(filename)+3);
+                if (p)
+                {
+                    sprintf(p, "%s/*", filename);
+                    rmPriv(p, flags);
+                    free(p);
+                    if (rmdir(filename) == 0) continue;
+                }
+            }
+            perror(filename);
+        }
     }
-    if (unlink(filename))
+    globfree(&globresult);
+}
+
+static void rmFunc(const iocshArgBuf *args)
+{
+    char *arg;
+    int i,j;
+    struct rmflags_t flags = {0};
+
+    for (i = 1; i < args[0].aval.ac; i++)
     {
-        perror(filename);
+        arg = args[0].aval.av[i];
+        if (arg[0] != '-') continue;
+        if (arg[1] == '-' && arg[2] == 0) break;
+        for (j = 1; arg[j]; j++)
+        {
+            switch (arg[j])
+            {
+                case 'r': flags.r = 1; break;
+                case 'f': flags.f = 1; break;
+                default:
+                    fprintf(stderr, "rm: ignoring unknown option -%c\n", arg[j]);
+            }
+        }
+    }
+    for (i = 1; i < args[0].aval.ac; i++)
+    {
+        arg = args[0].aval.av[i];
+        if (!flags.endflags && arg[0] == '-')
+        {
+            if (arg[1] == '-' && arg[2] == 0)
+                flags.endflags = 1;
+            continue;
+        }
+        rmPriv(arg, flags);
     }
 }
 
