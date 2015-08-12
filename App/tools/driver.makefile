@@ -438,6 +438,7 @@ endif
 else # in O.*
 ## RUN 4
 # in O.* directory
+$(foreach v, USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v_${OS_CLASS}} $${$v_${T_A}}))
 CFLAGS += ${EXTRA_CFLAGS}
 
 TESTVERSION := $(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$")
