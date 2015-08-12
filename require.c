@@ -7,26 +7,39 @@
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <unistd.h>
+#include <errno.h>
 
+#include <macLib.h>
 #include <epicsVersion.h>
 #ifdef BASE_VERSION
 #define EPICS_3_13
 #define epicsStdoutPrintf printf
-int dbLoadDatabase(char *filename, char *path, char *substitutions);
+extern int dbLoadDatabase(const char *filename, const char *path, const char *substitutions);
+extern int dbLoadTemplate(const char *filename);
+int dbLoadRecords(const char *filename, const char *substitutions)
+{
+    /* This implementation respects EPICS_DB_INCLUDE_PATH */
+    return dbLoadDatabase(filename, NULL, substitutions);
+}
 extern volatile int interruptAccept;
-#else
-#define EPICS_3_14
+#else /* 3.14+ */
 #include <iocsh.h>
 #include <dbAccess.h>
 epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
 #include <epicsExit.h>
 #include <epicsStdio.h>
+#include <dbLoadTemplate.h>
 #include <epicsExport.h>
 #endif
 
@@ -52,25 +65,32 @@ static int firstTime = 1;
     #include <usrLib.h>
     #include <taskLib.h>
     #include <ioLib.h>
-    #include <errno.h>
+    #include <envLib.h>
+    #include <epicsAssert.h>
+    #include "strdup.h"
+    #include "asprintf.h"
 
     #define HMODULE MODULE_ID
     #undef  INFIX
     #define INFIX "Lib"
     #define EXT ".munch"
     
-    #define getAddress(module,name) __extension__ \
-        ({SYM_TYPE t; char* a=NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
+    #define getAddress(module, name) __extension__ \
+        ({SYM_TYPE t; char* a = NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
         
-    #define snprintf(s, n, f, args...) sprintf(s, f, ## args)
+    /* vxWorks has no snprintf() */
+    #define snprintf(s, maxchars, f, args...) __extension__ \
+        ({int printed=sprintf(s, f, ## args); assert(printed < maxchars); printed;})
 
+    extern char** ppGlobalEnviron;
+    extern int execute();
+    
 #elif defined (__unix)
 
-    #define __USE_GNU
     #include <dlfcn.h>
     #define HMODULE void *
 
-    #define getAddress(module,name) (dlsym(module, name))
+    #define getAddress(module, name) dlsym(module, name)
 
     #ifdef CYGWIN32
 
@@ -83,6 +103,7 @@ static int firstTime = 1;
         #define EXT ".so"
 
     #endif
+    extern char** environ;
 
 #elif defined (_WIN32)
 
@@ -93,18 +114,20 @@ static int firstTime = 1;
     #define PATHSEP ";"
     #define EXT ".dll"
 
-    #define getAddress(module,name) (GetProcAddress(module, name))
+    #define getAddress(module, name) GetProcAddress(module, name)
 #else
 
     #warning unknwn OS
-    #define getAddress(module,name) NULL
+    #define getAddress(module, name) NULL
 
 #endif
 
-#define toStr2(x) x
-#define toStr(x) toStr2(#x) 
-const char epicsRelease[] = toStr(EPICS_RELEASE);
-const char targetArch[] = toStr(T_A);
+#define LIBDIR "lib" DIRSEP
+#define TEMPLATEDIR "db"
+
+const char epicsRelease[] = EPICS_RELEASE;
+const char targetArch[] = T_A;
+const char osClass[] = OS_CLASS;
 
 /* loadlib (library)
 Find a loadable library by name and load it.
@@ -114,20 +137,20 @@ static HMODULE loadlib(const char* libname)
 {
     HMODULE libhandle = NULL;
 
-    if (!libname)
+    if (libname == NULL)
     {
         fprintf (stderr, "missing library name\n");
         return NULL;
     }
 
 #if defined (__unix)
-    if (!(libhandle = dlopen(libname, RTLD_NOW|RTLD_GLOBAL)))
+    if ((libhandle = dlopen(libname, RTLD_NOW|RTLD_GLOBAL)) == NULL)
     {
         fprintf (stderr, "Loading %s library failed: %s\n",
             libname, dlerror());
     }
 #elif defined (_WIN32)
-    if (!(libhandle = LoadLibrary(libname)))
+    if ((libhandle = LoadLibrary(libname)) == NULL)
     {
         LPVOID lpMsgBuf;
 
@@ -174,89 +197,117 @@ static HMODULE loadlib(const char* libname)
 typedef struct moduleitem
 {
     struct moduleitem* next;
-    char name[100];
-    char version[20];
+    char content[0];
 } moduleitem;
 
 moduleitem* loadedModules = NULL;
 
-static void registerModule(const char* module, const char* version)
+static void registerModule(const char* module, const char* version, const char* location)
 {
-    moduleitem* m = (moduleitem*) calloc(sizeof (moduleitem),1);
-    if (!m)
+    moduleitem* m;
+    size_t lm = strlen(module) + 1;
+    size_t lv = (version ? strlen(version) : 0) + 1;
+    size_t ll = (location ? strlen(location) : 0) + 1;
+
+    if (requireDebug)
+        printf("require: registerModule(%s,%s,%s)\n", module, version, location);
+    m = (moduleitem*) malloc(sizeof(moduleitem) + lm + lv + ll);
+    if (m == NULL)
     {
-        printf ("require: out of memory\n");
+        fprintf(stderr, "require: out of memory\n");
+        return;
     }
-    else
-    {
-        strncpy (m->name, module, sizeof(m->name));
-        strncpy (m->version, version, sizeof(m->version));
-        m->next = loadedModules;
-        loadedModules = m;
-    }
+    strcpy (m->content, module);
+    strcpy (m->content+lm, version ? version : "");
+    strcpy (m->content+lm+lv, location ? location : "");
+    m->next = loadedModules;
+    loadedModules = m;
 }
 
 #if defined (vxWorks)
-BOOL findLibRelease (
+static BOOL findLibRelease (
     char      *name,  /* symbol name       */
     int       val,    /* value of symbol   */
     SYM_TYPE  type,   /* symbol type       */
     int       arg,    /* user-supplied arg */
     UINT16    group   /* group number      */
 ) {
-    char libname [20];
-    int e;
+    /* find symbols with a name like "_<module>LibRelease" */
+    char* module;
+    size_t lm;
+
     if (name[0] != '_') return TRUE;
-    e = strlen(name) - 10;
-    if (e <= 0 || e > 20) return TRUE;
-    if (strcmp(name+e, "LibRelease") != 0) return TRUE;
-    strncpy(libname, name+1, e-1);
-    libname[e-1]=0;
-    if (!getLibVersion(libname))
+    lm = strlen(name);
+    if (lm <= 10) /* strlen("LibRelease") */ return TRUE;
+    lm -= 10;
+    if (strcmp(name+lm, "LibRelease") != 0) return TRUE;
+    module = strdup(name+1);
+    module[lm-1]=0;
+    if (getLibVersion(module) == NULL)
     {
-        registerModule(libname, (char*)val);
+        registerModule(module, (char*)val, NULL);
     }
+    free(module);
     return TRUE;
 }
 
 static void registerExternalModules()
 {
+    /* iterate over all symbols */
     symEach(sysSymTbl, (FUNCPTR)findLibRelease, 0);
 }
 
 #elif defined (__linux)
+/* This is the Linux link.h, not the EPICS link.h ! */
 #include <link.h>
 
-int findLibRelease (
+static int findLibRelease (
     struct dl_phdr_info *info, /* shared library info */
     size_t size,               /* size of info structure */
     void *data                 /* user-supplied arg */
 ) {
     void *handle;
-    char symname [80];
-    const char* p;
-    char* q;
+    char* name;
+    char* location = NULL;
+    char* p;
     char* version;
+    char* symname;
     
-    if (!info->dlpi_name || !info->dlpi_name[0]) return 0;
-    p = strrchr(info->dlpi_name, '/');
-    if (p) p+=4; else p=info->dlpi_name + 3;
+    /* find a symbol with a name like "_<module>LibRelease"
+       where <module> is from the library name "<location>/lib<module>.so" */
+    if (info->dlpi_name == NULL || info->dlpi_name[0] == 0) return 0;  /* no library name */
+    name = malloc(strlen(info->dlpi_name)+11);              /* get a modifiable copy + space for "LibRelease" */
+    if (name == NULL)
+    {
+        perror("require");
+        return 0;
+    }
+    strcpy(name, info->dlpi_name);
+    handle = dlopen(info->dlpi_name, RTLD_LAZY);            /* re-open already loaded library */
+    p = strrchr(name, '/');                                 /* find file name part in "<location>/lib<module>.so" */
+    if (p) {location = name; *++p=0;}                       /* terminate "<location>/" */
+    else p=name;
+    symname = p+2;                                          /* replace "lib" with "_" */
     symname[0] = '_';
-    for (q=symname+1; *p && *p != '.' && *p != '-' && q < symname+11; p++, q++) *q=*p;
-    strcpy(q, "LibRelease");
-    handle = dlopen(info->dlpi_name, RTLD_NOW|RTLD_GLOBAL);
-    version = dlsym(handle, symname);
-    dlclose(handle);
-    *q = 0;
+    p = strchr(symname, '.');                               /* replace ".so" with "LibRelease" */
+    if (p == NULL) p = symname + strlen(symname);
+    strcpy(p, "LibRelease");
+    version = dlsym(handle, symname);                       /* find symbol "_<module>LibRelease" */
     if (version)
     {
-        registerModule(symname+1, version);
+        *p=0; symname++;                                    /* build module name "<module>" */
+        if ((p = strstr(name, DIRSEP LIBDIR)) != NULL)
+            p[1]=0;                                         /* cut "<location>" before libdir */
+        registerModule(symname, version, location);
     }
+    dlclose(handle);
+    free(name);
     return 0;
 }
 
 static void registerExternalModules()
 {
+    /* iterate over all loaded libraries */
     dl_iterate_phdr(findLibRelease, NULL);
 }
 
@@ -264,7 +315,7 @@ static void registerExternalModules()
 
 static void registerExternalModules()
 {
-    ;
+    fprintf (stderr, "How to find symbols on Windows?\n");
 }
 
 
@@ -282,19 +333,36 @@ const char* getLibVersion(const char* libname)
 
     for (m = loadedModules; m; m=m->next)
     {
-        if (strncmp(m->name, libname, sizeof(m->name)) == 0)
+        if (strcmp(m->content, libname) == 0)
         {
-            return m->version;
+            return m->content+strlen(m->content)+1;
         }
     }
     return NULL;
 }
 
-int libversionShow(const char* pattern)
+const char* getLibLocation(const char* libname)
 {
     moduleitem* m;
+    char *v;
+
+    for (m = loadedModules; m; m=m->next)
+    {
+        if (strcmp(m->content, libname) == 0)
+        {
+            v = m->content+strlen(m->content)+1;
+            return v+strlen(v)+1;
+        }
+    }
+    return NULL;
+}
+
+int libversionShow(const char* pattern, int showLocation)
+{
+    moduleitem* m;
+    int lm, lv;
     
-    if (firstTime)
+    if (firstTime) /* can only happen on vxWorks */
     {
         firstTime=0;
         registerExternalModules();
@@ -302,8 +370,13 @@ int libversionShow(const char* pattern)
 
     for (m = loadedModules; m; m=m->next)
     {
-        if (pattern && !strstr(m->name, pattern)) return 0;
-        epicsStdoutPrintf("%15s %s\n", m->name, m->version);
+        if (pattern && *pattern && !strstr(m->content, pattern)) continue;
+        lm = strlen(m->content)+1;
+        lv = strlen(m->content+lm)+1;
+        epicsStdoutPrintf("%20s %-20s %s\n",
+            m->content,
+            m->content+lm,
+            showLocation ? m->content+lm+lv : "");
     }
     return 0;
 }
@@ -311,7 +384,6 @@ int libversionShow(const char* pattern)
 #define MISMATCH -1
 #define EXACT 0
 #define MATCH 1
-#define COMPATIBLE 2
 #define TESTVERS 3
 
 static int compareVersions(const char* request, const char* found)
@@ -319,7 +391,14 @@ static int compareVersions(const char* request, const char* found)
     int found_major, found_minor=0, found_patch=0, found_parts;
     int req_major, req_minor, req_patch, req_parts;
     
-    if (!request || !*request)       return MATCH;      /* No particular version request. */
+    found_parts = sscanf(found, "%d.%d.%d", &found_major, &found_minor, &found_patch);
+
+    if (request == NULL || request[0] == 0)            /* No particular version request. match anything */
+    {
+        if (found_parts == 0)       return TESTVERS;   /* Test version found */
+        return MATCH;
+    }
+    
     if (strcmp(found, request) == 0) return EXACT;      /* Exact match. */
 
     /* Numerical version compare. Format is major.minor.patch
@@ -328,15 +407,43 @@ static int compareVersions(const char* request, const char* found)
     */
     req_parts = sscanf(request, "%d.%d.%d", &req_major, &req_minor, &req_patch);
     if (req_parts == 0)              return MISMATCH;   /* Test version request not found */
-    found_parts = sscanf(found, "%d.%d.%d", &found_major, &found_minor, &found_patch);
     if (found_parts == 0)            return TESTVERS;   /* Test version found */
     if (found_major != req_major)    return MISMATCH;   /* major mismatch */
     if (req_parts == 1)              return MATCH;      /* only major requested matches */
     if (found_minor < req_minor)     return MISMATCH;   /* minor too small */
-    if (found_minor > req_minor)     return COMPATIBLE; /* minor larger than required */
+    if (found_minor > req_minor)                        /* minor larger than required */
+    {
+        if(request[strlen(request)-1] == '+')
+            return MATCH;
+        else
+            return MISMATCH;
+    }
     if (req_parts == 2)              return MATCH;      /* major and minor requested matches */
     if (found_patch < req_patch)     return MISMATCH;   /* patch level too small */
-    return COMPATIBLE;                                  /* patch level higher or equal but "+" requested */
+    return MATCH;                                       /* patch level higher or equal but "+" requested */
+}
+
+static int putenvprintf(const char* format, ...) __attribute__((format(printf,1,2)));
+static int putenvprintf(const char* format, ...)
+{
+    va_list ap;
+    char *var;
+    
+    va_start(ap, format);
+    if (vasprintf(&var, format, ap) < 0)
+    {
+        perror("require putenv");
+        return errno;
+    }
+    va_end(ap);
+    
+    if (requireDebug)
+        printf("require: putenv(\"%s\")\n", var);
+    putenv(var);
+#ifdef vxWorks
+    free(var);
+#endif
+    return 0;
 }
 
 /* require (module)
@@ -351,55 +458,272 @@ it calls epicsExit to abort the application.
 */
 
 /* wrapper to abort statup script */
-static int require_priv(const char* module, const char* ver, const char* args);
+static int require_priv(const char* module, const char* version, const char* args);
 
-int require(const char* module, const char* ver, const char* args)
+int require(const char* module, const char* version, const char* args)
 {
-    if (firstTime)
+    int status;
+
+    if (firstTime) /* can only happen on vxWorks */
     {
         firstTime=0;
         registerExternalModules();
     }
     
-    if (!module)
+    if (getenv("EPICS_DB_INCLUDE_PATH") == NULL)
+        putenv("EPICS_DB_INCLUDE_PATH=.");
+
+    if (getenv("T_A") == NULL)
+        putenvprintf("T_A=%s", targetArch);
+
+    if (getenv("EPICS_RELEASE") == NULL)
+        putenvprintf("EPICS_RELEASE=%s", epicsRelease);
+    
+    if (module == NULL)
     {
         printf("Usage: require \"<module>\" [, \"<version>\"] [, \"<args>\"]\n");
-        printf("Loads " PREFIX "<module>" INFIX "[-<version>]" EXT " and dbd/<libname>[-<version>].dbd\n");
-#ifdef EPICS_3_14
+        printf("Loads " PREFIX "<module>" INFIX EXT " and <libname>.dbd\n");
+#ifndef EPICS_3_13
         printf("And calls <module>_registerRecordDeviceDriver\n");
 #endif
-        printf("If available, runs startup script snippet or loads substitution file with args\n");
+        printf("If available, runs startup script snippet or loads substitution file or templates with args\n");
         return -1;
     }
     
-    if (require_priv(module, ver, args) != 0 && !interruptAccept)
+    /* either order for version and args, either may be empty or NULL */
+    if (version && strchr(version, '='))
     {
-        /* require failed in startup script before iocInit */
-        fprintf(stderr, "Aborting startup script\n");
-#ifdef vxWorks
-        shellScriptAbort();
-#else
-        epicsExit(1);
-#endif
-        return -1;
+        const char *v = version;
+        version = args;
+        args = v;
+        if (requireDebug)
+            printf("require: swap version and args\n");
     }
+    
+    status = require_priv(module, version, args);
+    if (status == 0) return 0;
+    if (status != -1) perror("require");
+    if (interruptAccept) return status;
+
+    /* require failed in startup script before iocInit */
+    fprintf(stderr, "Aborting startup script\n");
+    #ifdef vxWorks
+    shellScriptAbort();
+    #else
+    epicsExit(1);
+    #endif
+    return status;
+}
+
+static off_t fileSize(const char* filename)
+{
+    struct stat filestat;
+    if (stat(
+#ifdef vxWorks
+        (char*) /* vxWorks has buggy stat prototype */
+#endif
+        filename, &filestat) != 0) return -1;
+    return filestat.st_size;
+}
+#define fileExists(filename) (fileSize(filename)>=0)
+
+static int handleDependencies(const char* module, char* depfilename)
+{
+    FILE* depfile;
+    char buffer[40];
+    char *end; /* end of string */
+    char *rmodule; /* required module */
+    char *rversion; /* required version */
+
+    /* parse dependency file if exists */
+    if (!fileExists(depfilename))
+    {
+        if (requireDebug)
+            printf("require: no dependency file %s\n", depfilename);
+        return 0;
+    }
+    if (requireDebug)
+        printf("require: parsing dependency file %s\n", depfilename);
+    depfile = fopen(depfilename, "r");
+    while (fgets(buffer, sizeof(buffer)-1, depfile))
+    {
+        rmodule = buffer;
+        /* ignore leading spaces */
+        while (isspace((unsigned char)*rmodule)) rmodule++;
+        /* ignore empty lines and comment lines */
+        if (*rmodule == 0 || *rmodule == '#') continue;
+        /* rmodule at start of module name */
+        rversion = rmodule;
+        /* find end of module name */
+        while (*rversion && !isspace((unsigned char)*rversion)) rversion++;
+        /* terminate module name */
+        *rversion++ = 0;
+        /* ignore spaces */
+        while (isspace((unsigned char)*rversion)) rversion++;
+        /* rversion at start of version */
+        end = rversion;
+        /* find end of version */
+        while (*end && !isspace((unsigned char)*end)) end++;
+        /* add + if not yet there */
+        if (*(end-1) != '+') *end++ = '+';
+        /* terminate version */
+        *end = 0;
+        printf("Module %s depends on %s %s\n", module, rmodule, rversion);
+        if (require(rmodule, rversion, NULL) != 0)
+        {
+            fclose(depfile);
+            return -1;
+        }
+    }
+    fclose(depfile);
     return 0;
 }
 
-static int checkLoadedVersion(const char* module, const char* version)
+int runScript(const char* filename, const char* args)
 {
-    const char* loaded;
+    MAC_HANDLE *mac = NULL;
+    FILE* file = NULL;
+    char* line_raw = NULL;
+    char* line_exp = NULL;
+    long line_raw_size = 100;
+    long line_exp_size = line_raw_size;
+    char** pairs;
+    int status = 0;
 
-    if (requireDebug)
-        printf("require: checking module %s version %s\n",
-            module, vers);
+    pairs = (char*[]){ "", "environ", NULL, NULL };
+    
+    if ((file = fopen(filename, "r")) == NULL) { perror(filename); return errno; }
+    if (macCreateHandle(&mac, pairs) != 0) goto error;
+    macSuppressWarning(mac, 1);
+    #ifdef EPICS_3_13
+    /* Have no environment macro substitution, thus load envionment explicitly */
+    /* Actually environmant macro substitution was introduced in 3.14.3 */
+    for (pairs = environ; *pairs; pairs++)
+    {
+        char* var, *eq;
+        if (requireDebug)
+            printf("runScript: environ %s\n", *pairs);
 
-    found = getLibVersion(module);
-    if (loaded)
+        /* take a copy to replace '=' with 0 */
+        if ((var = strdup(*pairs)) == NULL) goto error;
+        eq = strchr(var, '=');
+        if (eq)
+        {
+            *eq = 0;
+            macPutValue(mac, var, eq+1);
+        }
+        free(var);            
+    }
+    #endif
+
+    if (args)
     {
         if (requireDebug)
-            printf("require: %s version %s already loaded\n",
-                module, found);
+                printf("runScript: macParseDefns \"%s\"\n", args);
+        macParseDefns(mac, (char*)args, &pairs);
+        macInstallMacros(mac, pairs);
+        free(pairs);
+    }
+
+    /* execute line by line after expanding macros with arguments or environment */
+    if ((line_raw = malloc(line_raw_size)) == NULL) goto error;
+    if ((line_exp = malloc(line_exp_size)) == NULL) goto error;
+    while (fgets(line_raw, line_raw_size, file))
+    {
+        const unsigned char* p;
+        long len;
+
+        /* check if we have a line longer than the buffer size */
+        while (line_raw[(len = strlen(line_raw))-1] != '\n' && !feof(file))
+        {
+            if (requireDebug)
+                    printf("runScript partial line: \"%s\"\n", line_raw);
+            if ((line_raw = realloc(line_raw, line_raw_size *= 2)) == NULL) goto error;
+            if (fgets(line_raw + len, line_raw_size - len, file) == NULL) break;
+        }
+        if (requireDebug)
+                printf("runScript raw line: %s", line_raw);
+        /* expand and check the buffer size (different epics versions write different may number of bytes)*/
+        while ((len = labs(macExpandString(mac, line_raw, line_exp, line_exp_size-1))) >= line_exp_size-2)
+        {
+            if (requireDebug)
+                    printf("runScript: grow expand buffer: len=%ld size=%ld\n", len, line_exp_size);
+            free(line_exp);
+            if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
+        }
+        printf("%s", line_exp);
+        p=(unsigned char*)line_exp;
+        while (isspace(*p)) p++;
+        if (*p == 0 || *p == '#') continue;
+#ifdef vxWorks
+        status = execute(line_exp);
+#else
+        status = iocshCmd(line_exp);
+#endif
+        if (status != 0) break;
+    }
+    goto end;
+error:
+    if (errno)
+    {
+        status = errno;
+        perror("runScript");
+    }
+end:
+    free(line_raw);
+    free(line_exp);
+    if (mac) macDeleteHandle(mac);
+    if (file) fclose(file);
+    return status;
+}
+
+static int require_priv(const char* module, const char* version, const char* args)
+{
+    int status;
+    char* versionstr;
+    const char* loaded = NULL;
+    const char* found = NULL;
+    HMODULE libhandle;
+    int ifexists = 0;
+    const char* driverpath;
+    const char* dirname;
+    const char *end;
+
+    DIR* dir;
+    struct dirent* dirent;
+    int releasediroffs;
+    int libdiroffs;
+    int extoffs;
+    char* founddir = NULL;
+    char* symbolname;
+    char filename[NAME_MAX];
+
+    if (requireDebug)
+        printf("require: module=\"%s\" version=\"%s\" args=\"%s\"\n", module, version, args);
+        
+#define TRY_FILE(offs, args...) \
+    (snprintf(filename + offs, sizeof(filename) - offs, args) && \
+    (fileExists(filename) || (requireDebug && !printf("require: no %s\n", filename))))
+
+#define TRY_NONEMPTY_FILE(offs, args...) \
+    (snprintf(filename + offs, sizeof(filename) - offs, args) && \
+    (fileSize(filename)>0 || (requireDebug && !printf("require: no %s\n", filename))))
+        
+    driverpath = getenv("EPICS_DRIVER_PATH");
+    if (driverpath == NULL) driverpath = ".";
+    if (requireDebug)
+        printf("require: searchpath=%s\n", driverpath);
+
+    if (version && strcmp(version,"ifexists") == 0)
+    {
+        ifexists = 1;
+        version = NULL;
+    }
+        
+    /* check already loaded verion */
+    loaded = getLibVersion(module);
+    if (loaded)
+    {
         /* Library already loaded. Check Version. */
         switch (compareVersions(version, loaded))
         {
@@ -409,399 +733,416 @@ static int checkLoadedVersion(const char* module, const char* version)
                     module, version, loaded);
                 return -1;
             case TESTVERS:
-                printf("Warning: %s test version %s already loaded where %s was requested\n",
-                    module, loaded, version);
-                break;
-            default: /* EXACT or MATCH or COMPATIBLE */
-                printf ("%s %s already loaded\n", module, loaded);
+                if (version)
+                {
+                    printf("Warning: Module %s version %s already loaded where %s was requested\n",
+                        module, loaded, version);
+                }
+            default: /* EXACT or MATCH */
+                printf ("Module %s version %s already loaded\n", module, loaded);
         }
-        /* Already loaded version is ok */
-        return 0;
-    }
-}
-
-static int require_priv(const char* module, const char* vers, const char* args)
-{
-    char version[20];
-    const char* found;
-    struct stat filestat;
-    HMODULE libhandle;
-    char* p;
-    char *end; /* end of string */
-    const char sep[1] = PATHSEP;
-    char* driverpath;
-
-    memset(version, 0, sizeof(version));
-    if (vers) strncpy(version, vers, sizeof(version));
-    
-    if (checkLoadedVersion(module, version) == 0) return 0;
-    
-
-    driverpath = getenv("EPICS_DRIVER_PATH");
-    if (!driverpath) driverpath = ".";
-
-    if (requireDebug)
-        printf("require: searchpath=%s\n", driverpath);
-
-    /* NEW */
-
-    /* Search for module in driverpath */
-    for (p = driverpath; p != NULL; p = end)
-    {
-        char libdir[256];
-        char fulllibdir[256];
-        char foundlibdir[256];
-        DIR* dir;
-        struct dirent* dirent;
-
-        end = strchr(p, sep[0]);
-        snprintf(libdir, sizeof(libdir), "%.*s" DIRSEP "%s", 
-            (int)(end?(end++-p):sizeof(libdir)), p, module);
-
-        /* Ignore empty driverpath elements */
-        if (libdir[0] == 0) continue;
-
-        /* Does the module directory exist? */
-        dir = opendir(libdir);
+        dirname = getLibLocation(module);
+        if (dirname[0] == 0) return 0;
         if (requireDebug)
-            printf("require: directory candidate %s %sfound\n", libdir, dir?"":"not ");
-        if (!dir) continue;
-
-        /* Found module directory in driverpath. Now look for versions. */
-        while ((dirent = readdir(dir)) != NULL)
-        {
-            #ifdef _DIRENT_HAVE_D_TYPE
-            if (dirent->d_type != DT_DIR && dirent->d_type != DT_UNKNOWN) continue; /* not a directories */
-            #endif
-            if (dirent->d_name[0] == '.') continue;  /* ignore hidden directories */
-
-            /* Look for highest matching version. */
-            if (requireDebug)
-                printf("require: checking %s against %s\n",
-                        dirent->d_name, version);
-            switch (compareVersions(version, dirent->d_name))
-            {
-                int i;
-                case MISMATCH:
-                    if (requireDebug)
-                        printf("require: %s %s does not match %s\n",
-                            module, dirent->d_name, version);
-                    continue;
-                case MATCH:
-                    snprintf(foundlibdir, sizeof(foundlibdir), "%s" DIRSEP "%n%s",
-                        libdir, &i, dirent->d_name);
-                    found = foundlibdir + i;
-                    if (requireDebug)
-                        printf("require: %s %s matches %s exactly\n",
-                            module, found, version);
-                    /* We are done. */
-                    end = NULL;
-                    break;
-                case COMPATIBLE:  /* Potential version found. */
-                    if (requireDebug)
-                        printf("require: %s %s may match %s\n",
-                            module, dirent->d_name, version);
-
-                    /* Check if it has our EPICS version and architecture. */
-                    snprintf(fulllibdir, sizeof(fulllibdir),
-                        "%s" DIRSEP "%s" DIRSEP "%s" DIRSEP "lib" DIRSEP  "%s" DIRSEP,
-                        libdir, dirent->d_name, epicsRelease, targetArch);
-                    if (stat(fulllibdir, &filestat) == 0)
-                    {
-                         if (requireDebug)
-                            printf("require: %s %s has no support for %s %s\n",
-                                module, dirent->d_name, epicsRelease, targetArch);
-                        continue;
-                    }
-
-                    /* Is it higher than the one we found before? */
-                    if (compareVersions(found, dirent->d_name) == 1)
-                    {
-                        if (requireDebug)
-                            printf("require: %s %s looks promising\n",
-                                module, dirent->d_name);
-                        snprintf(foundlibdir, sizeof(foundlibdir), "%s" DIRSEP "%n%s",
-                            libdir, &i, dirent->d_name);
-                        found = foundlibdir + i;
-                    }
-                    /* Keep trying */;
-                    continue;
-            }
-            break;
-        }
-        closedir(dir);
-        if (!found && requireDebug)
-            printf("require: No matching version in %s\n", libdir);
+            printf("require: library found in %s\n", dirname);
+        snprintf(filename, sizeof(filename), "%s%n", dirname, &releasediroffs);
     }
-    if (found)
+    else
     {
         if (requireDebug)
-            printf("require: found module in %s\n", foundlibdir);
+            printf("require: no %s version loaded yet\n", module);
 
-        /* check dependencies */
-
-        /* load library */
-
-        /* load dbd file */
-
-        /* call register function */
-
-        /* load startup script */
-
-        /* load substitution file */
-
-
-        return -1;
-    }
-    char libname[256];
-    char dbdname[256];
-    char depname[256];
-    char fulllibname[256];
-    char fulldbdname[256];
-    char fulldepname[256];
-    char symbolname[256];
-        
-        if (requireDebug)
-            printf("require: trying the old way\n");
-        /* OLD */
-        
         /* user may give a minimal version (e.g. "1.2.4+")
            load highest matching version (here "1.2") and check later
+           (old style only)
         */
-        if (isdigit((unsigned char)version[0]) && version[strlen(version)-1] == '+')
+        if (version)
         {
-            char* p = strrchr(version, '.');
-            if (!p) p = version;
-            *p = 0;
-        }
-        
-        /* make filenames with or without version string */
-        
-        if (version[0])
-        {
-            sprintf(libname, PREFIX "%s" INFIX "-%s" EXT, module, version);
-            sprintf(depname, "%s-%s.dep", module, version);
+            if (asprintf(&versionstr, "-%s", version) < 0) return errno;
+            if (isdigit((unsigned char)version[0]) && version[strlen(version)-1] == '+')
+            {
+                char* p = strrchr(versionstr, '.');
+                if (p == NULL) p = versionstr;
+                *p = 0;
+            }
         }
         else
-        {
-            sprintf(libname, PREFIX "%s" INFIX EXT, module);
-            sprintf(depname, "%s.dep", module);
-        }
+            versionstr = calloc(2,1);
         if (requireDebug)
-        {
-            printf("require: libname is %s\n", libname);
-            printf("require: depname is %s\n", depname);
-        }
+            printf("require: versionstr = \"%s\"\n", versionstr);
 
-        /* search for library in driverpath */
-        for (p = driverpath; p != NULL; p = end)
-        {            
-            end = strchr(p, sep[0]);
-            if (end)
+        /* versionstr == "-<version>" or "" */
+
+        /* Search for module in driverpath */
+        for (dirname = driverpath; dirname != NULL; dirname = end)
+        {
+            /* get one directory from driverpath */
+            int dirlen;
+            int modulediroffs;
+
+            end = strchr(dirname, PATHSEP[0]);
+            if (end && end[1] == DIRSEP[0] && end[2] == DIRSEP[0])   /* "http://..." and friends */
+                end = strchr(end+2, PATHSEP[0]);
+            if (end) dirlen = end++ - dirname;
+            else dirlen = strlen(dirname);
+            if (dirlen == 0) continue; /* ignore empty driverpath elements */
+
+            if (requireDebug)
+                printf("require: trying %.*s\n", dirlen, dirname);
+
+            snprintf(filename, sizeof(filename), "%.*s" DIRSEP "%s" DIRSEP "%n", 
+                dirlen, dirname, module, &modulediroffs);
+            dirlen++;
+            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
+
+            /* Does the module directory exist? */
+            dir = opendir(filename);
+            if (dir)
             {
-                sprintf (libdir, "%.*s", (int)(end-p), p);
-                end++;
+                if (requireDebug)
+                    printf("require: found directory %s\n", filename);
+
+                /* Now look for versions. */
+                while ((dirent = readdir(dir)) != NULL)
+                {
+                    #ifdef _DIRENT_HAVE_D_TYPE
+                    if (dirent->d_type != DT_DIR && dirent->d_type != DT_UNKNOWN) continue; /* not a directory */
+                    #endif
+                    if (dirent->d_name[0] == '.') continue;  /* ignore hidden directories */
+
+                    /* Look for highest matching version. */
+                    if (requireDebug)
+                        printf("require: checking version %s against required %s\n",
+                                dirent->d_name, version);
+
+                    switch ((status = compareVersions(version, dirent->d_name)))
+                    {
+                        case EXACT: /* exact match found */
+                        {
+                            if (requireDebug)
+                                printf("require: %s %s matches %s exactly\n",
+                                    module, dirent->d_name, version);
+                            /* We are done. */
+                            end = NULL;
+                            break;
+                        }
+                        case MATCH:       /* all given numbers match. */
+                        {
+                            if (requireDebug)
+                                printf("require: %s %s may match %s\n",
+                                    module, dirent->d_name, version);
+
+                            /* Check if it has our EPICS version and architecture. */
+                            /* Even if it has no library, at least it has a dep file in the lib dir */
+
+                            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
+                            if (!TRY_FILE(modulediroffs, "%s" DIRSEP "R%s" DIRSEP LIBDIR "%s" DIRSEP,
+                                dirent->d_name, epicsRelease, targetArch))
+                            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/lib/<targetArch>/" */
+                            {
+                                if (requireDebug)
+                                    printf("require: %s %s has no support for %s %s\n",
+                                        module, dirent->d_name, epicsRelease, targetArch);
+                                continue;
+                            }
+
+                            /* Is it higher than the one we found before? */
+                            if (found && requireDebug)
+                                printf("require: %s %s support for %s %s found, compare against previously found %s\n",
+                                    module, dirent->d_name, epicsRelease, targetArch, found);
+                            if (!found || compareVersions(found, dirent->d_name) == MATCH)
+                            {
+                                if (requireDebug)
+                                    printf("require: %s %s looks promising\n", module, dirent->d_name);
+                                break;
+                            }
+                            continue;
+                        }
+                        default:
+                        {
+                            if (requireDebug)
+                                printf("require: %s %s does not match %s\n",
+                                    module, dirent->d_name, version);
+                            continue;
+                        }
+                    }
+                    /* we have found something (EXACT or MATCH) */
+                    free(founddir);
+                    /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]..." */
+                    if (asprintf(&founddir, "%.*s%s", modulediroffs, filename, dirent->d_name) < 0) return errno;
+                    /* founddir = "<dirname>/[dirlen]<module>/[modulediroffs]<version>" */
+                    found = founddir + modulediroffs; /* version part in the path */
+                }
+                closedir(dir);
             }
             else
             {
-                sprintf (libdir, "%s", p);
-            }
-            /* ignore empty driverpath elements */
-            if (libdir[0] == 0) continue;
+                /* filename = "<dirname>/[dirlen]<module>/" */
+                if (requireDebug)
+                    printf("require: no %s\n", filename);
 
-            sprintf (fulllibname, "%s" DIRSEP "%s", libdir, libname);
-            sprintf (fulldepname, "%s" DIRSEP "%s", libdir, depname);
-            if (requireDebug)
-                printf("require: looking for %s\n", fulllibname);
-            if (stat(fulllibname, &filestat) == 0) break;
-#ifdef vxWorks
-            /* now without the .munch */
-            fulllibname[strlen(fulllibname)-6] = 0;
-            if (requireDebug)
-                printf("require: looking for %s\n", fulllibname);
-            if (stat(fulllibname, &filestat) == 0) break;
-#endif            
-            /* allow dependency without library for aliasing */
-            if (requireDebug)
-                printf("require: looking for %s\n", fulldepname);
-            if (stat(fulldepname, &filestat) == 0) break;
-        }
-        if (!p)
-        {
-            fprintf(stderr, "Library %s not found in EPICS_DRIVER_PATH=%s\n",
-                libname, driverpath);
-            return -1;
-        }
-        if (requireDebug)
-            printf("require: found in %s\n", p);
-        
-        /* parse dependency file if exists */
-        if (stat(fulldepname, &filestat) == 0)
-        {
-            FILE* depfile;
-            char buffer[40];
-            char *rmodule; /* required module */
-            char *rversion; /* required version */
-            
-            if (requireDebug)
-                printf("require: parsing dependency file %s\n", fulldepname);
-            depfile = fopen(fulldepname, "r");
-            while (fgets(buffer, sizeof(buffer)-1, depfile))
-            {
-                rmodule = buffer;
-                /* ignore leading spaces */
-                while (isspace((int)*rmodule)) rmodule++;
-                /* ignore empty lines and comment lines */
-                if (*rmodule == 0 || *rmodule == '#') continue;
-                /* rmodule at start of module name */
-                rversion = rmodule;
-                /* find end of module name */
-                while (*rversion && !isspace((int)*rversion)) rversion++;
-                /* terminate module name */
-                *rversion++ = 0;
-                /* ignore spaces */
-                while (isspace((int)*rversion)) rversion++;
-                /* rversion at start of version */
-                end = rversion;
-                /* find end of version */
-                while (*end && !isspace((int)*end)) end++;
-                /* append + to version to allow newer compaible versions */
-                *end++ = '+';
-                /* terminate version */
-                *end = 0;
-                printf("%s depends on %s %s\n", module, rmodule, rversion);
-                if (require(rmodule, rversion) != 0)
+                /* try local/old style module only if no new style candidate has been found */
+                if (!found)
                 {
-                    fclose(depfile);
-                    return -1;
+                    /* look for dep file */
+                    releasediroffs = libdiroffs = dirlen;
+                    if (TRY_FILE(dirlen, "%s%s.dep", module, versionstr))
+                    /* filename = "<dirname>/[dirlen][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
+                    if (fileExists(filename))
+                    {
+                        if (requireDebug)
+                            printf("require: found old style %s\n", filename);
+                        printf ("Module %s %s found in %.*s\n", module,
+                        versionstr+1, dirlen, filename);
+                        goto checkdep;
+                    }
+
+                    /* look for library file */
+                    if (TRY_FILE(dirlen, PREFIX "%s" INFIX "%s%n" EXT, module, versionstr, &extoffs)
+                    /* filename = "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
+                    #ifdef vxWorks
+                        || (filename[dirlen + extoffs] = 0 && /* try without extension */
+                        (fileExists(filename) || (requireDebug && !printf("require: no %s\n", filename))))
+                    #endif
+                        )
+                    {
+                        if (requireDebug)
+                            printf("require: found old style %s\n", filename);
+                        printf ("Module %s s%s found in %.*s\n", module,
+                        versionstr+1, dirlen, filename);
+                        free(versionstr);
+                        goto loadlib;
+                    }
                 }
             }
-            fclose(depfile);
+            /* filename = "<dirname>/[dirlen]..." */
+            if (!found && requireDebug)
+                printf("require: no matching version in %.*s\n", dirlen, filename);
         }
-        
-        if (stat(fulllibname, &filestat) != 0)
-        {
-            /* no library, dep file was an alias */
-            if (requireDebug)
-                printf("require: no library to load\n");
-            return 0;
-        }
-        
-        /* load library */
-        if (requireDebug)
-            printf("require: loading library %s\n", fulllibname);
-        if (!(libhandle = loadlib(fulllibname)))
-        {
-            if (requireDebug)
-                printf("require: loading failed\n");
-            return -1;
-        }
-        
-        /* now check if we got what we wanted (with original version number) */
-        sprintf (symbolname, "_%sLibRelease", module);
-        loaded = getAddress(libhandle, symbolname);
+        free(versionstr);
+        versionstr = NULL;
 
-        if (loaded)
+        if (!found)
         {
-            printf("Loading %s (version %s)\n", fulllibname, loaded);
-            /* make sure we get the dbd that matches the library version */
-            sprintf(dbdname, "%s-%s.dbd", module, loaded);
+            fprintf(stderr, "Module %s not found\n", module);
+            return ifexists ? 0 : -1;
+        }
+
+        /* founddir = "<dirname>/[dirlen]<module>/<version>" */
+        printf ("Module %s version %s found in %s" DIRSEP "\n", module, found, founddir);
+
+        snprintf(filename, sizeof(filename),
+            "%s" DIRSEP "R%s" DIRSEP "%n" LIBDIR "%s" DIRSEP "%n%s.dep",
+            founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module);
+        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
+
+        /* check dependencies */
+        if (requireDebug)
+            printf("require: looking for dependency file %s\n", filename);
+
+checkdep:
+        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
+        /* or (old)   "<dirname>/[dirlen]][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
+        if (handleDependencies(module, filename) == -1) return -1;
+
+        /* load library */
+        snprintf(filename + libdiroffs, sizeof(filename) - libdiroffs,
+            PREFIX "%s" INFIX "%s%n" EXT, module, versionstr ? versionstr : "", &extoffs);
+        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs]EXT" */
+        /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
+
+        free(versionstr);
+
+        if (requireDebug)
+            printf("require: looking for library %s\n", filename);
+        #ifdef vxWorks
+            if (!fileExists(filename))
+            {
+                /* try without extension */
+                filename[libdiroffs + extoffs] = 0;
+                if (requireDebug)
+                    printf("require: looking for library %s\n", filename);
+            }
+        #endif
+        if (!fileExists(filename))
+        {
+            printf("Module %s has no library\n", module);
         }
         else
         {
-            printf("Loading %s (no version)\n", fulllibname);
-            sprintf(dbdname, "%s.dbd", module);
-            loaded = "";
-        }
-
-        if (compareVersions(vers, loaded) == -1)
-        {
-            fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
-                module, vers, loaded);
-            return -1;
-        }
-        
-        if (requireDebug)
-        {
-            printf("require: dbdname is %s\n", dbdname);
-        }
-        /* look for dbd in . ./dbd ../dbd ../../dbd (relative to lib dir) */
-        p = PATHSEP DIRSEP "dbd"
-            PATHSEP DIRSEP ".." DIRSEP "dbd"
-            PATHSEP DIRSEP ".." DIRSEP ".." DIRSEP "dbd";
-        while (p)
-        {
-            end = strchr(p, sep[0]);
-            if (end)
+loadlib:
+            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs]EXT" */
+            /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
+            printf("Loading library %s\n", filename);
+            if ((libhandle = loadlib(filename)) == NULL)
             {
-                sprintf(fulldbdname, "%s%.*s" DIRSEP "%s",
-                    libdir, (int)(end-p), p, dbdname);
-                end++;
+                return -1;
+            }
+
+            /* now check what version we really got (with compiled-in version number) */
+            if (asprintf (&symbolname, "_%sLibRelease", module) < 0)
+                return errno;
+            found = getAddress(libhandle, symbolname);
+            free(symbolname);
+            printf("Loaded %s version %s\n", module, found);
+
+            /* check what we got */
+            if (requireDebug)
+                printf("require: compare requested version %s with found version %s\n", version, found);
+            if (compareVersions(version, found) == MISMATCH)
+            {
+                fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
+                    module, version, found);
+                return -1;
+            }
+
+            /* load dbd file */
+            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" DIRSEP "%s.dbd", module) ||
+                TRY_NONEMPTY_FILE(releasediroffs, "%s.dbd", module))
+            {
+                printf("Loading dbd file %s\n", filename);
+                if (dbLoadDatabase(filename, NULL, NULL) != 0)
+                {
+                    fprintf (stderr, "Error loading %s\n", filename);
+                    return -1;
+                }
+
+                #ifndef EPICS_3_13
+                /* when dbd is loaded call register function */
+                if (asprintf(&symbolname, "%s_registerRecordDeviceDriver", module) < 0)
+                    return errno;
+                printf ("Calling function %s\n", symbolname);
+                #ifdef vxWorks
+                {
+                    FUNCPTR f = (FUNCPTR) getAddress(NULL, symbolname);
+                    if (f)
+                        f(pdbbase);
+                    else
+                        fprintf (stderr, "require: can't find %s function\n", symbolname);
+                }        
+                #else /* !vxWorks */
+                iocshCmd(symbolname);
+                #endif /* !vxWorks */
+                free(symbolname);
+                #endif /* !EPICS_3_13 */
             }
             else
             {
-                sprintf(fulldbdname, "%s%s" DIRSEP "%s",
-                    libdir, p, dbdname);
+                /* no dbd file, but that might be OK */
+                printf("%s has no dbd file\n", module);
             }
-            if (requireDebug)
-                printf("require: Looking for %s\n", fulldbdname);
-            if (stat(fulldbdname, &filestat) == 0) break;
-            p=end;
         }
-        
-        /* if dbd file exists and is not empty load it */
-        if (p && filestat.st_size > 0)
+        /* register module with path */
+        filename[releasediroffs] = 0;
+        registerModule(module, found, filename);
+    }
+
+    status = 0;       
+
+    /* set up environment */
+    /* Why putenv()?
+       vxWorks has no setenv()
+       Epics 3.13 has no epicsEnvSet()
+       Do not free the memory given to putenv (except for vxWorks)!
+    */
+
+    putenvprintf("MODULE=%s", module); /* "<dirname>/<module>/<version>/R<epicsRelease>/" */
+    putenvprintf("%s_DIR=%s", module, filename);
+
+    if (requireDebug)
+        printf("require: looking for template directory\n");
+    /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]..." */
+    if (TRY_FILE(releasediroffs, TEMPLATEDIR))
+    {
+        char* old_path;           
+        char* p;
+        char* q;
+
+        if (requireDebug)
+            printf("require: found template directory %s\n", filename);
+
+        /* set up db search path environment variables
+          <module>_TEMPLATES      template path of <module>
+          TEMPLATES               template path of the current module (overwritten)
+          EPICS_DB_INCLUDE_PATH   template path of all loaded modules (appended)
+        */
+
+        putenvprintf("%s_TEMPLATES=%s", module, filename);
+        putenvprintf("TEMPLATES=%s", filename);
+        old_path = getenv("EPICS_DB_INCLUDE_PATH");
+        if (loaded) /* Library was already loaded thus filename is already in path. Remove it. */
         {
-            printf("Loading %s\n", fulldbdname);
-            if (dbLoadDatabase(fulldbdname, NULL, NULL) != 0)
+            p = strstr(old_path, filename);
+            if (p)
             {
-                fprintf (stderr, "require: can't load %s\n", fulldbdname);
-                return -1;
+                /* remove leading or trailing ':' */
+                q = p + releasediroffs + sizeof(TEMPLATEDIR)-1;
+                if (*q == ':') q++; else if (p != old_path && *(p-1) == ':') p--;
+                strcpy(p, q);
             }
-            
-            /* when dbd is loaded call register function for 3.14 */
-#ifdef EPICS_3_14
-            sprintf (symbolname, "%s_registerRecordDeviceDriver", module);
-            printf ("Calling %s function\n", symbolname);
-#ifdef vxWorks
-            {
-                FUNCPTR f = (FUNCPTR) getAddress(NULL, symbolname);
-                if (f)
-                    f(pdbbase);
-                else
-                    fprintf (stderr, "require: can't find %s function\n", symbolname);
-            }        
-#else
-            iocshCmd(symbolname);
-#endif
-#endif        
         }
+        putenvprintf("EPICS_DB_INCLUDE_PATH=%s:%s", filename, old_path);
+    }
+    else
+    {
+        putenvprintf("TEMPLATES=.");
+    }
+
+#define SETUP_PATH(NAME, args...) \
+    if (TRY_FILE(releasediroffs, args)) \
+    { \
+        putenvprintf("%s_" #NAME "=%s", module, filename); \
+        putenvprintf(#NAME "=%s", filename); \
+    }\
+    else \
+    { \
+        putenvprintf(#NAME "=."); \
+    }
+
+    if (loaded && args == NULL) return 0; /* no need to execute startup script twice if not with new arguments */
+
+    /* load startup script */
+    if (requireDebug)
+        printf("require: looking for startup script\n");
+    /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]db" */
+    if (TRY_FILE(releasediroffs, "%s.cmd", targetArch) ||
+        TRY_FILE(releasediroffs, "%s.cmd", osClass) ||
+        TRY_FILE(releasediroffs, "startup.cmd") ||
+        TRY_FILE(releasediroffs, ".." DIRSEP "%s.cmd", targetArch) ||
+        TRY_FILE(releasediroffs, ".." DIRSEP "%s.cmd", osClass) ||
+        TRY_FILE(releasediroffs, ".." DIRSEP "startup.cmd")
+        )
+    {
+        if (args)
+            printf("Executing script %s with \"%s\"\n", filename, args);
         else
-        {
-            /* no dbd file, but that might be OK */
-            printf("no dbd file %s\n", dbdname);
-        }
-        
-        registerModule(module, loaded);
-        return 0;
+            printf("Executing script %s\n", filename);
+        if (runScript(filename, args) != 0)
+            fprintf (stderr, "Error executing %s\n", filename);
+        else
+            printf("Done with script %s\n", filename);
+    }
+    return status;
 }
 
-#ifdef EPICS_3_14
+#ifndef EPICS_3_13
 static const iocshArg requireArg0 = { "module", iocshArgString };
-static const iocshArg requireArg1 = { "version", iocshArgString };
-static const iocshArg * const requireArgs[2] = { &requireArg0, &requireArg1 };
-static const iocshFuncDef requireDef = { "require", 2, requireArgs };
+static const iocshArg requireArg1 = { "[version]", iocshArgString };
+static const iocshArg requireArg2 = { "[substitutions]", iocshArgString };
+static const iocshArg * const requireArgs[3] = { &requireArg0, &requireArg1, &requireArg2 };
+static const iocshFuncDef requireDef = { "require", 3, requireArgs };
 static void requireFunc (const iocshArgBuf *args)
 {
-    require(args[0].sval, args[1].sval);
+    require(args[0].sval, args[1].sval, args[2].sval);
 }
 
 static const iocshArg libversionShowArg0 = { "pattern", iocshArgString };
-static const iocshArg * const libversionArgs[1] = { &libversionShowArg0 };
-static const iocshFuncDef libversionShowDef = { "libversionShow", 1, libversionArgs };
+static const iocshArg libversionShowArg1 = { "showLocation", iocshArgInt };
+static const iocshArg * const libversionArgs[2] = { &libversionShowArg0, &libversionShowArg1 };
+static const iocshFuncDef libversionShowDef = { "libversionShow", 2, libversionArgs };
 static void libversionShowFunc (const iocshArgBuf *args)
 {
-    libversionShow(args[0].sval);
+    libversionShow(args[0].sval, args[1].ival);
 }
 
 static const iocshArg ldArg0 = { "library", iocshArgString };
@@ -812,6 +1153,15 @@ static void ldFunc (const iocshArgBuf *args)
     loadlib(args[0].sval);
 }
 
+static const iocshArg runScriptArg0 = { "filename", iocshArgString };
+static const iocshArg runScriptArg1 = { "substitutions", iocshArgString };
+static const iocshArg * const runScriptArgs[2] = { &runScriptArg0, &runScriptArg1 };
+static const iocshFuncDef runScriptDef = { "runScript", 2, runScriptArgs };
+static void runScriptFunc (const iocshArgBuf *args)
+{
+    runScript(args[0].sval, args[1].sval);
+}
+
 static void requireRegister(void)
 {
     if (firstTime) {
@@ -819,6 +1169,7 @@ static void requireRegister(void)
         iocshRegister (&ldDef, ldFunc);
         iocshRegister (&libversionShowDef, libversionShowFunc);
         iocshRegister (&requireDef, requireFunc);
+        iocshRegister (&runScriptDef, runScriptFunc);
         registerExternalModules();
     }
 }
@@ -826,3 +1177,4 @@ static void requireRegister(void)
 epicsExportRegistrar(requireRegister);
 epicsExportAddress(int, requireDebug);
 #endif
+

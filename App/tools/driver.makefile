@@ -1,8 +1,8 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.101 2015/06/22 07:42:01 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.100 2014/12/10 14:15:29 zimoch Exp $
 #
-# This generic makefile compiles EPICS code (drivers, records, snl, ...)
+# This generic makefile compiles EPICS modules (drivers, records, snl, ...)
 # for all installed EPICS versions in parallel.
 # Read this documentation and the inline comments carefully before
 # changing anything in this file.
@@ -24,27 +24,22 @@
 #   Find the sources etc.
 #   Include EPICS configuration files for this ${EPICSVERSION}
 #   Iterate over all target architectures (${T_A}) defined for this version
-#   Create O.${EPICSVERSION}_${T_A} subdirectories if necessary.
 #
 # - Third run: (see comment ## RUN 3)
-#   Compile (or install, uninstall, etc) everything
+#   Check which target architectures to build.
+#   Create O.${EPICSVERSION}_${T_A} subdirectories if necessary.
+#   Change to O.${EPICSVERSION}_${T_A} subdirectories.
+#
+# - Fourth run: (see comment ## RUN 4)
+#   Compile everything.
 #
 # Library names are derived from the directory name (unless overwritten
 # with the PROJECT variable in your Makefile).
-# A version number is appended to the name which is derived from
-# the latest CVS tag on the files in the source directory.
-# If any file is not up-to-date in CVS, not tagged, or tagged differently from the
+# A LIBVERSION number is generated from the latest CVS or GIT tag of the sources.
+# If any file is not up-to-date in CVS/GIT, not tagged, or tagged differently from the
 # other files, the version is a test version and labelled with the user name.
-# The library is installed to ${INSTALL_ROOT}/R${EPICSVERSION}/${T_A}.
-# Symbolic links are set to the latest version, the highest minor release
-# if each major release, and the highest patch level of each minor release.
-# Test versions are never linked, however.
-# The library can be loaded with  require "<libname>" [,"<version>"]
-#
-# This makefile can also be used to build local libraries for IOC projects
-# instead of drivers. Here however, no versioning is done (i.e. no
-# version string is appended) and the libraries cannot be installed with
-# this makefile. Use slsinstall to install the IOC project instead.
+# The library is installed to ${EPICS_MODULES}/${PROJECT}/${LIBVERSION}/lib/${T_A}.
+# The library can be loaded with  require "<libname>" [,"<version>"] [,"<variables=substitutions>"]
 #
 # User variables (add them to your Makefile, none is required):
 # PROJECT
@@ -74,8 +69,8 @@ USERMAKEFILE:=$(lastword $(filter-out $(lastword ${MAKEFILE_LIST}), ${MAKEFILE_L
 # Some configuration
 DEFAULT_EPICS_VERSIONS = 3.13.9 3.13.10 3.14.8 3.14.12
 BUILDCLASSES = vxWorks
-INSTBASE ?= /work
-INSTALL_ROOT=${INSTBASE}/iocBoot
+EPICS_MODULES ?= /ioc/modules
+MODULE_LOCATION = ${EPICS_MODULES}/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
 EPICS_LOCATION = /usr/local/epics
 SNCSEQ=${EPICS_BASE}/../seq
 
@@ -83,31 +78,8 @@ DOCUEXT = txt html htm doc pdf ps tex dvi gif jpg png
 DOCUEXT += TXT HTML HTM DOC PDF PS TEX DVI GIF JPG PNG
 DOCUEXT += template db dbt subs subst substitutions script
 
-LOCALPROJECTS = /X/ /A/ /F/ /P/ /S/ /Z/
-
 #override config here
 -include ${MAKEHOME}/config
-
-# Are we in an IOC project directory?
-# YES:
-#   - Don't use versions.
-#   - Install to IOC directory with slsinstall.
-#   - Use for local code (snl, subroutine records, etc.)
-#   - Autodetected: SLS beamline and machine, PROSCAN, FEL
-# NO:
-#   - Get version number from CVS tag.
-#   - Install to driver pool with make install.
-#   - Use for drivers and other modules of global interest.
-#   - This is the default.
-# User can overwrite USE_LIBVERSION in the Makefile.
-
-# Where are we in CVS (or in PWD if no CVS is around)?
-THISDIR := $(if $(wildcard CVS/Repository),/$(shell cat CVS/Repository),${PWD})
-# Do not use versions on known local projects (IOC projects)
-USE_LIBVERSION := $(if $(strip $(foreach d,${LOCALPROJECTS},$(findstring $d,${THISDIR}))),NO,YES)
-
-# Some shortcuts
-MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION}
 
 # Some shell commands
 LN = ln -s
@@ -115,41 +87,39 @@ EXISTS = test -e
 NM = nm
 RMDIR = rm -rf
 RM = rm -f
+CP = cp
 
 # some generated file names
-VERSIONFILE = ${PRJ}_Version${LIBVERSION}.c
+VERSIONFILE = ${PRJ}_version_${LIBVERSION}.c
 REGISTRYFILE = ${PRJ}_registerRecordDeviceDriver.cpp
 EXPORTFILE = ${PRJ}_exportAddress.c
 SUBFUNCFILE = ${PRJ}_subRecordFunctions.dbd
+DEPFILE = ${PRJ}.dep
 
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules)
 default: build
 
 IGNOREFILES = .cvsignore .gitignore
+%: ${IGNOREFILES}
 ${IGNOREFILES}:
 	@echo -e "O.*\n.cvsignore\n.gitignore" > $@
         
 ifndef EPICSVERSION
 ## RUN 1
-# in source directory, first run
+# in source directory
 
 # Find out which EPICS versions to build
 INSTALLED_EPICS_VERSIONS := $(patsubst ${EPICS_LOCATION}/base-%,%,$(wildcard ${EPICS_LOCATION}/base-*[0-9]))
 EPICS_VERSIONS = $(filter-out ${EXCLUDE_VERSIONS:=%},${DEFAULT_EPICS_VERSIONS})
 MISSING_EPICS_VERSIONS = $(filter-out ${BUILD_EPICS_VERSIONS},${EPICS_VERSIONS})
 BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
-EPICS_VERSIONS_3.13 = $(filter 3.13.%,${BUILD_EPICS_VERSIONS})
-EPICS_VERSIONS_3.14 = $(filter 3.14.%,${BUILD_EPICS_VERSIONS})
-EPICS_VERSIONS_3.15 = $(filter 3.15.%,${BUILD_EPICS_VERSIONS})
+$(foreach v,$(sort $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
 
 #check only what is needed to build the lib? But what is that?
 VERSIONCHECKFILES = ${SOURCES} ${DBDS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v})
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
-LIBVERSION_YES = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
-LIBVERSION_Yes = $(LIBVERSION_YES)
-LIBVERSION_yes = $(LIBVERSION_YES)
-LIBVERSION = ${LIBVERSION_${USE_LIBVERSION}}
+LIBVERSION = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 
 # Default project name is name of current directory.
@@ -164,20 +134,32 @@ export OS_CLASS_LIST
 export ARCH_FILTER
 export EXCLUDE_ARCHS
 
-clean::
-	$(RMDIR) O.*
-#	find . -name "*~" -exec $(RM) {} \;
+# shell commands
+RMDIR = rm -rf
+LN = ln -s
+EXISTS = test -e
+NM = nm
+RM = rm -f
+MKDIR = mkdir -p -m 775
 
-clean.3.%::
-	$(RMDIR) O.${@:clean.%=%}*
+clean:
+	$(RMDIR) O.*
+
+clean.%:
+	$(RMDIR) $(wildcard O.*${@:clean.%=%}*)
+
+uninstall:
+	$(RMDIR) ${MODULE_LOCATION}
+
+uninstall.%:
+	$(RMDIR) $(wildcard ${MODULE_LOCATION}/R*${@:uninstall.%=%}*)
 
 help:
 	@echo "usage:"
 	@for target in '' build '<EPICS version>' \
 	install 'install.<EPICS version>' \
 	uninstall 'uninstall.<EPICS version>' \
-	install-headers 'install-headers.<EPICS version>' \
-	install-doc install-templates clean help version; \
+	clean help version; \
 	do echo "  make $$target"; \
 	done
 	@echo "Makefile variables: (defaults)"
@@ -202,32 +184,30 @@ debug::
 	@echo "MISSING_EPICS_VERSIONS = ${MISSING_EPICS_VERSIONS}"
 	@echo "EPICS_VERSIONS_3.13 = ${EPICS_VERSIONS_3.13}"
 	@echo "EPICS_VERSIONS_3.14 = ${EPICS_VERSIONS_3.14}"
+	@echo "EPICS_VERSIONS_3.15 = ${EPICS_VERSIONS_3.15}"
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
-	@echo "USE_LIBVERSION = ${USE_LIBVERSION}"
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "VERSIONCHECKFILES = ${VERSIONCHECKFILES}"
 	@echo "ARCH_FILTER = ${ARCH_FILTER}"
 
 # Loop over all EPICS versions for second run.
-build install uninstall install-headers install-doc install-templates debug:: ${IGNOREFILES}
-	for VERSION in ${BUILD_EPICS_VERSIONS}; do \
-	${MAKEVERSION} EPICSVERSION=$$VERSION $@ || exit; done
+MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION}
 
-# Handle cases where user requests 3.13 or 3.14 
+build install debug:: ${IGNOREFILES}
+	for VERSION in ${BUILD_EPICS_VERSIONS}; do ${MAKEVERSION} EPICSVERSION=$$VERSION $@; done
+
+# Handle cases where user requests a group of EPICS versions
 # make <action>.3.13 or make <action>.3.14 instead of make <action> or
 # make 3.13 or make 3.14 instead of make
 
 define VERSIONRULES
-$(1):
-	for VERSION in $${EPICS_VERSIONS_$(1)}; do \
-	$${MAKEVERSION} EPICSVERSION=$$$$VERSION build || exit; done
+$(1): ${IGNOREFILES}
+	for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
 
-%.$(1):
-	for VERSION in $${EPICS_VERSIONS_$(1)}; do \
-	$${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%} || exit; done
+%.$(1): ${IGNOREFILES}
+	for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
 endef
-
-$(foreach v,3.13 3.14 3.15,$(eval $(call VERSIONRULES,$v)))
+$(foreach v,$(sort $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIONRULES,$v)))
 
 # Handle cases where user requests one specific version
 # make <action>.<version> instead of make <action> or
@@ -241,12 +221,6 @@ ${INSTALLED_EPICS_VERSIONS:%=build.%}:
 
 ${INSTALLED_EPICS_VERSIONS:%=install.%}:
 	${MAKEVERSION} EPICSVERSION=${@:install.%=%} install
-
-${INSTALLED_EPICS_VERSIONS:%=uninstall.%}:
-	${MAKEVERSION} EPICSVERSION=${@:uninstall.%=%} uninstall
-
-${INSTALLED_EPICS_VERSIONS:%=install-headers.%}:
-	${MAKEVERSION} EPICSVERSION=${@:install-headers.%=%} install-headers
 
 ${INSTALLED_EPICS_VERSIONS:%=debug.%}:
 	${MAKEVERSION} EPICSVERSION=${@:debug.%=%} debug
@@ -292,17 +266,20 @@ ${EPICS_BASE}/config/CONFIG:
 	@echo "ERROR: EPICS release ${EPICSVERSION} not installed on this host."
 
 -include ${EPICS_BASE}/config/CONFIG
+#relax 3.13 cross compilers (default is STRICT)
+CMPLR=STD
+GCC_STD = $(GCC)
+CXXCMPLR=ANSI
+G++_ANSI = $(G++) -ansi
 OBJ=.o
 export BUILD_TYPE=Vx
 endif # 3.13
 
-INSTALL_LOCATION = ${INSTALL_ROOT}/R${EPICSVERSION}
-
 ifndef T_A
-### RUN 2
+## RUN 2
 # target achitecture not yet defined
 # but EPICSVERSION is already known
-# still in source directory, second run
+# still in source directory
 
 # Look for sources etc.
 # Export everything for third run
@@ -344,12 +321,17 @@ TEMPLS += ${TEMPLATES_${EPICS_BASETYPE}}
 TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
 
+SCR = $(or ${SCRIPTS},$(wildcard *.cmd))
+export SCR
+
+export CFG
+
 DOCUDIR = .
 #DOCU = $(foreach DIR,${DOCUDIR},$(wildcard ${DIR}/*README*) $(foreach EXT,${DOCUEXT}, $(wildcard ${DIR}/*.${EXT})))
 export DOCU
 
 # Loop over all target architectures for third run
-# Go to O.${T_A} subdirectory because Rules.Vx only work there:
+# Go to O.${T_A} subdirectory because RULES.Vx only work there:
 
 ifeq (${EPICS_BASETYPE},3.14)
 CROSS_COMPILER_TARGET_ARCHS += ${EPICS_HOST_ARCH}
@@ -373,15 +355,11 @@ DBDFILES_vxWorks += ${DBDS_${EPICS_BASETYPE}_vxWorks}
 DBDFILES_vxWorks += ${DBDS_vxWorks_${EPICS_BASETYPE}}
 export DBDFILES_vxWorks
 
-# Do not install without version
-ifndef LIBVERSION
-install uninstall install-headers::
-	@echo "ERROR: Can't $@ without LIBVERSION defined"
-	@exit 1
-endif # !LIBVERSION
-
-install build install-headers debug::
+install build debug::
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
+
+uninstall::
+	$(RMDIR) ${INSTALL_REV}
 
 debug::
 	@echo "EPICS_BASE = ${EPICS_BASE}"
@@ -389,7 +367,6 @@ debug::
 	@echo "EPICS_BASETYPE = ${EPICS_BASETYPE}" 
 	@echo "CROSS_COMPILER_TARGET_ARCHS = ${CROSS_COMPILER_TARGET_ARCHS}"
 	@echo "EXCLUDE_ARCHS = ${EXCLUDE_ARCHS}"
-	@echo "INSTALL_LOCATION = ${INSTALL_LOCATION}"
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "RELEASE_TOPS = ${RELEASE_TOPS}"
 
@@ -402,9 +379,6 @@ ifeq (${EPICS_BASETYPE},3.14)
     BUILDDIRS += O.${EPICSVERSION}_Common
 endif
 
-${BUILDDIRS}:
-	mkdir $@
-
 define MAKELINKDIRS
 LINKDIRS+=O.${EPICSVERSION}_$1
 O.${EPICSVERSION}_$1:
@@ -413,73 +387,87 @@ endef
 
 $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
-install build install-headers debug:: ${BUILDDIRS} ${LINKDIRS}
+install::
+	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION} || \
+        (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION} already exists.If you really want to overwrite then uninstall first."; false)
+
+install build::
 # Delete old build if INSTBASE has changed.
 	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-            echo ${INSTBASE} | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RM) O.${EPICSVERSION}_$$ARCH/*; \
-	    ${MAKE} -C O.${EPICSVERSION}_$$ARCH -f ../${USERMAKEFILE} T_A=$$ARCH $@; \
+            echo $(realpath ${EPICS_MODULES}) | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RMDIR) O.${EPICSVERSION}_$$ARCH; \
 	done
 
-# No need to create O.${T_A} subdirectory here:
-uninstall install-doc install-templates::
-	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
-	for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-	${MAKEVERSION} T_A=$$ARCH $@; done
+install build debug::
+	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
+	    umask 002; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
+	done
 
 else # T_A
+
+ifeq ($(filter O.%,$(notdir ${CURDIR})),)
 ## RUN 3
 # target architecture defined 
-# third run, in O.* directory for build, install, install-headers
-# still in source directory for uninstall, install-doc, install-templates
+# still in source directory, third run
 
 ifeq ($(filter ${OS_CLASS},${OS_CLASS_LIST}),)
 
-install%: build
-install: build
-build%: build
-build:
-	@echo Skipping ${T_A} because $(if ${OS_CLASS},${OS_CLASS} is not in BUILDCLASSES = ${BUILDCLASSES},it is not available for R$(EPICSVERSION).)
+install% build%: build
+install build:
+	@echo Skipping ${T_A} because $(if ${OS_CLASS},OS_CLASS=\"${OS_CLASS}\" is not in BUILDCLASSES=\"${BUILDCLASSES}\",it is not available for R$(EPICSVERSION).)
 %:
 	@true
 
 else ifeq ($(wildcard $(firstword ${CC})),)
 
-install%: build
-install: build
-build%: build
-build:
+install% build%: build
+install build:
 	@echo Warning: Skipping ${T_A} because cross compiler $(firstword ${CC}) is not installed.
 %:
 	@true
 
 else
 
+O.%:
+	$(MKDIR) $@
+
+install build debug: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
+	@${MAKE} -C O.${EPICSVERSION}_${T_A} -f ../${USERMAKEFILE} $@
+
+endif
+
+else # in O.*
+## RUN 4
+# in O.* directory
 CFLAGS += ${EXTRA_CFLAGS}
 
-LIBVERSIONSTR = $(if ${LIBVERSION},-${LIBVERSION})
 TESTVERSION := $(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$")
-PROJECTDBD=${if $(strip ${DBDFILES}),${PRJ}${LIBVERSIONSTR}.dbd}
-DEPFILE = ${PRJ}${LIBVERSIONSTR}.dep
-
-INSTALL_BIN = ${INSTALL_LOCATION}/${T_A}
-INSTALL_DOC = $(dir ${INSTALL_LOCATION})driverdoc
-INSTALL_TEMPL = $(dir ${INSTALL_LOCATION})templates
-INSTALL_LIBRARY = $(addprefix ${INSTALL_BIN}/,${PROJECTLIB})
-INSTALL_PROJECTDBD = $(addprefix ${INSTALL_DBD}/,${PROJECTDBD})
-INSTALL_HDRS = $(patsubst %.h,${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h, $(notdir ${HDRS}))
-INSTALL_DOCUS = $(addprefix ${INSTALL_DOC}/${PRJ}/,$(notdir ${DOCU}))
-INSTALL_TEMPLATES = $(addprefix ${INSTALL_TEMPL}/,$(subst .,${LIBVERSIONSTR}.,$(notdir ${TEMPLS})))
-INSTALL_DEP = ${INSTALL_BIN}/${DEPFILE}
-
-INSTALLDIRS = ${INSTALL_LOCATION} ${INSTALL_INCLUDE} ${INSTALL_BIN} 
-INSTALLDIRS += ${INSTALL_DBD} ${INSTALL_DOC} ${INSTALL_DOC}/${PRJ}
-INSTALLDIRS += ${INSTALL_TEMPL} 
+PROJECTDBD=${if $(strip ${DBDFILES}),./${PRJ}.dbd}
 
 COMMON_DIR_3.14 = ../O.${EPICSVERSION}_Common
 COMMON_DIR_3.13 = .
 COMMON_DIR = ${COMMON_DIR_${EPICS_BASETYPE}}
 
-debug::
+#remove include directory for this module from search path
+#3.13 and 3.14 use different variables
+INSTALL_INCLUDES =
+EPICS_INCLUDES =
+
+# Add include directory of foreign modules to include file search path
+# Default is to use latest version of any module
+# The user can overwrite by defining <module>_VERSION=<version>
+# For each foreign module look for include/os/$(OS_CLASS)/ and include/ for the EPICS base version in use
+# The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!)
+# Only really existing directories are added to the search path
+define ADD_FOREIGN_INCLUDES
+# If you find out why make fails without this line please tell me.
+$(1)_VERSION=$(2)
+$(1)_INC=include/os/$(OS_CLASS) include
+USR_INCLUDES += $$(addprefix -I,$$(realpath $$(addprefix ${EPICS_MODULES}/$(1)/$$($(1)_VERSION)/R${EPICSVERSION}/,$$($(1)_INC))))
+endef
+# The tricky part is to sort versions numerically. Make can't but ls -v can. Only accept numerical versions.
+$(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call ADD_FOREIGN_INCLUDES,$(notdir $m),$(lastword $(shell ls -v $m|grep -E "[0-9]+\.[0-9]+\.[0-9]+")))))
+
+debug:
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
 	@echo "OS_CLASS = ${OS_CLASS}"
 	@echo "T_A = ${T_A}"
@@ -500,6 +488,9 @@ debug::
 	@echo "DBDFILES = ${DBDFILES}"
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "TESTVERSION = ${TESTVERSION}"
+	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
+
+
 
 ifeq (${EPICS_BASETYPE},3.13)
 INSTALLRULE=install::
@@ -511,79 +502,38 @@ BUILDRULE=build:
 BASERULES=${EPICS_BASE}/configure/RULES
 endif # 3.14
 
-$(INSTALLRULE) build ${INSTALLDIRS} ${INSTALL_HDRS} ${INSTALL_TEMPLATES}
+INSTALL_REV     = ${MODULE_LOCATION}/R${EPICSVERSION}
+INSTALL_BIN     = ${INSTALL_REV}/bin/$(T_A)
+INSTALL_LIB     = ${INSTALL_REV}/lib/$(T_A)
+INSTALL_INCLUDE = ${INSTALL_REV}/include
+INSTALL_DBD     = ${INSTALL_REV}/dbd
+INSTALL_DB      = ${INSTALL_REV}/db
+INSTALL_CFG     = ${INSTALL_REV}/cfg
+INSTALL_DOC     = ${MODULE_LOCATION}/doc
+INSTALL_SCR     = ${INSTALL_REV}
 
-install-headers:: ${INSTALL_LOCATION} ${INSTALL_INCLUDE}
-install-headers:: ${INSTALL_HDRS}
-install-templates:: ${INSTALL_TEMPLATES}
-install-doc:: ${INSTALL_LOCATION} ${INSTALL_DOC} ${INSTALL_DOC}/${PRJ} ${INSTALL_DOCUS}
+#INSTALL_DOCUS = $(addprefix ${INSTALL_DOC}/${PRJ}/,$(notdir ${DOCU}))
 
-#link only non-test versions
-SETLINKS=$(if ${TESTVERSION},@\#,${MAKEHOME}setLinks.tcl)
-
-${INSTALLDIRS}:
-	mkdir -m 775 $@
-
-${INSTALL_DOC}/${PRJ}/%: %
-	@echo "Installing documentation $@"
-	$(RM) $@
-	cp $^ $@
-	chmod 444 $@
-
-${INSTALL_TEMPL}/%${LIBVERSIONSTR}.template: %.template
-	@echo "Installing template file $@"
-	$(RM) $@
-	echo "#${PRJ}Lib ${LIBVERSION}" > $@
-	cat $^ >> $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_TEMPL} .template $(basename $(notdir $^))
-
-${INSTALL_TEMPL}/%${LIBVERSIONSTR}.db: %.db
-	@echo "Installing template file $@"
-	$(RM) $@
-	echo "#${PRJ}Lib ${LIBVERSION}" > $@
-	cat $^ >> $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_TEMPL} .db $(basename $(notdir $^))
-
-ifeq ($(filter O.%,$(notdir ${CURDIR})),)
-# still in source directory, third run
-# EPICSVERSION and T_A defined 
-
-RMFILES += ${INSTALL_BIN}/${PRJ}Lib${LIBVERSIONSTR}
-RMFILES += ${INSTALL_BIN}/${PRJ}Lib${LIBVERSIONSTR}.munch
-RMFILES += ${INSTALL_BIN}/lib${PRJ}${LIBVERSIONSTR}.so
-RMFILES += ${INSTALL_DEP}
-RMFILES += ${INSTALL_PROJECTDBD}
-RMFILES += ${INSTALL_HDRS}
-RMFILES += ${INSTALL_TEMPLATES}
-
-uninstall::
-	@for i in ${RMFILES}; \
-	    do ${EXISTS} $$i && echo "Uninstalling $$i" && $(RM) $$i; \
-	done; true
-	$(SETLINKS) ${INSTALL_BIN} "" ${PRJ}Lib
-	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib
-	$(SETLINKS) ${INSTALL_BIN} .so lib${PRJ}
-	$(SETLINKS) ${INSTALL_BIN} .dep ${PRJ}
-	$(SETLINKS) ${INSTALL_DBD} .dbd $(notdir ${INSTALL_PROJECTDBD:%${LIBVERSIONSTR}.dbd=%})
-	$(SETLINKS) ${INSTALL_INCLUDE} .h $(notdir ${HDRS:%.h=%})
-	$(SETLINKS) ${INSTALL_TEMPL} .template $(notdir ${TEMPLS:%.template=%})
-	$(SETLINKS) ${INSTALL_TEMPL} .db $(notdir ${TEMPLS:%.db=%})
-
-${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h: %.h
-	@echo "Installing header file $@"
-	$(RM) $@
-	echo "#define __${PRJ}Lib__ ${MAJOR}.${MINOR}" > $@
-	cat $^ >> $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_INCLUDE} .h $(basename $(notdir $^))
-
-vpath %.db $(sort $(dir ${TEMPLS}))
-vpath %.template $(sort $(dir ${TEMPLS}))
-vpath % $(sort $(dir ${DOCU}))
-
-else # in O.* directory, third run
+#${INSTALL_DOC}/${PRJ}/%: %
+#	@echo "Installing documentation $@"
+#	$(RM) $@
+#	cp $^ $@
+#	chmod 444 $@
+#
+#${INSTALL_TEMPL}/%.template: %.template
+#	@echo "Installing template file $@"
+#	$(RM) $@
+#	echo "#${PRJ}Lib ${LIBVERSION}" > $@
+#	cat $^ >> $@
+#	chmod 444 $@
+#	$(SETLINKS) ${INSTALL_TEMPL} .template $(basename $(notdir $^))
+#
+#${INSTALL_TEMPL}/%.db: %.db
+#	@echo "Installing template file $@"
+#	$(RM) $@
+#	$(CP) $^ >> $@
+#	chmod 444 $@
+#	$(SETLINKS) ${INSTALL_TEMPL} .db $(basename $(notdir $^))
 
 # add sources for specific epics types (3.13 or 3.14) or architectures
 ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
@@ -596,43 +546,44 @@ DBDFILES += $(foreach PART, ${ARCH_PARTS}, ${DBDFILES_${EPICS_BASETYPE}_${PART}}
 
 ifeq (${EPICS_BASETYPE},3.13) # only 3.13 from here
 
-PROJECTLIB = $(if ${LIBOBJS},${PRJ}Lib${LIBVERSIONSTR},)
 # Convert sources to object code, skip .a and .o here
 LIBOBJS += $(patsubst %,%.o,$(notdir $(basename $(filter-out %.o %.a,${SRCS}))))
 # add all .a and .o with absolute path
 LIBOBJS += $(filter /%.o /%.a,${SRCS})
 # add all .a and .o with relative path, but prefix with ../
 LIBOBJS += $(patsubst %,../%,$(filter-out /%,$(filter %.o %.a,${SRCS})))
-LIBOBJS += ${LIBRARIES:%=${INSTALL_BIN}/%Lib}
-LIBNAME = ${PROJECTLIB}
+LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
+LIBNAME = $(if ${LIBOBJS},${PRJ}Lib,)   # must be the un-munched name
+PROJECTLIB = ${LIBNAME:%=%.munch}
+PROD = ${PROJECTLIB}
 
 #add munched library for C++ code (does not work for Tornado 1)
-ifneq ($(filter %.cc %.cpp %.C,${SRCS}),)
-ifeq ($(filter T1-%,${T_A}),)
-PROD = ${PROJECTLIB}.munch
-endif # T1- T_A
-endif # .cc or .cpp found
+#ifneq ($(filter %.cc %.cpp %.C,${SRCS}),)
+#ifeq ($(filter T1-%,${T_A}),)
+#PROD = ${PROJECTLIB}.munch
+#endif # T1- T_A
+#endif # .cc or .cpp found
 
 else # only 3.14 from here
 
 ifeq (${OS_CLASS},vxWorks)
 # only install the munched lib
 INSTALL_PROD=
-PROJECTLIB = $(if ${LIBOBJS},${PRJ}Lib${LIBVERSIONSTR}.munch,)
+PROJECTLIB = $(if ${LIBOBJS},${PRJ}Lib.munch,)
 else
-PROJECTLIB = $(if ${LIBOBJS},${LIB_PREFIX}${PRJ}${LIBVERSIONSTR}${SHRLIB_SUFFIX},)
+PROJECTLIB = $(if ${LIBOBJS},${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
 endif
 
 # vxWorks
 PROD_vxWorks=${PROJECTLIB}
 LIBOBJS += $(addsuffix $(OBJ),$(notdir $(basename $(filter-out %.o %.a,$(sort ${SRCS})))))
-LIBOBJS += ${LIBRARIES:%=${INSTALL_BIN}/%Lib}
+LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
 LIBS = -L ${EPICS_BASE_LIB} ${BASELIBS:%=-l%}
 LINK.cpp += ${LIBS}
 PRODUCT_OBJS = ${LIBOBJS}
 
 # Linux
-LOADABLE_LIBRARY=$(if ${LIBOBJS},${PRJ}${LIBVERSIONSTR},)
+LOADABLE_LIBRARY=$(if ${LIBOBJS},${PRJ},)
 LIBRARY_OBJS = ${LIBOBJS}
 
 # Handle registry stuff automagically if we have a dbd file.
@@ -643,12 +594,9 @@ endif # both, 3.13 and 3.14 from here
 
 # If we build a library and use versions, provide a version variable.
 ifdef PROJECTLIB
-ifdef LIBVERSION
 LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
-endif # LIBVERSION
 endif # PROJECTLIB
 
-ifdef LIBVERSION
 ifndef TESTVERSION
 # Provide a global symbol for every version with the same
 # major and equal or smaller minor version number.
@@ -659,32 +607,15 @@ MAJOR_MINOR_PATCH=$(subst ., ,${LIBVERSION})
 MAJOR=$(word 1,${MAJOR_MINOR_PATCH})
 MINOR=$(word 2,${MAJOR_MINOR_PATCH})
 PATCH=$(word 3,${MAJOR_MINOR_PATCH})
-ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
-PREREQUISITES = $(shell ${MAKEHOME}/getPrerequisites.tcl ${INSTALL_INCLUDE} | grep -vw ${PRJ})
-ifeq (${OS_CLASS}, vxWorks)
-PROVIDES = ${ALLMINORS:%=--defsym __${PRJ}Lib_${MAJOR}.%=0}
-endif # vxWorks
-ifeq (${OS_CLASS}, Linux)
-PROVIDES = ${ALLMINORS:%=-Wl,--defsym,${PRJ}Lib_${MAJOR}.%=0}
-endif # Linux
 endif # TESTVERSION
-endif # LIBVERSION defined
-
-LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
 
 # Create and include dependency files
 CPPFLAGS += -MD
 # 3.14.12 already defines -MDD here (what we don't want):
 HDEPENDSCFLAGS =
+HDEPENDS_CMD = 
 -include *.d
 
-# Setup searchpaths from all used files
-vpath % ..
-vpath % $(sort $(dir ${SRCS:%=../%}))
-vpath %.h $(addprefix ../,$(sort $(dir $(filter-out /%,${HDRS})))) $(dir $(filter /%,${HDRS}))
-vpath %.template $(sort $(dir ${TEMPLS:%=../%}))
-vpath %.db $(sort $(dir ${TEMPLS:%=../%}))
-vpath %.dbd $(sort $(dir ${DBDFILES:%=../%}))
 #VPATH += $(sort $(dir ${DOCU:%=../%}))
 
 DBDDIRS = $(sort $(dir ${DBDFILES:%=../%}))
@@ -724,89 +655,85 @@ SNC_CFLAGS=-I ${SNCSEQ}/include
 
 endif # 3.14
 
-${BUILDRULE} PROJECTINFOS $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS})) ${PROJECTDBD} ${DEPFILE}
-
-PROJECTINFOS:
-	@echo ${PRJ} > PROJECTNAME
-	@echo ${INSTBASE} > INSTBASE
-	@echo ${PROJECTLIB} ${PROJECTDBD} ${DEPFILE} > PRODUCTS
-
-# Build one dbd file by expanding all source dbd files.
-# We can't use dbExpand (from the default EPICS make rules)
-# because it has too strict checks for a loadable module.
-${PROJECTDBD}: ${DBDFILES}
-	@echo "Expanding $@"
-	${MAKEHOME}/expandDBD.tcl ${EXPANDARG} ${DBDEXPANDPATH} $^ > $@
-
-# Install everything and set up symbolic links
-ifeq (${EPICS_BASETYPE},3.14)
-${INSTALL_BIN}/${PROJECTLIB}: ${PROJECTLIB}
-	@echo "Installing library $@"
-	$(RM) $@
-	cp $^ $@
-	chmod 444 $@
-ifeq (${OS_CLASS},vxWorks)
-	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib
-else
-	$(SETLINKS) ${INSTALL_BIN} ${SHRLIB_SUFFIX} ${LIB_PREFIX}${PRJ}
-endif
-else
-${INSTALL_BIN}/${PROJECTLIB}.munch: ${PROJECTLIB}.munch
-	@echo "Installing munched library $@"
-	$(RM) $@
-	cp $^ $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_BIN} .munch ${PRJ}Lib
-
-${INSTALL_BIN}/${PROJECTLIB}: ${PROJECTLIB}
-	@echo "Installing library $@"
-	$(RM) $@
-	cp $^ $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_BIN} "" ${PRJ}Lib
-endif
-
-${INSTALL_BIN}/${DEPFILE}: ${DEPFILE}
-	@echo "Installing dependency file $@"
-	$(RM) $@
-	cp $^ $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_BIN} .dep ${PRJ}
-
-${INSTALL_DBD}/%.dbd: %.dbd
-	@echo "Installing dbd file $@"
-	$(RM) $@
-	cp $^ $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_DBD} .dbd ${PRJ}
-
-# Add a #define so that users of the header know the version.
-${INSTALL_INCLUDE}/%${LIBVERSIONSTR}.h: %.h
-	@echo "Installing header file $@"
-	$(RM) $@
-	echo "#define __${PRJ}Lib__ ${MAJOR}.${MINOR}" > $@
-	cat $^ >> $@
-	chmod 444 $@
-	$(SETLINKS) ${INSTALL_INCLUDE} .h $(basename $(notdir $^))
-
+${BUILDRULE} PROJECTINFOS
+${BUILDRULE} ${PROJECTDBD}
+${BUILDRULE} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
+${BUILDRULE} ${DEPFILE}
 
 # Include default EPICS Makefiles (version dependent)
 # avoid library installation when doing 'make build'
 INSTALL_LOADABLE_SHRLIBS=
+# avoid installing .munch to bin
+INSTALL_MUNCHS=
 include ${BASERULES}
 
 #Fix release rules
 RELEASE_DBDFLAGS = -I ${EPICS_BASE}/dbd
 RELEASE_INCLUDES = -I${EPICS_BASE}/include 
+#for 3.15:
 RELEASE_INCLUDES += -I${EPICS_BASE}/include/compiler/${CMPLR_CLASS}
 RELEASE_INCLUDES += -I${EPICS_BASE}/include/os/${OS_CLASS}
+#for 3.13:
+EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
-#relax 3.13 cross compilers (default is STRICT)
-CMPLR=ANSI
-CXXCMPLR=ANSI
-G++_ANSI = $(G++) -ansi
+# Setup searchpaths from all used files
+#vpath % ..
+# find all sources whatever suffix
+$(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),$(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
+# find dbd files but remove ../ to avoid circular dependency if source dbd has the same name as the project dbd
+vpath %.dbd $(filter-out ../,$(sort $(dir ${DBDFILES:%=../%})))
+# find header files to install
+vpath %.h $(addprefix ../,$(sort $(dir ${HDRS} ${SRCS})))
+#vpath %.h $(addprefix ../,$(sort $(dir $(filter-out /%,${HDRS})))) $(dir $(filter /%,${HDRS}))  # why headers starting with / ??
 
-${INSTALLRULE} ${INSTALL_DOCUS} ${INSTALL_PROJECTDBD} ${INSTALL_LIBRARY} ${INSTALL_DEP}
+
+PRODUCTS = ${PROJECTLIB} ${PROJECTDBD} ${DEPFILE}
+PROJECTINFOS:
+	@echo ${PRJ} > PROJECTNAME
+	@echo $(realpath ${EPICS_MODULES}) > INSTBASE
+	@echo ${PRODUCTS} > PRODUCTS
+	@echo ${LIBVERSION} > LIBVERSION
+
+# Build one dbd file by expanding all source dbd files.
+# We can't use dbExpand (from the default EPICS make rules)
+# because it has too strict checks for a loadable module.
+${PROJECTDBD}: ${DBDFILES:%=../%}
+	@echo "Expanding $@"
+	${MAKEHOME}/expandDBD.tcl ${EXPANDARG} ${DBDEXPANDPATH} $^ > $@
+
+# Install everything
+INSTALL_LIBS = ${PROJECTLIB:%=${INSTALL_LIB}/%}
+INSTALL_DEPS = ${DEPFILE:%=${INSTALL_LIB}/%}
+INSTALL_DBDS = ${PROJECTDBD:%=${INSTALL_DBD}/%}
+INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(notdir ${HDRS}))
+INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
+INSTALL_SCRS = $(SCR:%=$(INSTALL_SCR)/%)
+INSTALL_CFGS = $(CFG:%=$(INSTALL_CFG)/%)
+
+INSTALLS += ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_DEPS} ${INSTALL_CFGS}
+
+${INSTALLRULE} ${INSTALLS}
+
+${INSTALL_DBDS}: $(notdir ${INSTALL_DBDS})
+	@echo "Installing module dbd file $@"
+	$(INSTALL) -d -m444 $< $(@D)
+
+${INSTALL_LIBS}: $(notdir ${INSTALL_LIBS})
+	@echo "Installing module library $@"
+	$(INSTALL) -d -m555 $< $(@D)
+
+${INSTALL_DEPS}: $(notdir ${INSTALL_DEPS})
+	@echo "Installing module dependency file $@"
+	$(INSTALL) -d -m444 $< $(@D)
+
+${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
+	@echo "Installing module template file $@"
+	$(INSTALL) -d -m444 $< $(@D)
+
+${INSTALL_SCR}: $(notdir ${SCR})
+	@echo "Installing script $@"
+	$(INSTALL) -d -m444 $< $(@D)
+
 
 # Create SNL code from st/stt file
 # (RULES.Vx only allows ../%.st, 3.14 has no .st rules at all)
@@ -855,7 +782,7 @@ MUNCH=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
 %.munch: CMPLR=TRAD
 %.munch: %
 	@echo Munching $<
-	@ $(RM) ctct.o ctdt.c
+	$(RM) ctct.o ctdt.c
 	$(NM) $< | $(MUNCH) > ctdt.c
 	$(COMPILE.c) ctdt.c
 	$(LINK.c) $@ $< ctdt.o
@@ -927,12 +854,11 @@ ${DEPFILE}: ${LIBOBJS}
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	${MAKEHOME}/getPrerequisites.tcl -dep ${INSTALL_INCLUDE} | grep -vw ${PRJ} >> $@; true
+	cat *.d | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
 
 endif # in O.* directory
 endif # T_A defined
-endif # OS_CLASS in BUILDCLASSES
 endif # EPICSVERSION defined
