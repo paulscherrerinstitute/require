@@ -11,3 +11,6 @@ BUILDCLASSES += Linux
 
 SOURCES += require.c
 DBDS    += require.dbd
+
+SOURCES_vxWorks += strdup.c asprintf.c
+HEADERS += strdup.h asprintf.h
