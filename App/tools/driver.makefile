@@ -854,7 +854,7 @@ ${DEPFILE}: ${LIBOBJS}
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
+	cat *.d | sed 's/ /\n/g' | sed -n 's%$(realpath $(EPICS_MODULES))/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
