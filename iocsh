@@ -333,12 +333,12 @@ then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
     ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
     # load "require" command
-    [ -z "$REQUIRE" ] && REQUIRE=misc
     LIBPREFIX=lib
     LIBPOSTFIX=.so
     
     if [ "$EPICS_MODULES" ]
     then
+        [ -z "$REQUIRE" ] && REQUIRE=require
         if [ -z "$REQUIRE_LIB" ]
         then
             if [ "$REQUIRE_VERSION" ]
@@ -350,6 +350,7 @@ then
         fi
         REQUIRE_DBD=$(dirname $(dirname $(dirname $REQUIRE_LIB)))/dbd/$REQUIRE.dbd
     else
+        [ -z "$REQUIRE" ] && REQUIRE=misc
         if [ -z "$REQUIRE_LIB" ]
         then
             if [ "$REQUIRE_VERSION" ]
