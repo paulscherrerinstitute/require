@@ -438,11 +438,10 @@ endif
 else # in O.*
 ## RUN 4
 # in O.* directory
-$(foreach v, USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v_${OS_CLASS}} $${$v_${T_A}}))
 CFLAGS += ${EXTRA_CFLAGS}
 
 TESTVERSION := $(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$")
-PROJECTDBD=${if $(strip ${DBDFILES}),./${PRJ}.dbd}
+PROJECTDBD=${if $(strip ${DBDFILES}),${PRJ}.dbd}
 
 COMMON_DIR_3.14 = ../O.${EPICSVERSION}_Common
 COMMON_DIR_3.13 = .
@@ -678,11 +677,14 @@ RELEASE_INCLUDES += -I${EPICS_BASE}/include/os/${OS_CLASS}
 EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
 # Setup searchpaths from all used files
-#vpath % ..
+
 # find all sources whatever suffix
 $(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),$(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
+
 # find dbd files but remove ../ to avoid circular dependency if source dbd has the same name as the project dbd
 vpath %.dbd $(filter-out ../,$(sort $(dir ${DBDFILES:%=../%})))
+# but the %Record.h rules need %Record.dbd which may be in ..
+vpath %Record.dbd ..
 # find header files to install
 vpath %.h $(addprefix ../,$(sort $(dir ${HDRS} ${SRCS})))
 #vpath %.h $(addprefix ../,$(sort $(dir $(filter-out /%,${HDRS})))) $(dir $(filter /%,${HDRS}))  # why headers starting with / ??
@@ -855,7 +857,7 @@ ${DEPFILE}: ${LIBOBJS}
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d | sed 's/ /\n/g' | sed -n 's%$(realpath $(EPICS_MODULES))/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
+	cat *.d | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
