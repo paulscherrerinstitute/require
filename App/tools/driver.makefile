@@ -733,7 +733,7 @@ ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
 	@echo "Installing module template file $@"
 	$(INSTALL) -d -m444 $< $(@D)
 
-${INSTALL_SCR}: $(notdir ${SCR})
+${INSTALL_SCRS}: $(notdir ${SCR})
 	@echo "Installing script $@"
 	$(INSTALL) -d -m444 $< $(@D)
 
@@ -857,7 +857,7 @@ ${DEPFILE}: ${LIBOBJS}
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
+	cat *.d | sed 's/ /\n/g' | sed -n 's%$(realpath $(EPICS_MODULES))/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
