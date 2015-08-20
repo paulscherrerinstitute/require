@@ -182,12 +182,12 @@ then
     INSTBASE=/work
 fi
 
-if [ -n "$EPICS_MODULES" ]
+if [ -z "$EPICS_MODULES" ]
 then
-    EPICS_DRIVER_PATH+=:$EPICS_MODULES
+    EPICS_MODULES=/ioc/modules
 fi
 
-EPICS_DRIVER_PATH+=:$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH
+EPICS_DRIVER_PATH+=:$EPICS_MODULES:$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH
 
 # convert for win32-x86 arch
 if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
@@ -335,34 +335,26 @@ then
     # load "require" command
     LIBPREFIX=lib
     LIBPOSTFIX=.so
-    
-    if [ "$EPICS_MODULES" ]
+    REQUIRE=require
+    if [ -d $EPICS_MODULES/$REQUIRE ] # new module pool model
     then
-        [ -z "$REQUIRE" ] && REQUIRE=require
-        if [ -z "$REQUIRE_LIB" ]
+        if [ "$REQUIRE_VERSION" ]
         then
-            if [ "$REQUIRE_VERSION" ]
-            then
-                REQUIRE_LIB=$EPICS_MODULES/$REQUIRE/$REQUIRE_VERSION/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
-            else
-                REQUIRE_LIB=$(ls -rvd $EPICS_MODULES/$REQUIRE/*.*.*|head -n1)/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
-            fi
+            dir=$EPICS_MODULES/$REQUIRE/$REQUIRE_VERSION
+        else
+            dir=$(ls -rvd $EPICS_MODULES/$REQUIRE/*.*.*|head -n1)
         fi
-        REQUIRE_DBD=$(dirname $(dirname $(dirname $REQUIRE_LIB)))/dbd/$REQUIRE.dbd
-    else
-        [ -z "$REQUIRE" ] && REQUIRE=misc
-        if [ -z "$REQUIRE_LIB" ]
+        REQUIRE_LIB=$dir/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
+        REQUIRE_DBD=$dir/R$BASE/dbd/$REQUIRE.dbd
+    else                             # old driver bool model
+        if [ "$REQUIRE_VERSION" ]
         then
-            if [ "$REQUIRE_VERSION" ]
-            then
-                REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE-$REQUIRE_VERSION$LIBPOSTFIX
-            else
-                REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
-            fi
+            REQUIRE=misc-$REQUIRE_VERSION
+        else
+            REQUIRE=misc
         fi
-        f=${REQUIRE_LIB##*$LIBPREFIX}
-        f=${f%$LIBPOSTFIX}
-        REQUIRE_DBD=$(dirname $(dirname $REQUIRE_LIB))/dbd/$f.dbd
+        REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
+        REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
     fi
     if [ ! -f $REQUIRE_LIB ]
     then
