@@ -166,7 +166,7 @@ fi
 
 # setup search path for require
 ODIR=O.${BASE}_$EPICS_HOST_ARCH
-EPICS_DRIVER_PATH=.:bin:snl:../snl:$ODIR:src/$ODIR:snl/$ODIR:../snl/$ODIR:$EPICS_DRIVER_PATH
+EPICS_DRIVER_PATH=.:bin:snl:../snl:$ODIR:src/$ODIR:snl/$ODIR:../snl/$ODIR:${EPICS_DRIVER_PATH#:}
 
 #Special PSI: find installation base for libs from working directory
 D=$(rp $PWD)
@@ -177,17 +177,7 @@ then
     export INSTBASE
 fi
 
-if [ -z "$INSTBASE" ]
-then
-    INSTBASE=/work
-fi
-
-if [ -z "$EPICS_MODULES" ]
-then
-    EPICS_MODULES=/ioc/modules
-fi
-
-EPICS_DRIVER_PATH+=:$EPICS_MODULES:$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH
+EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH%:}:${EPICS_MODULES:=/ioc/modules}:${INSTBASE:=/work}/iocBoot/R$BASE/$EPICS_HOST_ARCH
 
 # convert for win32-x86 arch
 if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
@@ -322,12 +312,13 @@ done
 startup=/tmp/iocsh.startup.$$
 trap "rm -f $startup" EXIT TERM KILL
 {
-echo "#date=\"$(date)\""
-echo "#user=\"${USER:-$(whoami)}\""
+echo "# date=\"$(date)\""
+echo "# user=\"${USER:-$(whoami)}\""
 for var in PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER_PATH
 do
-    echo "#$var=\"${!var}\""
+    echo "# $var=\"${!var}\""
 done
+
 if [ $BASEMINOR -ge 15 -o $BASEPATCH -ge 12 ]
 then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
@@ -335,24 +326,12 @@ then
     # load "require" command
     LIBPREFIX=lib
     LIBPOSTFIX=.so
-    REQUIRE=require
-    if [ -d $EPICS_MODULES/$REQUIRE ] # new module pool model
-    then
-        if [ "$REQUIRE_VERSION" ]
-        then
-            dir=$EPICS_MODULES/$REQUIRE/$REQUIRE_VERSION
-        else
-            dir=$(ls -rvd $EPICS_MODULES/$REQUIRE/*.*.*|head -n1)
-        fi
-        REQUIRE_LIB=$dir/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
-        REQUIRE_DBD=$dir/R$BASE/dbd/$REQUIRE.dbd
-    else                             # old driver bool model
-        if [ "$REQUIRE_VERSION" ]
-        then
-            REQUIRE=misc-$REQUIRE_VERSION
-        else
-            REQUIRE=misc
-        fi
+    if [ -d $EPICS_MODULES/${REQUIRE:=require} ]
+    then # new module pool model
+        REQUIRE_LIB=$EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:=$(cd $EPICS_MODULES/$REQUIRE; ls -rvd *.*.*)}/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
+        REQUIRE_DBD=$EPICS_MODULES/$REQUIRE/$REQUIRE_VERSION/R$BASE/dbd/$REQUIRE.dbd
+    else # old driver pool model
+        REQUIRE=misc${REQUIRE_VERSION:+-}$REQUIRE_VERSION
         REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
         REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
     fi
