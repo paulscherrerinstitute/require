@@ -481,7 +481,7 @@ int require(const char* module, const char* version, const char* args)
     
     if (module == NULL)
     {
-        printf("Usage: require \"<module>\" [, \"<version>\"] [, \"<args>\"]\n");
+        printf("Usage: require \"<module>\" [, \"<version>\" | \"ifexists\"] [, \"<args>\"]\n");
         printf("Loads " PREFIX "<module>" INFIX EXT " and <libname>.dbd\n");
 #ifndef EPICS_3_13
         printf("And calls <module>_registerRecordDeviceDriver\n");
