@@ -455,17 +455,16 @@ EPICS_INCLUDES =
 # Add include directory of foreign modules to include file search path
 # Default is to use latest version of any module
 # The user can overwrite by defining <module>_VERSION=<version>
-# For each foreign module look for include/os/$(OS_CLASS)/ and include/ for the EPICS base version in use
+# For each foreign module look for include/ for the EPICS base version in use
 # The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!)
 # Only really existing directories are added to the search path
+
 define ADD_FOREIGN_INCLUDES
-# If you find out why make fails without this line please tell me.
-$(1)_VERSION=$(2)
-$(1)_INC=include/os/$(OS_CLASS) include
-USR_INCLUDES += $$(addprefix -I,$$(realpath $$(addprefix ${EPICS_MODULES}/$(1)/$$($(1)_VERSION)/R${EPICSVERSION}/,$$($(1)_INC))))
+$(eval $(notdir $(1))_VERSION := $(patsubst $(1)/%/R${EPICSVERSION}/include,%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION}/include 2>/dev/null))))
+USR_INCLUDES += $$(patsubst %,-I$(1)/%/R${EPICSVERSION}/include,$$($(notdir $(1))_VERSION))
 endef
 # The tricky part is to sort versions numerically. Make can't but ls -v can. Only accept numerical versions.
-$(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call ADD_FOREIGN_INCLUDES,$(notdir $m),$(lastword $(shell ls -v $m|grep -E "[0-9]+\.[0-9]+\.[0-9]+")))))
+$(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call ADD_FOREIGN_INCLUDES,$m)))
 
 debug:
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
@@ -680,15 +679,12 @@ EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
 # find all sources whatever suffix
 $(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),$(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
-
 # find dbd files but remove ../ to avoid circular dependency if source dbd has the same name as the project dbd
 vpath %.dbd $(filter-out ../,$(sort $(dir ${DBDFILES:%=../%})))
 # but the %Record.h rules need %Record.dbd which may be in ..
 vpath %Record.dbd ..
 # find header files to install
 vpath %.h $(addprefix ../,$(sort $(dir ${HDRS} ${SRCS})))
-#vpath %.h $(addprefix ../,$(sort $(dir $(filter-out /%,${HDRS})))) $(dir $(filter /%,${HDRS}))  # why headers starting with / ??
-
 
 PRODUCTS = ${PROJECTLIB} ${PROJECTDBD} ${DEPFILE}
 PROJECTINFOS:
@@ -857,7 +853,7 @@ ${DEPFILE}: ${LIBOBJS}
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d | sed 's/ /\n/g' | sed -n 's%$(realpath $(EPICS_MODULES))/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
+	cat *.d | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
