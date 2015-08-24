@@ -1,7 +1,4 @@
 #!/bin/bash
-SOURCE='$Source: /cvs/G/DRV/misc/iocsh,v $'
-REVISION='$Revision: 3.11 $'
-DATE='$Date: 2015/06/29 09:47:00 $'
 
 help () {
     {
@@ -36,9 +33,6 @@ help () {
 version () {
     {
     echo "iocsh by Dirk Zimoch"
-    echo $SOURCE
-    echo $REVISION
-    echo $DATE
     } >&2
     exit
 }
@@ -310,7 +304,7 @@ done
 }
 
 startup=/tmp/iocsh.startup.$$
-trap "rm -f $startup" EXIT TERM KILL
+trap "stty sane; echo; rm -f $startup" EXIT TERM KILL
 {
 echo "# date=\"$(date)\""
 echo "# user=\"${USER:-$(whoami)}\""
@@ -355,6 +349,7 @@ else
     echo "${APP}_registerRecordDeviceDriver(pdbbase)"
 fi
 loadFiles "$@"
+echo "require misc"
 if [ "$init" != NO ]
 then
     echo "iocInit"
@@ -362,10 +357,12 @@ fi
 if [ "$SHELLBOX" ]
 then
   PATH=$PATH:/home/ioc/bin
-  echo "rm /tmp/${IOC}.dbl"
+  export BCAST_ADDR=$(/sbin/ifconfig eth0 | awk -F '[ :]+' '/Bcast/ {print $6}')
+  echo "require misc"
+  echo "! rm -f /tmp/${IOC}.dbl"
   echo 'dbl "","RTYP DESC" > /tmp/${IOC}.dbl'
-  echo "! dbl2odb.sh ${IOC} $(/sbin/ifconfig eth0 | awk -F '[ :]+' '/Bcast/ {print $6}') $EPICS_CA_SERVER_PORT"
-  echo "rm /tmp/${IOC}.libs"
+  echo "! dbl2odb.sh ${IOC} \"$BCAST_ADDR\" \"$EPICS_CA_SERVER_PORT\""
+  echo "! rm -f /tmp/${IOC}.libs"
   echo "libversionShow > /tmp/${IOC}.libs"
   echo "! upload_libinfo.py -i ${IOC} -l /tmp/${IOC}.libs"
 fi
@@ -385,4 +382,3 @@ fi
 
 echo $EXE $ARGS $startup
 eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
-echo
