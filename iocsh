@@ -358,7 +358,6 @@ if [ "$SHELLBOX" ]
 then
   PATH=$PATH:/home/ioc/bin
   export BCAST_ADDR=$(/sbin/ifconfig eth0 | awk -F '[ :]+' '/Bcast/ {print $6}')
-  echo "require misc"
   echo "! rm -f /tmp/${IOC}.dbl"
   echo 'dbl "","RTYP DESC" > /tmp/${IOC}.dbl'
   echo "! dbl2odb.sh ${IOC} \"$BCAST_ADDR\" \"$EPICS_CA_SERVER_PORT\""
