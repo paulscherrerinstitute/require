@@ -381,4 +381,5 @@ then
 fi
 
 echo $EXE $ARGS $startup
+ulimit -c unlimited
 eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
