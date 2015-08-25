@@ -74,17 +74,17 @@ static int firstTime = 1;
     #undef  INFIX
     #define INFIX "Lib"
     #define EXT ".munch"
-    
+
     #define getAddress(module, name) __extension__ \
         ({SYM_TYPE t; char* a = NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
-        
+
     /* vxWorks has no snprintf() */
     #define snprintf(s, maxchars, f, args...) __extension__ \
         ({int printed=sprintf(s, f, ## args); assert(printed < maxchars); printed;})
 
     extern char** ppGlobalEnviron;
     extern int execute();
-    
+
 #elif defined (__unix)
 
     #include <dlfcn.h>
@@ -272,7 +272,7 @@ static int findLibRelease (
     char* p;
     char* version;
     char* symname;
-    
+
     /* find a symbol with a name like "_<module>LibRelease"
        where <module> is from the library name "<location>/lib<module>.so" */
     if (info->dlpi_name == NULL || info->dlpi_name[0] == 0) return 0;  /* no library name */
@@ -361,7 +361,7 @@ int libversionShow(const char* pattern, int showLocation)
 {
     moduleitem* m;
     int lm, lv;
-    
+
     if (firstTime) /* can only happen on vxWorks */
     {
         firstTime=0;
@@ -390,7 +390,7 @@ static int compareVersions(const char* request, const char* found)
 {
     int found_major, found_minor=0, found_patch=0, found_parts;
     int req_major, req_minor, req_patch, req_parts;
-    
+
     found_parts = sscanf(found, "%d.%d.%d", &found_major, &found_minor, &found_patch);
 
     if (request == NULL || request[0] == 0)            /* No particular version request. match anything */
@@ -398,7 +398,7 @@ static int compareVersions(const char* request, const char* found)
         if (found_parts == 0)       return TESTVERS;   /* Test version found */
         return MATCH;
     }
-    
+
     if (strcmp(found, request) == 0) return EXACT;      /* Exact match. */
 
     /* Numerical version compare. Format is major.minor.patch
@@ -428,7 +428,7 @@ static int putenvprintf(const char* format, ...)
 {
     va_list ap;
     char *var;
-    
+
     va_start(ap, format);
     if (vasprintf(&var, format, ap) < 0)
     {
@@ -436,7 +436,7 @@ static int putenvprintf(const char* format, ...)
         return errno;
     }
     va_end(ap);
-    
+
     if (requireDebug)
         printf("require: putenv(\"%s\")\n", var);
     putenv(var);
@@ -458,18 +458,19 @@ it calls epicsExit to abort the application.
 */
 
 /* wrapper to abort statup script */
-static int require_priv(const char* module, const char* version, const char* args);
+static int require_priv(const char* module, const char* version, const char* args, const char* versionstr);
 
 int require(const char* module, const char* version, const char* args)
 {
     int status;
+    char* versionstr;
 
     if (firstTime) /* can only happen on vxWorks */
     {
         firstTime=0;
         registerExternalModules();
     }
-    
+
     if (getenv("EPICS_DB_INCLUDE_PATH") == NULL)
         putenv("EPICS_DB_INCLUDE_PATH=.");
 
@@ -478,7 +479,7 @@ int require(const char* module, const char* version, const char* args)
 
     if (getenv("EPICS_RELEASE") == NULL)
         putenvprintf("EPICS_RELEASE=%s", epicsRelease);
-    
+
     if (module == NULL)
     {
         printf("Usage: require \"<module>\" [, \"<version>\" | \"ifexists\"] [, \"<args>\"]\n");
@@ -489,7 +490,7 @@ int require(const char* module, const char* version, const char* args)
         printf("If available, runs startup script snippet or loads substitution file or templates with args\n");
         return -1;
     }
-    
+
     /* either order for version and args, either may be empty or NULL */
     if (version && strchr(version, '='))
     {
@@ -499,8 +500,31 @@ int require(const char* module, const char* version, const char* args)
         if (requireDebug)
             printf("require: swap version and args\n");
     }
-    
-    status = require_priv(module, version, args);
+
+    if (version)
+    {
+        /* needed for old style only: */
+        if (asprintf(&versionstr, "-%s", version) < 0) return errno;
+        if (isdigit((unsigned char)version[0]) && version[strlen(version)-1] == '+')
+        {
+            /*
+                user may give a minimal version (e.g. "1.2.4+")
+                load highest matching version (here "1.2") and check later
+            */
+            char* p = strrchr(versionstr, '.');
+            if (p == NULL) p = versionstr;
+            *p = 0;
+        }
+    }
+    else
+        versionstr = "";
+    if (requireDebug)
+        printf("require: versionstr = \"%s\"\n", versionstr);
+
+    status = require_priv(module, version, args, versionstr);
+
+    if (version) free(versionstr);
+
     if (status == 0) return 0;
     if (status != -1) perror("require");
     if (interruptAccept) return status;
@@ -591,7 +615,7 @@ int runScript(const char* filename, const char* args)
     int status = 0;
 
     pairs = (char*[]){ "", "environ", NULL, NULL };
-    
+
     if ((file = fopen(filename, "r")) == NULL) { perror(filename); return errno; }
     if (macCreateHandle(&mac, pairs) != 0) goto error;
     macSuppressWarning(mac, 1);
@@ -677,10 +701,10 @@ end:
     return status;
 }
 
-static int require_priv(const char* module, const char* version, const char* args)
+static int require_priv(const char* module, const char* version, const char* args,
+    const char* versionstr  /* "-<version>" or "" (for old style only */ )
 {
     int status;
-    char* versionstr;
     const char* loaded = NULL;
     const char* found = NULL;
     HMODULE libhandle;
@@ -700,7 +724,7 @@ static int require_priv(const char* module, const char* version, const char* arg
 
     if (requireDebug)
         printf("require: module=\"%s\" version=\"%s\" args=\"%s\"\n", module, version, args);
-        
+
 #define TRY_FILE(offs, args...) \
     (snprintf(filename + offs, sizeof(filename) - offs, args) && \
     (fileExists(filename) || (requireDebug && !printf("require: no %s\n", filename))))
@@ -708,7 +732,7 @@ static int require_priv(const char* module, const char* version, const char* arg
 #define TRY_NONEMPTY_FILE(offs, args...) \
     (snprintf(filename + offs, sizeof(filename) - offs, args) && \
     (fileSize(filename)>0 || (requireDebug && !printf("require: no %s\n", filename))))
-        
+
     driverpath = getenv("EPICS_DRIVER_PATH");
     if (driverpath == NULL) driverpath = ".";
     if (requireDebug)
@@ -718,8 +742,9 @@ static int require_priv(const char* module, const char* version, const char* arg
     {
         ifexists = 1;
         version = NULL;
+        versionstr = "";
     }
-        
+
     /* check already loaded verion */
     loaded = getLibVersion(module);
     if (loaded)
@@ -751,27 +776,6 @@ static int require_priv(const char* module, const char* version, const char* arg
     {
         if (requireDebug)
             printf("require: no %s version loaded yet\n", module);
-
-        /* user may give a minimal version (e.g. "1.2.4+")
-           load highest matching version (here "1.2") and check later
-           (old style only)
-        */
-        if (version)
-        {
-            if (asprintf(&versionstr, "-%s", version) < 0) return errno;
-            if (isdigit((unsigned char)version[0]) && version[strlen(version)-1] == '+')
-            {
-                char* p = strrchr(versionstr, '.');
-                if (p == NULL) p = versionstr;
-                *p = 0;
-            }
-        }
-        else
-            versionstr = calloc(2,1);
-        if (requireDebug)
-            printf("require: versionstr = \"%s\"\n", versionstr);
-
-        /* versionstr == "-<version>" or "" */
 
         /* Search for module in driverpath */
         for (dirname = driverpath; dirname != NULL; dirname = end)
@@ -869,9 +873,11 @@ static int require_priv(const char* module, const char* version, const char* arg
                     /* we have found something (EXACT or MATCH) */
                     free(founddir);
                     /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]..." */
-                    if (asprintf(&founddir, "%.*s%s", modulediroffs, filename, dirent->d_name) < 0) return errno;
+                    if (asprintf(&founddir, "%.*s%s", modulediroffs, filename, dirent->d_name) < 0)
+                        return errno;
                     /* founddir = "<dirname>/[dirlen]<module>/[modulediroffs]<version>" */
                     found = founddir + modulediroffs; /* version part in the path */
+                    if (status == EXACT) break;
                 }
                 closedir(dir);
             }
@@ -910,7 +916,6 @@ static int require_priv(const char* module, const char* version, const char* arg
                             printf("require: found old style %s\n", filename);
                         printf ("Module %s s%s found in %.*s\n", module,
                         versionstr+1, dirlen, filename);
-                        free(versionstr);
                         goto loadlib;
                     }
                 }
@@ -919,14 +924,14 @@ static int require_priv(const char* module, const char* version, const char* arg
             if (!found && requireDebug)
                 printf("require: no matching version in %.*s\n", dirlen, filename);
         }
-        free(versionstr);
-        versionstr = NULL;
 
         if (!found)
         {
             fprintf(stderr, "Module %s not found\n", module);
             return ifexists ? 0 : -1;
         }
+
+        versionstr = "";
 
         /* founddir = "<dirname>/[dirlen]<module>/<version>" */
         printf ("Module %s version %s found in %s" DIRSEP "\n", module, found, founddir);
@@ -943,15 +948,14 @@ static int require_priv(const char* module, const char* version, const char* arg
 checkdep:
         /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
         /* or (old)   "<dirname>/[dirlen]][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
-        if (handleDependencies(module, filename) == -1) return -1;
+        if (handleDependencies(module, filename) == -1)
+            return -1;
 
         /* load library */
         snprintf(filename + libdiroffs, sizeof(filename) - libdiroffs,
-            PREFIX "%s" INFIX "%s%n" EXT, module, versionstr ? versionstr : "", &extoffs);
+            PREFIX "%s" INFIX "%s%n" EXT, module, versionstr, &extoffs);
         /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs]EXT" */
         /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
-
-        free(versionstr);
 
         if (requireDebug)
             printf("require: looking for library %s\n", filename);
@@ -975,20 +979,19 @@ loadlib:
             /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
             printf("Loading library %s\n", filename);
             if ((libhandle = loadlib(filename)) == NULL)
-            {
                 return -1;
-            }
 
             /* now check what version we really got (with compiled-in version number) */
             if (asprintf (&symbolname, "_%sLibRelease", module) < 0)
                 return errno;
+
             found = getAddress(libhandle, symbolname);
             free(symbolname);
             printf("Loaded %s version %s\n", module, found);
 
             /* check what we got */
             if (requireDebug)
-                printf("require: compare requested version %s with found version %s\n", version, found);
+                printf("require: compare requested version %s with loaded version %s\n", version, found);
             if (compareVersions(version, found) == MISMATCH)
             {
                 fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
@@ -997,8 +1000,8 @@ loadlib:
             }
 
             /* load dbd file */
-            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" DIRSEP "%s.dbd", module) ||
-                TRY_NONEMPTY_FILE(releasediroffs, "%s.dbd", module))
+            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" DIRSEP "%s%s.dbd", module, versionstr) ||
+                TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr))
             {
                 printf("Loading dbd file %s\n", filename);
                 if (dbLoadDatabase(filename, NULL, NULL) != 0)
@@ -1011,6 +1014,7 @@ loadlib:
                 /* when dbd is loaded call register function */
                 if (asprintf(&symbolname, "%s_registerRecordDeviceDriver", module) < 0)
                     return errno;
+
                 printf ("Calling function %s\n", symbolname);
                 #ifdef vxWorks
                 {
