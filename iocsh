@@ -322,14 +322,14 @@ then
     LIBPOSTFIX=.so
     if [ -d $EPICS_MODULES/${REQUIRE:=require} ]
     then # new module pool model
-        REQUIRE_LIB=$EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:=$(cd $EPICS_MODULES/$REQUIRE; ls -rvd *.*.*)}/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
+        REQUIRE_LIB=$EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:=$(cd $EPICS_MODULES/$REQUIRE; ls -1rvd *.*.* | head -n 1)}/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
         REQUIRE_DBD=$EPICS_MODULES/$REQUIRE/$REQUIRE_VERSION/R$BASE/dbd/$REQUIRE.dbd
     else # old driver pool model
         REQUIRE=misc${REQUIRE_VERSION:+-}$REQUIRE_VERSION
         REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
         REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
     fi
-    if [ ! -f $REQUIRE_LIB ]
+    if [ ! -f "$REQUIRE_LIB" ]
     then
         echo "Library $REQUIRE_LIB not found." >&2
         echo "Command 'require' is not available." >&2
