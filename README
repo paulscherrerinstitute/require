@@ -23,7 +23,7 @@ require "<module>" [,"<version>"] [,"<macro1>=<value2>, <macro2>=<value2>"]
     * the loaded version matches the required version exactly
     * major numbers are the same and loaded minor number is at least the required one
     * major and minor numbers are the same and patch number is at least the required one
-    * the loaded version a test version and the required version is not a test version
+    * the loaded version is a test version and the required version is not a test version
  
  Versions with different major numbers are never compatible.
  Different test versions are never compatible.
