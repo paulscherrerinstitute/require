@@ -284,13 +284,13 @@ ifndef T_A
 # Look for sources etc.
 # Export everything for third run
 
-AUTOSRCS := $(filter-out ~%,$(wildcard *.c) $(wildcard *.cc) $(wildcard *.cpp) $(wildcard *.st) $(wildcard *.stt) $(wildcard *.gt))
+AUTOSRCS := $(filter-out ~%,$(wildcard *.c) $(wildcard *.cc) $(wildcard *.cpp *.st *.stt *.gt))
 SRCS = $(if ${SOURCES},$(filter-out -none-,${SOURCES}),${AUTOSRCS})
 SRCS += ${SOURCES_${EPICS_BASETYPE}}
 SRCS += ${SOURCES_${EPICSVERSION}}
 export SRCS
 
-DBDFILES = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
+DBDFILES = $(if ${DBDS},$(filter-out -none-,${DBDS}),${MENUS} $(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
 DBDFILES += ${DBDS_${EPICS_BASETYPE}}
 DBDFILES += ${DBDS_${EPICSVERSION}}
 DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
@@ -316,7 +316,7 @@ HDRS += ${HEADERS_${EPICS_BASETYPE}}
 HDRS += ${HEADERS_${EPICSVERSION}}
 export HDRS
 
-TEMPLS = ${TEMPLATES}
+TEMPLS = $(if ${TEMPLATES},$(filter-out -none-,${TEMPLATES}),$(wildcard *.template *.db *.subs))
 TEMPLS += ${TEMPLATES_${EPICS_BASETYPE}}
 TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
@@ -438,6 +438,7 @@ endif
 else # in O.*
 ## RUN 4
 # in O.* directory
+$(foreach v, USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v_${OS_CLASS}} $${$v_${T_A}}))
 CFLAGS += ${EXTRA_CFLAGS}
 
 TESTVERSION := $(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$")
@@ -458,7 +459,6 @@ EPICS_INCLUDES =
 # For each foreign module look for include/ for the EPICS base version in use
 # The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!)
 # Only really existing directories are added to the search path
-
 define ADD_FOREIGN_INCLUDES
 $(eval $(notdir $(1))_VERSION := $(patsubst $(1)/%/R${EPICSVERSION}/include,%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION}/include 2>/dev/null))))
 USR_INCLUDES += $$(patsubst %,-I$(1)/%/R${EPICSVERSION}/include,$$($(notdir $(1))_VERSION))
@@ -485,6 +485,7 @@ debug:
 	@echo "DBDS_${EPICS_BASETYPE} = ${DBDS_${EPICS_BASETYPE}}"
 	@echo "DBDS_${OS_CLASS} = ${DBDS_${OS_CLASS}}"
 	@echo "DBDFILES = ${DBDFILES}"
+	@echo "TEMPLS = ${TEMPLS}"
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "TESTVERSION = ${TESTVERSION}"
 	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
@@ -676,7 +677,6 @@ RELEASE_INCLUDES += -I${EPICS_BASE}/include/os/${OS_CLASS}
 EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
 # Setup searchpaths from all used files
-
 # find all sources whatever suffix
 $(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),$(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
 # find dbd files but remove ../ to avoid circular dependency if source dbd has the same name as the project dbd
@@ -726,12 +726,12 @@ ${INSTALL_DEPS}: $(notdir ${INSTALL_DEPS})
 	$(INSTALL) -d -m444 $< $(@D)
 
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
-	@echo "Installing module template file $@"
-	$(INSTALL) -d -m444 $< $(@D)
+	@echo "Installing module template files $^ to $(@D)"
+	$(INSTALL) -d -m444 $^ $(@D)
 
-${INSTALL_SCRS}: $(notdir ${SCR})
-	@echo "Installing script $@"
-	$(INSTALL) -d -m444 $< $(@D)
+${INSTALL_SCRS}: ${SCR}
+	@echo "Installing scripts $^ to $(@D)"
+	$(INSTALL) -d -m444 $^ $(@D)
 
 
 # Create SNL code from st/stt file
