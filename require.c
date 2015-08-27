@@ -665,8 +665,9 @@ int runScript(const char* filename, const char* args)
             if ((line_raw = realloc(line_raw, line_raw_size *= 2)) == NULL) goto error;
             if (fgets(line_raw + len, line_raw_size - len, file) == NULL) break;
         }
+        line_raw[--len] = 0; /* get rid of '\n' */
         if (requireDebug)
-                printf("runScript raw line: %s", line_raw);
+                printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
         while ((len = labs(macExpandString(mac, line_raw, line_exp, line_exp_size-1))) >= line_exp_size-2)
         {
@@ -675,7 +676,7 @@ int runScript(const char* filename, const char* args)
             free(line_exp);
             if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
         }
-        printf("%s", line_exp);
+        printf("%s\n", line_exp);
         p=(unsigned char*)line_exp;
         while (isspace(*p)) p++;
         if (*p == 0 || *p == '#') continue;
