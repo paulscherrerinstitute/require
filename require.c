@@ -748,7 +748,7 @@ static int require_priv(const char* module, const char* version, const char* arg
     {
         ifexists = 1;
         version = NULL;
-        versionstr = "";
+        versionstr = (char[2]){0,0};
     }
 
     /* check already loaded verion */
