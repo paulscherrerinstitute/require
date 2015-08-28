@@ -748,7 +748,7 @@ static int require_priv(const char* module, const char* version, const char* arg
     {
         ifexists = 1;
         version = NULL;
-        versionstr = (char[2]){0,0};
+        versionstr = "";
     }
 
     /* check already loaded verion */
@@ -904,8 +904,8 @@ static int require_priv(const char* module, const char* version, const char* arg
                     {
                         if (requireDebug)
                             printf("require: found old style %s\n", filename);
-                        printf ("Module %s %s found in %.*s\n", module,
-                        versionstr+1, dirlen, filename);
+                        printf ("Module %s%s found in %.*s\n", module,
+                        versionstr, dirlen, filename);
                         goto checkdep;
                     }
 
@@ -920,8 +920,8 @@ static int require_priv(const char* module, const char* version, const char* arg
                     {
                         if (requireDebug)
                             printf("require: found old style %s\n", filename);
-                        printf ("Module %s s%s found in %.*s\n", module,
-                        versionstr+1, dirlen, filename);
+                        printf ("Module %s%s found in %.*s\n", module,
+                        versionstr, dirlen, filename);
                         goto loadlib;
                     }
                 }
