@@ -22,6 +22,7 @@
 
 #include <macLib.h>
 #include <epicsVersion.h>
+
 #ifdef BASE_VERSION
 #define EPICS_3_13
 #define epicsStdoutPrintf printf
@@ -33,14 +34,20 @@ int dbLoadRecords(const char *filename, const char *substitutions)
     return dbLoadDatabase(filename, NULL, substitutions);
 }
 extern volatile int interruptAccept;
+#define OSI_PATH_SEPARATOR "/"
+#define OSI_PATH_LIST_SEPARATOR ":"
+
 #else /* 3.14+ */
+
 #include <iocsh.h>
 #include <dbAccess.h>
 epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
 #include <epicsExit.h>
 #include <epicsStdio.h>
 #include <dbLoadTemplate.h>
+#include <osiFileName.h>
 #include <epicsExport.h>
+
 #endif
 
 #include "require.h"
@@ -48,11 +55,6 @@ epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
 int requireDebug=0;
 
 static int firstTime = 1;
-
-#define DIRSEP "/"
-#define PATHSEP ":"
-#define PREFIX
-#define INFIX
 
 #if defined (vxWorks)
 
@@ -71,7 +73,7 @@ static int firstTime = 1;
     #include "asprintf.h"
 
     #define HMODULE MODULE_ID
-    #undef  INFIX
+    #define PREFIX
     #define INFIX "Lib"
     #define EXT ".munch"
 
@@ -81,6 +83,23 @@ static int firstTime = 1;
     /* vxWorks has no snprintf() */
     #define snprintf(s, maxchars, f, args...) __extension__ \
         ({int printed=sprintf(s, f, ## args); assert(printed < maxchars); printed;})
+
+    /* vxWorks has no realpath() -- at least make directory absolute */
+    static char* realpath(const char* path, char* buf)
+    {
+        size_t len = 0;
+        if (!buf) buf = malloc(MAX_FILENAME_LENGTH);
+        if (!buf) return NULL;
+        if (path[0] != OSI_PATH_SEPARATOR[0])
+        {
+            getcwd(buf, MAX_FILENAME_LENGTH);
+            len = strlen(buf);
+            if (len && buf[len-1] != OSI_PATH_SEPARATOR[0])
+                buf[len++] = OSI_PATH_SEPARATOR[0];
+        }
+        strcpy(buf+len, path);
+        return buf;
+    }
 
     extern char** ppGlobalEnviron;
     extern int execute();
@@ -93,36 +112,35 @@ static int firstTime = 1;
     #define getAddress(module, name) dlsym(module, name)
 
     #ifdef CYGWIN32
-
+        #define PREFIX
+        #define INFIX
         #define EXT ".dll"
-
     #else
-
-        #undef  PREFIX
         #define PREFIX "lib"
+        #define INFIX
         #define EXT ".so"
-
     #endif
     extern char** environ;
 
 #elif defined (_WIN32)
 
     #include <windows.h>
-    #undef  DIRSEP
-    #define DIRSEP "\\"
-    #undef  PATHSEP
-    #define PATHSEP ";"
+    #define PREFIX
+    #define INFIX
     #define EXT ".dll"
 
     #define getAddress(module, name) GetProcAddress(module, name)
 #else
 
     #warning unknwn OS
+    #define PREFIX
+    #define INFIX
+    #define EXT
     #define getAddress(module, name) NULL
 
 #endif
 
-#define LIBDIR "lib" DIRSEP
+#define LIBDIR "lib" OSI_PATH_SEPARATOR
 #define TEMPLATEDIR "db"
 
 const char epicsRelease[] = EPICS_RELEASE;
@@ -296,7 +314,7 @@ static int findLibRelease (
     if (version)
     {
         *p=0; symname++;                                    /* build module name "<module>" */
-        if ((p = strstr(name, DIRSEP LIBDIR)) != NULL)
+        if ((p = strstr(name, OSI_PATH_SEPARATOR LIBDIR)) != NULL)
             p[1]=0;                                         /* cut "<location>" before libdir */
         registerModule(symname, version, location);
     }
@@ -787,9 +805,9 @@ static int require_priv(const char* module, const char* version, const char* arg
             int dirlen;
             int modulediroffs;
 
-            end = strchr(dirname, PATHSEP[0]);
-            if (end && end[1] == DIRSEP[0] && end[2] == DIRSEP[0])   /* "http://..." and friends */
-                end = strchr(end+2, PATHSEP[0]);
+            end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
+            if (end && end[1] == OSI_PATH_SEPARATOR[0] && end[2] == OSI_PATH_SEPARATOR[0])   /* "http://..." and friends */
+                end = strchr(end+2, OSI_PATH_LIST_SEPARATOR[0]);
             if (end) dirlen = end++ - dirname;
             else dirlen = strlen(dirname);
             if (dirlen == 0) continue; /* ignore empty driverpath elements */
@@ -797,7 +815,7 @@ static int require_priv(const char* module, const char* version, const char* arg
             if (requireDebug)
                 printf("require: trying %.*s\n", dirlen, dirname);
 
-            snprintf(filename, sizeof(filename), "%.*s" DIRSEP "%s" DIRSEP "%n", 
+            snprintf(filename, sizeof(filename), "%.*s" OSI_PATH_SEPARATOR "%s" OSI_PATH_SEPARATOR "%n", 
                 dirlen, dirname, module, &modulediroffs);
             dirlen++;
             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
@@ -843,7 +861,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                             /* Even if it has no library, at least it has a dep file in the lib dir */
 
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
-                            if (!TRY_FILE(modulediroffs, "%s" DIRSEP "R%s" DIRSEP LIBDIR "%s" DIRSEP,
+                            if (!TRY_FILE(modulediroffs, "%s" OSI_PATH_SEPARATOR "R%s" OSI_PATH_SEPARATOR LIBDIR "%s" OSI_PATH_SEPARATOR,
                                 dirent->d_name, epicsRelease, targetArch))
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/lib/<targetArch>/" */
                             {
@@ -937,10 +955,10 @@ static int require_priv(const char* module, const char* version, const char* arg
         versionstr = "";
 
         /* founddir = "<dirname>/[dirlen]<module>/<version>" */
-        printf ("Module %s version %s found in %s" DIRSEP "\n", module, found, founddir);
+        printf ("Module %s version %s found in %s" OSI_PATH_SEPARATOR "\n", module, found, founddir);
 
         snprintf(filename, sizeof(filename),
-            "%s" DIRSEP "R%s" DIRSEP "%n" LIBDIR "%s" DIRSEP "%n%s.dep",
+            "%s" OSI_PATH_SEPARATOR "R%s" OSI_PATH_SEPARATOR "%n" LIBDIR "%s" OSI_PATH_SEPARATOR "%n%s.dep",
             founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module);
         /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
 
@@ -1003,10 +1021,10 @@ loadlib:
             }
 
             /* load dbd file */
-            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" DIRSEP "%s%s.dbd", module, versionstr) ||
+            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
                 TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, ".." DIRSEP "dbd" DIRSEP "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, ".." DIRSEP "%s%s.dbd", module, versionstr))
+                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "dbd" OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
+                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr))
             {
                 printf("Loading dbd file %s\n", filename);
                 if (dbLoadDatabase(filename, NULL, NULL) != 0)
@@ -1062,26 +1080,13 @@ loadlib:
         printf("require: looking for template directory\n");
     /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]..." */
     if (TRY_FILE(releasediroffs, TEMPLATEDIR) ||
-        TRY_FILE(releasediroffs, ".." DIRSEP TEMPLATEDIR))
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR TEMPLATEDIR))
     {
         char* old_path;           
         char* p;
         size_t len;
 
-#ifndef vxWorks
-        char* absdir;
-        absdir = realpath(filename, NULL); /* so we can change directory later safely */
-#else
-        /* vxWorks has no realpath() -- at least make directory absolute */
-        char absdir[MAX_FILENAME_LENGTH];
-        if (filename[0] != DIRSEP[0])
-        {
-            getcwd(absdir, MAX_FILENAME_LENGTH);
-            len = strlen(absdir);
-            if (len && absdir[len-1] != DIRSEP[0]) absdir[len++] = DIRSEP[0];
-            strcpy(absdir+len, filename);
-        }
-#endif
+        char* absdir = realpath(filename, NULL); /* so we can change directory later safely */
         len = strlen(absdir);
 
         if (requireDebug)
@@ -1105,13 +1110,14 @@ loadlib:
             /* If directory is already in path, move it to front. */
             p = old_path;
             while ((p = strstr(p, absdir)) != NULL)
-            {  /* /ioc/modules/sysmon/1.1.2/R3.14.12/db:/ioc/modules/mrfioc2/zimoch/R3.14.12/db */
-                if (p == old_path) break; /* already at front, nothing to do */
-                if (*(p-1) == PATHSEP[0] && (p[len] == 0 || p[len] == PATHSEP[0])) /* found pre:absdir or pre:absdir:post */
+            {
+                if ((p == old_path || *(p-1) == OSI_PATH_LIST_SEPARATOR[0]) &&
+                    (p[len] == 0 || p[len] == OSI_PATH_LIST_SEPARATOR[0]))
                 {
-                    memmove(old_path+len+1, old_path, p-old_path-1);    /* ....:[pre](:post) */
+                    if (p == old_path) break; /* already at front, nothing to do */
+                    memmove(old_path+len+1, old_path, p-old_path-1);
                     strcpy(old_path, absdir);
-                    old_path[len] = PATHSEP[0];
+                    old_path[len] = OSI_PATH_LIST_SEPARATOR[0];
                     if (requireDebug)
                         printf("require: modified EPICS_DB_INCLUDE_PATH=%s\n", old_path);
                     break;
@@ -1122,9 +1128,7 @@ loadlib:
                 /* add new directory to the front */
                 putenvprintf("EPICS_DB_INCLUDE_PATH=%s:%s", absdir, old_path);
         }
-#ifndef vxWorks
         free(absdir);
-#endif
     }
     else
     {
@@ -1151,9 +1155,9 @@ loadlib:
     if (TRY_FILE(releasediroffs, "%s.cmd", targetArch) ||
         TRY_FILE(releasediroffs, "%s.cmd", osClass) ||
         TRY_FILE(releasediroffs, "startup.cmd") ||
-        TRY_FILE(releasediroffs, ".." DIRSEP "%s.cmd", targetArch) ||
-        TRY_FILE(releasediroffs, ".." DIRSEP "%s.cmd", osClass) ||
-        TRY_FILE(releasediroffs, ".." DIRSEP "startup.cmd")
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", targetArch) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", osClass) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup.cmd")
         )
     {
         if (args)
