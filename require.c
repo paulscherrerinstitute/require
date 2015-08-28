@@ -388,26 +388,31 @@ int libversionShow(const char* pattern, int showLocation)
 
 static int compareVersions(const char* request, const char* found)
 {
-    int found_major, found_minor=0, found_patch=0, found_parts;
+    int found_major, found_minor=0, found_patch=0, found_parts = 0;
     int req_major, req_minor, req_patch, req_parts;
-
-    found_parts = sscanf(found, "%d.%d.%d", &found_major, &found_minor, &found_patch);
-
-    if (request == NULL || request[0] == 0)            /* No particular version request. match anything */
+    
+    if (found == NULL || found[0] == 0)                /* no version found: any requested? */
     {
-        if (found_parts == 0)       return TESTVERS;   /* Test version found */
+        if (request == NULL || request[0] == 0) return EXACT;
+        else return MISMATCH;
+    }
+    
+    found_parts = sscanf(found, "%d.%d.%d", &found_major, &found_minor, &found_patch);
+    if (request == NULL || request[0] == 0)            /* no particular version request: match anything */
+    {
+        if (found_parts == 0)       return TESTVERS;   /* test version found */
         return MATCH;
     }
 
-    if (strcmp(found, request) == 0) return EXACT;      /* Exact match. */
+    if (strcmp(found, request) == 0) return EXACT;      /* exact match */
 
     /* Numerical version compare. Format is major.minor.patch
        Numerical requests must have exact match in major and
        backward-compatible number in minor and patch
     */
     req_parts = sscanf(request, "%d.%d.%d", &req_major, &req_minor, &req_patch);
-    if (req_parts == 0)              return MISMATCH;   /* Test version request not found */
-    if (found_parts == 0)            return TESTVERS;   /* Test version found */
+    if (req_parts == 0)              return MISMATCH;   /* test version request not found */
+    if (found_parts == 0)            return TESTVERS;   /* test version found */
     if (found_major != req_major)    return MISMATCH;   /* major mismatch */
     if (req_parts == 1)              return MATCH;      /* only major requested matches */
     if (found_minor < req_minor)     return MISMATCH;   /* minor too small */
