@@ -476,9 +476,6 @@ int require(const char* module, const char* version, const char* args)
         registerExternalModules();
     }
 
-    if (getenv("EPICS_DB_INCLUDE_PATH") == NULL)
-        putenv("EPICS_DB_INCLUDE_PATH=.");
-
     if (getenv("T_A") == NULL)
         putenvprintf("T_A=%s", targetArch);
 
@@ -1007,7 +1004,9 @@ loadlib:
 
             /* load dbd file */
             if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" DIRSEP "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr))
+                TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr) ||
+                TRY_NONEMPTY_FILE(releasediroffs, ".." DIRSEP "dbd" DIRSEP "%s%s.dbd", module, versionstr) ||
+                TRY_NONEMPTY_FILE(releasediroffs, ".." DIRSEP "%s%s.dbd", module, versionstr))
             {
                 printf("Loading dbd file %s\n", filename);
                 if (dbLoadDatabase(filename, NULL, NULL) != 0)
@@ -1062,14 +1061,31 @@ loadlib:
     if (requireDebug)
         printf("require: looking for template directory\n");
     /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]..." */
-    if (TRY_FILE(releasediroffs, TEMPLATEDIR))
+    if (TRY_FILE(releasediroffs, TEMPLATEDIR) ||
+        TRY_FILE(releasediroffs, ".." DIRSEP TEMPLATEDIR))
     {
         char* old_path;           
         char* p;
-        char* q;
+        size_t len;
+
+#ifndef vxWorks
+        char* absdir;
+        absdir = realpath(filename, NULL); /* so we can change directory later safely */
+#else
+        /* vxWorks has no realpath() -- at least make directory absolute */
+        char absdir[MAX_FILENAME_LENGTH];
+        if (filename[0] != DIRSEP[0])
+        {
+            getcwd(absdir, MAX_FILENAME_LENGTH);
+            len = strlen(absdir);
+            if (len && absdir[len-1] != DIRSEP[0]) absdir[len++] = DIRSEP[0];
+            strcpy(absdir+len, filename);
+        }
+#endif
+        len = strlen(absdir);
 
         if (requireDebug)
-            printf("require: found template directory %s\n", filename);
+            printf("require: found template directory %s\n", absdir);
 
         /* set up db search path environment variables
           <module>_TEMPLATES      template path of <module>
@@ -1077,21 +1093,38 @@ loadlib:
           EPICS_DB_INCLUDE_PATH   template path of all loaded modules (appended)
         */
 
-        putenvprintf("%s_TEMPLATES=%s", module, filename);
-        putenvprintf("TEMPLATES=%s", filename);
+        putenvprintf("%s_TEMPLATES=%s", module, absdir);
+        putenvprintf("TEMPLATES=%s", absdir);
+
+        /* add directory to front of EPICS_DB_INCLUDE_PATH */
         old_path = getenv("EPICS_DB_INCLUDE_PATH");
-        if (loaded) /* Library was already loaded thus filename is already in path. Remove it. */
+        if (old_path == NULL)
+            putenvprintf("EPICS_DB_INCLUDE_PATH=%s", absdir);
+        else
         {
-            p = strstr(old_path, filename);
-            if (p)
-            {
-                /* remove leading or trailing ':' */
-                q = p + releasediroffs + sizeof(TEMPLATEDIR)-1;
-                if (*q == ':') q++; else if (p != old_path && *(p-1) == ':') p--;
-                strcpy(p, q);
+            /* If directory is already in path, move it to front. */
+            p = old_path;
+            while ((p = strstr(p, absdir)) != NULL)
+            {  /* /ioc/modules/sysmon/1.1.2/R3.14.12/db:/ioc/modules/mrfioc2/zimoch/R3.14.12/db */
+                if (p == old_path) break; /* already at front, nothing to do */
+                if (*(p-1) == PATHSEP[0] && (p[len] == 0 || p[len] == PATHSEP[0])) /* found pre:absdir or pre:absdir:post */
+                {
+                    memmove(old_path+len+1, old_path, p-old_path-1);    /* ....:[pre](:post) */
+                    strcpy(old_path, absdir);
+                    old_path[len] = PATHSEP[0];
+                    if (requireDebug)
+                        printf("require: modified EPICS_DB_INCLUDE_PATH=%s\n", old_path);
+                    break;
+                }
+                p += len;
             }
+            if (p == NULL)
+                /* add new directory to the front */
+                putenvprintf("EPICS_DB_INCLUDE_PATH=%s:%s", absdir, old_path);
         }
-        putenvprintf("EPICS_DB_INCLUDE_PATH=%s:%s", filename, old_path);
+#ifndef vxWorks
+        free(absdir);
+#endif
     }
     else
     {
