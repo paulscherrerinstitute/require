@@ -679,10 +679,13 @@ EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 # Setup searchpaths from all used files
 # find all sources whatever suffix
 $(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),$(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
-# find dbd files but remove ../ to avoid circular dependency if source dbd has the same name as the project dbd
-vpath %.dbd $(filter-out ../,$(sort $(dir ${DBDFILES:%=../%})))
-# but the %Record.h rules need %Record.dbd which may be in ..
-vpath %Record.dbd ..
+
+# Do not tread %.dbd the same way because it creates a circular dependency
+# if a source dbd has the same name as the project dbd.
+# But the %Record.h and menu%.h rules need to find their dbd files (example: asyn)
+vpath %Record.dbd $(sort $(dir ${DBDFILES:%=../%}))
+vpath menu%.dbd $(sort $(dir ${DBDFILES:%=../%}))
+
 # find header files to install
 vpath %.h $(addprefix ../,$(sort $(dir ${HDRS} ${SRCS})))
 
