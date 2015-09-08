@@ -630,7 +630,8 @@ GENERIC_SRC_INCLUDES = $(SRC_INCLUDES)
 EXPANDARG = -3.14
 
 # Create dbd file for snl code
-DBDFILES += $(patsubst %.st,%_snl.dbd,$(notdir $(filter %.st %.stt,${SRCS})))
+DBDFILES += $(patsubst %.st,%_snl.dbd,$(notdir $(filter %.st,${SRCS})))
+DBDFILES += $(patsubst %.stt,%_snl.dbd,$(notdir $(filter %.stt,${SRCS})))
 
 # Create dbd file for GPIB code
 DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
