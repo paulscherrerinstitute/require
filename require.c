@@ -1095,7 +1095,7 @@ loadlib:
         /* set up db search path environment variables
           <module>_TEMPLATES      template path of <module>
           TEMPLATES               template path of the current module (overwritten)
-          EPICS_DB_INCLUDE_PATH   template path of all loaded modules (appended)
+          EPICS_DB_INCLUDE_PATH   template path of all loaded modules (last in front after ".")
         */
 
         putenvprintf("%s_TEMPLATES=%s", module, absdir);
@@ -1104,10 +1104,14 @@ loadlib:
         /* add directory to front of EPICS_DB_INCLUDE_PATH */
         old_path = getenv("EPICS_DB_INCLUDE_PATH");
         if (old_path == NULL)
-            putenvprintf("EPICS_DB_INCLUDE_PATH=%s", absdir);
+            putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s", absdir);
         else
         {
-            /* If directory is already in path, move it to front. */
+            /* skip over "." at the beginning */
+            if (old_path[0] == '.' && old_path[1] == OSI_PATH_LIST_SEPARATOR[0])
+                old_path += 2;
+            
+            /* If directory is already in path, move it to front */
             p = old_path;
             while ((p = strstr(p, absdir)) != NULL)
             {
@@ -1125,8 +1129,9 @@ loadlib:
                 p += len;
             }
             if (p == NULL)
-                /* add new directory to the front */
-                putenvprintf("EPICS_DB_INCLUDE_PATH=%s:%s", absdir, old_path);
+                /* add new directory to the front (after "." )*/
+                putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s" OSI_PATH_LIST_SEPARATOR "%s",
+                     absdir, old_path);
         }
         free(absdir);
     }
