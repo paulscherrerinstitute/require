@@ -615,7 +615,7 @@ HDEPENDS_CMD =
 DBDFILES = ${DBD_SRCS:%=../%}
 DBD_PATH = $(sort $(dir ${DBDFILES}))
 
-DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${INSTALL_DBD} ${EPICS_BASE}/dbd)
+DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${EPICS_BASE}/dbd)
 USR_DBDFLAGS += $(DBDEXPANDPATH)
 
 ifeq (${EPICS_BASETYPE},3.13)
