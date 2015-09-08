@@ -290,18 +290,13 @@ SRCS += ${SOURCES_${EPICS_BASETYPE}}
 SRCS += ${SOURCES_${EPICSVERSION}}
 export SRCS
 
-DBDFILES = $(if ${DBDS},$(filter-out -none-,${DBDS}),${MENUS} $(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
-DBDFILES += ${DBDS_${EPICS_BASETYPE}}
-DBDFILES += ${DBDS_${EPICSVERSION}}
-DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
-ifeq (${EPICS_BASETYPE},3.14)
-DBDFILES += $(patsubst %.st,%_snl.dbd,$(notdir $(filter %.st,${SRCS})))
-DBDFILES += $(patsubst %.stt,%_snl.dbd,$(notdir $(filter %.stt,${SRCS})))
-endif # 3.14
-export DBDFILES
+DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),${MENUS} $(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
+DBD_SRCS += ${DBDS_${EPICS_BASETYPE}}
+DBD_SRCS += ${DBDS_${EPICSVERSION}}
+export DBD_SRCS
 
-RECORDS1 = $(patsubst %Record.dbd,%,$(notdir $(filter %Record.dbd, ${DBDFILES})))
-RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBDFILES}))) $(realpath ${DBDS}))
+RECORDS1 = $(patsubst %Record.dbd,%,$(notdir $(filter %Record.dbd, ${DBD_SRCS})))
+RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS}))
 RECORDS = $(sort ${RECORDS1} ${RECORDS2})
 export RECORDS
 
@@ -346,14 +341,14 @@ SRCS_vxWorks = ${SOURCES_vxWorks}
 SRCS_vxWorks += ${SOURCES_${EPICS_BASETYPE}_vxWorks}
 SRCS_vxWorks += ${SOURCES_vxWorks_${EPICS_BASETYPE}}
 export SRCS_vxWorks
-DBDFILES_Linux = ${DBDS_Linux}
-DBDFILES_Linux += ${DBDS_${EPICS_BASETYPE}_Linux}
-DBDFILES_Linux += ${DBDS_Linux_${EPICS_BASETYPE}}
-export DBDFILES_Linux
-DBDFILES_vxWorks = ${DBDS_vxWorks}
-DBDFILES_vxWorks += ${DBDS_${EPICS_BASETYPE}_vxWorks}
-DBDFILES_vxWorks += ${DBDS_vxWorks_${EPICS_BASETYPE}}
-export DBDFILES_vxWorks
+DBD_SRCS_Linux = ${DBDS_Linux}
+DBD_SRCS_Linux += ${DBDS_${EPICS_BASETYPE}_Linux}
+DBD_SRCS_Linux += ${DBDS_Linux_${EPICS_BASETYPE}}
+export DBD_SRCS_Linux
+DBD_SRCS_vxWorks = ${DBDS_vxWorks}
+DBD_SRCS_vxWorks += ${DBDS_${EPICS_BASETYPE}_vxWorks}
+DBD_SRCS_vxWorks += ${DBDS_vxWorks_${EPICS_BASETYPE}}
+export DBD_SRCS_vxWorks
 
 install build debug::
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
@@ -539,8 +534,8 @@ INSTALL_SCR     = ${INSTALL_REV}
 ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
 SRCS += $(foreach PART, ${ARCH_PARTS}, ${SRCS_${PART}})
 SRCS += $(foreach PART, ${ARCH_PARTS}, ${SRCS_${EPICS_BASETYPE}_${PART}})
-DBDFILES += $(foreach PART, ${ARCH_PARTS}, ${DBDFILES_${PART}})
-DBDFILES += $(foreach PART, ${ARCH_PARTS}, ${DBDFILES_${EPICS_BASETYPE}_${PART}})
+DBD_SRCS += $(foreach PART, ${ARCH_PARTS}, ${DBD_SRCS_${PART}})
+DBD_SRCS += $(foreach PART, ${ARCH_PARTS}, ${DBD_SRCS_${EPICS_BASETYPE}_${PART}})
 
 # Different settings required to build library in 3.13. and 3.14
 
@@ -616,11 +611,11 @@ HDEPENDSCFLAGS =
 HDEPENDS_CMD = 
 -include *.d
 
-#VPATH += $(sort $(dir ${DOCU:%=../%}))
+# need to find source dbd files relative to .. but generated dbd files in .
+DBDFILES = ${DBD_SRCS:%=../%}
+DBD_PATH = $(sort $(dir ${DBDFILES}))
 
-DBDDIRS = $(sort $(dir ${DBDFILES:%=../%}))
-DBDDIRS += ${INSTALL_DBD} ${EPICS_BASE}/dbd
-DBDEXPANDPATH = $(addprefix -I , ${DBDDIRS})
+DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${INSTALL_DBD} ${EPICS_BASE}/dbd)
 USR_DBDFLAGS += $(DBDEXPANDPATH)
 
 ifeq (${EPICS_BASETYPE},3.13)
@@ -633,6 +628,12 @@ SRC_INCLUDES = $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
 GENERIC_SRC_INCLUDES = $(SRC_INCLUDES)
 
 EXPANDARG = -3.14
+
+# Create dbd file for snl code
+DBDFILES += $(patsubst %.st,%_snl.dbd,$(notdir $(filter %.st %.stt,${SRCS})))
+
+# Create dbd file for GPIB code
+DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 
 # Create dbd file with references to all subRecord functions
 # Problem: functions may be commented out. Better preprocess, but then generate headers first.
@@ -683,8 +684,8 @@ $(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})
 # Do not tread %.dbd the same way because it creates a circular dependency
 # if a source dbd has the same name as the project dbd.
 # But the %Record.h and menu%.h rules need to find their dbd files (example: asyn)
-vpath %Record.dbd $(sort $(dir ${DBDFILES:%=../%}))
-vpath menu%.dbd $(sort $(dir ${DBDFILES:%=../%}))
+vpath %Record.dbd ${DBD_PATH}
+vpath menu%.dbd ${DBD_PATH}
 
 # find header files to install
 vpath %.h $(addprefix ../,$(sort $(dir ${HDRS} ${SRCS})))
@@ -699,7 +700,7 @@ PROJECTINFOS:
 # Build one dbd file by expanding all source dbd files.
 # We can't use dbExpand (from the default EPICS make rules)
 # because it has too strict checks for a loadable module.
-${PROJECTDBD}: ${DBDFILES:%=../%}
+${PROJECTDBD}: ${DBDFILES}
 	@echo "Expanding $@"
 	${MAKEHOME}/expandDBD.tcl ${EXPANDARG} ${DBDEXPANDPATH} $^ > $@
 
