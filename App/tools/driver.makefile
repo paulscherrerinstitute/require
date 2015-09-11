@@ -341,14 +341,6 @@ SRCS_vxWorks = ${SOURCES_vxWorks}
 SRCS_vxWorks += ${SOURCES_${EPICS_BASETYPE}_vxWorks}
 SRCS_vxWorks += ${SOURCES_vxWorks_${EPICS_BASETYPE}}
 export SRCS_vxWorks
-DBD_SRCS_Linux = ${DBDS_Linux}
-DBD_SRCS_Linux += ${DBDS_${EPICS_BASETYPE}_Linux}
-DBD_SRCS_Linux += ${DBDS_Linux_${EPICS_BASETYPE}}
-export DBD_SRCS_Linux
-DBD_SRCS_vxWorks = ${DBDS_vxWorks}
-DBD_SRCS_vxWorks += ${DBDS_${EPICS_BASETYPE}_vxWorks}
-DBD_SRCS_vxWorks += ${DBDS_vxWorks_${EPICS_BASETYPE}}
-export DBD_SRCS_vxWorks
 
 install build debug::
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
