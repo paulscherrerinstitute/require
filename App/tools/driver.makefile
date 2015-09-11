@@ -34,16 +34,16 @@
 #   Compile everything.
 #
 # Library names are derived from the directory name (unless overwritten
-# with the PROJECT variable in your Makefile).
+# with the MODULE variable in your Makefile).
 # A LIBVERSION number is generated from the latest CVS or GIT tag of the sources.
 # If any file is not up-to-date in CVS/GIT, not tagged, or tagged differently from the
 # other files, the version is a test version and labelled with the user name.
-# The library is installed to ${EPICS_MODULES}/${PROJECT}/${LIBVERSION}/lib/${T_A}.
-# The library can be loaded with  require "<libname>" [,"<version>"] [,"<variables=substitutions>"]
+# The library is installed to ${EPICS_MODULES}/${MODULE}/${LIBVERSION}/lib/${T_A}/.
+# The library can be loaded with  require "<libname>" [,"<version>"] [,"<variable>=<substitution>, ..."]
 #
 # User variables (add them to your Makefile, none is required):
-# PROJECT
-#    Basename of the built library.
+# MODULE
+#    Name of the built module.
 #    If not defined, it is derived from the directory name.
 # SOURCES
 #    All source files to compile. 
@@ -124,8 +124,8 @@ VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 
 # Default project name is name of current directory.
 # But don't use "src" or "snl", go up directory tree instead.
-PRJDIR:=$(notdir $(patsubst %Lib,%,$(patsubst %/snl,%,$(patsubst %/src,%,${PWD}))))
-PRJ = $(if ${PROJECT},${PROJECT},${PRJDIR})
+PRJDIR:=$(subst -,_,$(subst .,_,$(notdir $(patsubst %Lib,%,$(patsubst %/snl,%,$(patsubst %/src,%,${PWD}))))))
+PRJ = $(or ${MODULE},${PROJECT},${PRJDIR})
 export PRJ
 
 OS_CLASS_LIST = $(BUILDCLASSES)
@@ -164,14 +164,16 @@ help:
 	done
 	@echo "Makefile variables: (defaults)"
 	@echo "  EPICS_VERSIONS   (${DEFAULT_EPICS_VERSIONS})"
-	@echo "  PROJECT          (${PRJDIR}) [from current directory name]"
+	@echo "  MODULE           (${PRJ}) [from current directory name]"
+	@echo "  PROJECT          [older name for MODULE]"
 	@echo "  SOURCES          (*.c *.cc *.cpp *.st *.stt *.gt)"
-	@echo "  HEADERS          () [only those to install]"
-	@echo "  TEMPLATES        ()"
 	@echo "  DBDS             (*.dbd)"
+	@echo "  HEADERS          () [only those to install]"
+	@echo "  TEMPLATES        (*.template *.db *.subs) [db files]"
+	@echo "  SCRIPTS          (*.cmd) [startup and other scripts]"
 	@echo "  EXCLUDE_VERSIONS () [versions not to build, e.g. 3.14]"
-	@echo "  EXCLUDE_ARCHS    () [target architectures not to build, e.g. eldk]"
-	@echo "  ARCH_FILTER      () [target architectures to build, e.g. eldk-%]"
+	@echo "  EXCLUDE_ARCHS    () [target architectures not to build]"
+	@echo "  ARCH_FILTER      () [target architectures to build, e.g. SL6%]"
 	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"
 
 # "make version" shows the version and why it is how it is.       
@@ -189,6 +191,7 @@ debug::
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "VERSIONCHECKFILES = ${VERSIONCHECKFILES}"
 	@echo "ARCH_FILTER = ${ARCH_FILTER}"
+	@echo "PRJ = ${PRJ}"
 
 # Loop over all EPICS versions for second run.
 MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION}
@@ -317,8 +320,8 @@ TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
 
 SCR = $(or ${SCRIPTS},$(wildcard *.cmd))
-SCR += ${SCRIPTS_{EPICS_BASETYPE}}
-SCR += ${SCRIPTS_{EPICSVERSION}}
+SCR += ${SCRIPTS_${EPICS_BASETYPE}}
+SCR += ${SCRIPTS_${EPICSVERSION}}
 export SCR
 
 export CFG
@@ -357,8 +360,6 @@ debug::
 	@echo "CROSS_COMPILER_TARGET_ARCHS = ${CROSS_COMPILER_TARGET_ARCHS}"
 	@echo "EXCLUDE_ARCHS = ${EXCLUDE_ARCHS}"
 	@echo "LIBVERSION = ${LIBVERSION}"
-	@echo "RELEASE_TOPS = ${RELEASE_TOPS}"
-
 
 # Create build dirs (and links) if necessary
 LINK_eldk52-e500v2 = eldk52-rt-e500v2 eldk52-xenomai-e500v2
@@ -431,7 +432,7 @@ $(foreach v, USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v
 CFLAGS += ${EXTRA_CFLAGS}
 
 TESTVERSION := $(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$")
-PROJECTDBD=${if $(strip ${DBDFILES}),${PRJ}.dbd}
+MODULEDBD=${if $(strip ${DBDFILES}),${PRJ}.dbd}
 
 COMMON_DIR_3.14 = ../O.${EPICSVERSION}_Common
 COMMON_DIR_3.13 = .
@@ -460,7 +461,7 @@ debug:
 	@echo "OS_CLASS = ${OS_CLASS}"
 	@echo "T_A = ${T_A}"
 	@echo "ARCH_PARTS = ${ARCH_PARTS}"
-	@echo "PROJECTDBD = ${PROJECTDBD}"
+	@echo "MODULEDBD = ${MODULEDBD}"
 	@echo "RECORDS = ${RECORDS}"
 	@echo "MENUS = ${MENUS}"
 	@echo "BPTS = ${BPTS}"
@@ -478,8 +479,6 @@ debug:
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "TESTVERSION = ${TESTVERSION}"
 	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
-
-
 
 ifeq (${EPICS_BASETYPE},3.13)
 INSTALLRULE=install::
@@ -543,13 +542,13 @@ LIBOBJS += $(filter /%.o /%.a,${SRCS})
 LIBOBJS += $(patsubst %,../%,$(filter-out /%,$(filter %.o %.a,${SRCS})))
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
 LIBNAME = $(if ${LIBOBJS},${PRJ}Lib,)   # must be the un-munched name
-PROJECTLIB = ${LIBNAME:%=%.munch}
-PROD = ${PROJECTLIB}
+MODULELIB = ${LIBNAME:%=%.munch}
+PROD = ${MODULELIB}
 
 #add munched library for C++ code (does not work for Tornado 1)
 #ifneq ($(filter %.cc %.cpp %.C,${SRCS}),)
 #ifeq ($(filter T1-%,${T_A}),)
-#PROD = ${PROJECTLIB}.munch
+#PROD = ${MODULELIB}.munch
 #endif # T1- T_A
 #endif # .cc or .cpp found
 
@@ -558,13 +557,13 @@ else # only 3.14 from here
 ifeq (${OS_CLASS},vxWorks)
 # only install the munched lib
 INSTALL_PROD=
-PROJECTLIB = $(if ${LIBOBJS},${PRJ}Lib.munch,)
+MODULELIB = $(if ${LIBOBJS},${PRJ}Lib.munch,)
 else
-PROJECTLIB = $(if ${LIBOBJS},${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
+MODULELIB = $(if ${LIBOBJS},${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
 endif
 
 # vxWorks
-PROD_vxWorks=${PROJECTLIB}
+PROD_vxWorks=${MODULELIB}
 LIBOBJS += $(addsuffix $(OBJ),$(notdir $(basename $(filter-out %.o %.a,$(sort ${SRCS})))))
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
 LIBS = -L ${EPICS_BASE_LIB} ${BASELIBS:%=-l%}
@@ -577,14 +576,14 @@ LIBRARY_OBJS = ${LIBOBJS}
 
 # Handle registry stuff automagically if we have a dbd file.
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
-LIBOBJS += $(if $(PROJECTDBD),$(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
+LIBOBJS += $(if $(MODULEDBD),$(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
 
 endif # both, 3.13 and 3.14 from here
 
 # If we build a library and use versions, provide a version variable.
-ifdef PROJECTLIB
+ifdef MODULELIB
 LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
-endif # PROJECTLIB
+endif # MODULELIB
 
 ifndef TESTVERSION
 # Provide a global symbol for every version with the same
@@ -651,8 +650,8 @@ SNC_CFLAGS=-I ${SNCSEQ}/include
 
 endif # 3.14
 
-${BUILDRULE} PROJECTINFOS
-${BUILDRULE} ${PROJECTDBD}
+${BUILDRULE} MODULEINFOS
+${BUILDRULE} ${MODULEDBD}
 ${BUILDRULE} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
 ${BUILDRULE} ${DEPFILE}
 
@@ -677,17 +676,18 @@ EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 $(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),$(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
 
 # Do not tread %.dbd the same way because it creates a circular dependency
-# if a source dbd has the same name as the project dbd.
+# if a source dbd has the same name as the project dbd. Have to clear %.dbd.
 # But the %Record.h and menu%.h rules need to find their dbd files (example: asyn)
+vpath %.dbd
 vpath %Record.dbd ${DBD_PATH}
 vpath menu%.dbd ${DBD_PATH}
 
 # find header files to install
 vpath %.h $(addprefix ../,$(sort $(dir ${HDRS} ${SRCS})))
 
-PRODUCTS = ${PROJECTLIB} ${PROJECTDBD} ${DEPFILE}
-PROJECTINFOS:
-	@echo ${PRJ} > PROJECTNAME
+PRODUCTS = ${MODULELIB} ${MODULEDBD} ${DEPFILE}
+MODULEINFOS:
+	@echo ${PRJ} > MODULENAME
 	@echo $(realpath ${EPICS_MODULES}) > INSTBASE
 	@echo ${PRODUCTS} > PRODUCTS
 	@echo ${LIBVERSION} > LIBVERSION
@@ -695,14 +695,14 @@ PROJECTINFOS:
 # Build one dbd file by expanding all source dbd files.
 # We can't use dbExpand (from the default EPICS make rules)
 # because it has too strict checks for a loadable module.
-${PROJECTDBD}: ${DBDFILES}
+${MODULEDBD}: ${DBDFILES}
 	@echo "Expanding $@"
 	${MAKEHOME}/expandDBD.tcl ${EXPANDARG} ${DBDEXPANDPATH} $^ > $@
 
 # Install everything
-INSTALL_LIBS = ${PROJECTLIB:%=${INSTALL_LIB}/%}
+INSTALL_LIBS = ${MODULELIB:%=${INSTALL_LIB}/%}
 INSTALL_DEPS = ${DEPFILE:%=${INSTALL_LIB}/%}
-INSTALL_DBDS = ${PROJECTDBD:%=${INSTALL_DBD}/%}
+INSTALL_DBDS = ${MODULEDBD:%=${INSTALL_DBD}/%}
 INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(notdir ${HDRS}))
 INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
 INSTALL_SCRS = $(SCR:%=$(INSTALL_SCR)/%)
@@ -794,7 +794,7 @@ endif
 
 # EPICS R3.14.*:
 # Create file to fill registry from dbd file.
-${REGISTRYFILE}: ${PROJECTDBD}
+${REGISTRYFILE}: ${MODULEDBD}
 	$(RM) $@ temp.cpp
 	$(PERL) $(EPICS_BASE_HOST_BIN)/registerRecordDeviceDriver.pl $< $(basename $@) | grep -v iocshRegisterCommon > temp.cpp
 	$(MV) temp.cpp $@
