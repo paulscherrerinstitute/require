@@ -46,7 +46,7 @@ require "<module>" [,"<version>"] [,"<macro1>=<value2>, <macro2>=<value2>"]
    * <module>_DIR           the directory of the loaded version of the module
    * TEMPLATES              the db directory of the module
    * <module>_TEMPLATES     the db directory of the module
-   * EPICS_DB_INCLUDE_PATH  the db directories of all modules, last reqired first
+   * EPICS_DB_INCLUDE_PATH  the db directories of all modules, last reqired first (after ".")
 
    The variables MODULE and TEMPLATES get overwritten for each module.
    They always refer to the last require call, even if the module was already loaded.
