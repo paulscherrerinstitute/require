@@ -317,6 +317,8 @@ TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
 
 SCR = $(or ${SCRIPTS},$(wildcard *.cmd))
+SCR += ${SCRIPTS_{EPICS_BASETYPE}}
+SCR += ${SCRIPTS_{EPICSVERSION}}
 export SCR
 
 export CFG
