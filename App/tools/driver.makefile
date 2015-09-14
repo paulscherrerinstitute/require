@@ -162,7 +162,7 @@ help:
 	clean help version; \
 	do echo "  make $$target"; \
 	done
-	@echo "Makefile variables: (defaults)"
+	@echo "Makefile variables:(defaults) [comment]"
 	@echo "  EPICS_VERSIONS   (${DEFAULT_EPICS_VERSIONS})"
 	@echo "  MODULE           (${PRJ}) [from current directory name]"
 	@echo "  PROJECT          [older name for MODULE]"
@@ -174,7 +174,7 @@ help:
 	@echo "  EXCLUDE_VERSIONS () [versions not to build, e.g. 3.14]"
 	@echo "  EXCLUDE_ARCHS    () [target architectures not to build]"
 	@echo "  ARCH_FILTER      () [target architectures to build, e.g. SL6%]"
-	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"
+	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"       
 
 # "make version" shows the version and why it is how it is.       
 version: ${IGNOREFILES}
@@ -425,6 +425,9 @@ install build debug: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
 
 endif
 
+REQ = ${REQUIRED} ${REQUIRED_${OS_CLASS}} ${REQUIRED_${T_A}} ${REQUIRED_${EPICS_BASETYPE}} ${REQUIRED_${EPICSVERSION}}
+export REQ
+
 else # in O.*
 ## RUN 4
 # in O.* directory
@@ -455,6 +458,12 @@ USR_INCLUDES += $$(patsubst %,-I$(1)/%/R${EPICSVERSION}/include,$$($(notdir $(1)
 endef
 # The tricky part is to sort versions numerically. Make can't but ls -v can. Only accept numerical versions.
 $(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call ADD_FOREIGN_INCLUDES,$m)))
+
+# manually required modules
+define ADD_MANUAL_DEPENDENCIES
+$(eval $(notdir $(1))_VERSION := $(or $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null))),$(error Manually required module $(notdir $(1)) not found)))
+endef
+$(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,${EPICS_MODULES}/$m)))
 
 debug:
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
@@ -848,11 +857,12 @@ ${EXPORTFILE}: $(filter-out $(basename ${EXPORTFILE})$(OBJ),${LIBOBJS})
 	$(NM) $^ ${BASELIBS:%=${EPICS_BASE}/lib/${T_A}/${LIB_PREFIX}%$(LSUFFIX)} ${CORELIB} | awk '$(makexportfile)' > $@
 
 # Create dependency file for recursive requires
-${DEPFILE}: ${LIBOBJS}
+${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
 	cat *.d | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
+	$(foreach m,${REQ},echo "$m $(basename ${$m_VERSION})+" >> $@;)
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
