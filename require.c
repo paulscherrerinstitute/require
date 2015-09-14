@@ -468,7 +468,10 @@ static int compareVersions(const char* request, const char* found)
     {
         if (requireDebug)
             printf("require: compareVersions: TESTVERS numeric requested, test version found\n");
-        return TESTVERS;
+        if(request[strlen(request)-1] == '+')
+            return TESTVERS;
+        else
+            return MISMATCH;
     }
     if (found_major < req_major)
     {
@@ -868,8 +871,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                 printf ("Module %s version %s already loaded\n", module, loaded);
                 break;
             default:
-                printf("Conflict between requested %s version %s\n"
-                    "and already loaded version %s.\n",
+                printf("Conflict between requested %s version %s and already loaded version %s.\n",
                     module, version, loaded);
                 return -1;
         }
