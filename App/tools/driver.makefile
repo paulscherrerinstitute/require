@@ -670,7 +670,8 @@ EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
 # Setup searchpaths from all used files
 # find all sources whatever suffix
-$(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),$(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
+$(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),\
+    $(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
 
 # Do not tread %.dbd the same way because it creates a circular dependency
 # if a source dbd has the same name as the project dbd. Have to clear %.dbd.
@@ -846,7 +847,7 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
+	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'| sort -u >> $@
 	$(foreach m,${REQ},echo "$m $(basename ${$m_VERSION})+" >> $@;)
 
 $(BUILDRULE)
