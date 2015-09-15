@@ -589,22 +589,10 @@ LIBOBJS += $(if $(MODULEDBD),$(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXP
 
 endif # both, 3.13 and 3.14 from here
 
-# If we build a library and use versions, provide a version variable.
+# If we build a library, provide a version variable.
 ifneq ($(MODULELIB),)
 LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
 endif # MODULELIB
-
-ifndef TESTVERSION
-# Provide a global symbol for every version with the same
-# major and equal or smaller minor version number.
-# OUTDATED: Other code using this will look for one of those symbols.
-# NOT ANY MORE: Add an undefined symbol for the version of every used driver.
-# This is done with the #define in the used headers (see below).
-MAJOR_MINOR_PATCH=$(subst ., ,${LIBVERSION})
-MAJOR=$(word 1,${MAJOR_MINOR_PATCH})
-MINOR=$(word 2,${MAJOR_MINOR_PATCH})
-PATCH=$(word 3,${MAJOR_MINOR_PATCH})
-endif # TESTVERSION
 
 # Create and include dependency files
 CPPFLAGS += -MD
@@ -752,7 +740,7 @@ CPPSNCFLAGS1 += $(filter-out ${OP_SYS_INCLUDE_CPPFLAGS} ,${CPPFLAGS}) ${CPPSNCFL
 SNCFLAGS += -r
 
 %$(OBJ) %_snl.dbd: %.st
-	@echo "Preprocessing $*.st"
+	@echo "Preprocessing $(<F)"
 	$(RM) $(*F).i
 	$(CPP) ${CPPSNCFLAGS1} $< > $(*F).i
 	@echo "Converting $(*F).i"
@@ -765,7 +753,7 @@ SNCFLAGS += -r
 	awk -F '[ ;]' '/extern struct seqProgram/ { print "registrar (" $$4 "Registrar)"}' $(*F).c > $(*F)_snl.dbd
 
 %$(OBJ) %_snl.dbd: %.stt
-	@echo "Preprocessing $*.stt"
+	@echo "Preprocessing $(<F)"
 	$(RM) $(*F).i
 	$(CPP) ${CPPSNCFLAGS1} $< > $(*F).i
 	@echo "Converting $(*F).i"
@@ -797,7 +785,7 @@ endif
 
 ${VERSIONFILE}:
 ifndef TESTVERSION
-	echo "double _${PRJ}LibVersion = ${MAJOR}.${MINOR};" > $@
+	echo "double _${PRJ}LibVersion = $(basename ${LIBVERSION});" > $@
 endif
 	echo "char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
 
