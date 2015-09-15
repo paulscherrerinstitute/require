@@ -142,10 +142,10 @@ NM = nm
 RM = rm -f
 MKDIR = mkdir -p -m 775
 
-clean:
+clean::
 	$(RMDIR) O.*
 
-clean.%:
+clean.%::
 	$(RMDIR) $(wildcard O.*${@:clean.%=%}*)
 
 uninstall:
