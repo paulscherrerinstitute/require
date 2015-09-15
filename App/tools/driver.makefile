@@ -784,9 +784,6 @@ MUNCH=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
 endif
 
 ${VERSIONFILE}:
-ifndef TESTVERSION
-	echo "double _${PRJ}LibVersion = $(basename ${LIBVERSION});" > $@
-endif
 	echo "char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
 
 # EPICS R3.14.*:
