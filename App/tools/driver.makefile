@@ -550,7 +550,7 @@ LIBOBJS += $(filter /%.o /%.a,${SRCS})
 # add all .a and .o with relative path, but prefix with ../
 LIBOBJS += $(patsubst %,../%,$(filter-out /%,$(filter %.o %.a,${SRCS})))
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
-LIBNAME = $(if ${LIBOBJS},${PRJ}Lib,)   # must be the un-munched name
+LIBNAME = $(if $(strip ${LIBOBJS}),${PRJ}Lib,)   # must be the un-munched name
 MODULELIB = ${LIBNAME:%=%.munch}
 PROD = ${MODULELIB}
 
@@ -566,9 +566,9 @@ else # only 3.14 from here
 ifeq (${OS_CLASS},vxWorks)
 # only install the munched lib
 INSTALL_PROD=
-MODULELIB = $(if ${LIBOBJS},${PRJ}Lib.munch,)
+MODULELIB = $(if $(strip ${LIBOBJS}),${PRJ}Lib.munch,)
 else
-MODULELIB = $(if ${LIBOBJS},${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
+MODULELIB = $(if $(strip ${LIBOBJS}),${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
 endif
 
 # vxWorks
@@ -590,7 +590,7 @@ LIBOBJS += $(if $(MODULEDBD),$(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXP
 endif # both, 3.13 and 3.14 from here
 
 # If we build a library and use versions, provide a version variable.
-ifdef MODULELIB
+ifneq ($(MODULELIB),)
 LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
 endif # MODULELIB
 
@@ -861,7 +861,7 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
+	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'|sort -u >> $@
 	$(foreach m,${REQ},echo "$m $(basename ${$m_VERSION})+" >> $@;)
 
 $(BUILDRULE)
