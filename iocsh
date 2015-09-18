@@ -348,8 +348,8 @@ else
     echo "dbLoadDatabase \"$APP.dbd\",\"$DBD\""
     echo "${APP}_registerRecordDeviceDriver(pdbbase)"
 fi
+echo "require misc $MISC_VERSION"
 loadFiles "$@"
-echo "require misc"
 if [ "$init" != NO ]
 then
     echo "iocInit"
