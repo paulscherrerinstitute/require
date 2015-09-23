@@ -155,7 +155,7 @@ scanmatch $git_context {fatal: No names found} {
     set version test
 }
 
-scanmatch $git_context {([0-9]+)[_.]([0-9]+)([_.]([0-9]+))?$} {
+scanmatch $git_context {_([0-9]+)[_.]([0-9]+)([_.]([0-9]+))?$} {
     set major $matchInfo(submatch0)
     set minor $matchInfo(submatch1)
     set patch [expr $matchInfo(submatch3) + 0]
@@ -163,7 +163,7 @@ scanmatch $git_context {([0-9]+)[_.]([0-9]+)([_.]([0-9]+))?$} {
     puts stderr "checking tag $matchInfo(line) => version $version"
 }
 
-scanmatch $git_context {(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g} {
+scanmatch $git_context {_(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g} {
     set version test
     puts stderr "tag $matchInfo(submatch0) is $matchInfo(submatch2) commits old => version test"
 }
@@ -237,4 +237,4 @@ if {[catch {
 puts stderr "No repository found => version test"
 puts "test"
 
-# $Header: /cvs/G/DRV/misc/App/tools/getVersion.tcl,v 1.4 2015/06/22 07:42:01 zimoch Exp $
+# $Header: /cvs/G/DRV/misc/App/tools/getVersion.tcl,v 1.3 2010/08/03 08:42:40 zimoch Exp $
