@@ -155,7 +155,7 @@ scanmatch $git_context {fatal: No names found} {
     set version test
 }
 
-scanmatch $git_context {_([0-9]+)[_.]([0-9]+)([_.]([0-9]+))?$} {
+scanmatch $git_context {([0-9]+)\.([0-9]+)(\.([0-9]+))?$} {
     set major $matchInfo(submatch0)
     set minor $matchInfo(submatch1)
     set patch [expr $matchInfo(submatch3) + 0]
@@ -163,7 +163,15 @@ scanmatch $git_context {_([0-9]+)[_.]([0-9]+)([_.]([0-9]+))?$} {
     puts stderr "checking tag $matchInfo(line) => version $version"
 }
 
-scanmatch $git_context {_(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g} {
+scanmatch $git_context {_([0-9]+)_([0-9]+)(_([0-9]+))?$} {
+    set major $matchInfo(submatch0)
+    set minor $matchInfo(submatch1)
+    set patch [expr $matchInfo(submatch3) + 0]
+    set version $major.$minor.$patch
+    puts stderr "checking tag $matchInfo(line) => version $version"
+}
+
+scanmatch $git_context {(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g} {
     set version test
     puts stderr "tag $matchInfo(submatch0) is $matchInfo(submatch2) commits old => version test"
 }
