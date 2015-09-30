@@ -377,9 +377,9 @@ endef
 
 $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
-install::
-	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
-        (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.If you really want to overwrite then uninstall first."; false)
+#install::
+#	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
+#        (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.If you really want to overwrite then uninstall first."; false)
 
 install build::
 # Delete old build if INSTBASE has changed.
