@@ -655,7 +655,14 @@ static off_t fileSize(const char* filename)
 #ifdef vxWorks
         (char*) /* vxWorks has buggy stat prototype */
 #endif
-        filename, &filestat) != 0) return -1;
+        filename, &filestat) != 0)
+    {
+        if (requireDebug)
+            printf("require: %s does not exist\n", filename);
+        return -1;
+    }
+    if (requireDebug)
+        printf("require: %s exists and has size %ld\n", filename, filestat.st_size);
     return filestat.st_size;
 }
 #define fileExists(filename) (fileSize(filename)>=0)
@@ -671,9 +678,8 @@ static int handleDependencies(const char* module, char* depfilename)
     /* parse dependency file if exists */
     if (!fileExists(depfilename))
     {
-        if (requireDebug)
-            printf("require: no dependency file %s\n", depfilename);
-        return 0;
+        fprintf(stderr, "No dependency file %s\n", depfilename);
+        return -1;
     }
     if (requireDebug)
         printf("require: parsing dependency file %s\n", depfilename);
@@ -831,17 +837,18 @@ static int require_priv(const char* module, const char* version, const char* arg
     char* founddir = NULL;
     char* symbolname;
     char filename[NAME_MAX];
+    
+    int someVersionFound = 0;
+    int someArchFound = 0;
 
     if (requireDebug)
         printf("require: module=\"%s\" version=\"%s\" args=\"%s\"\n", module, version, args);
 
 #define TRY_FILE(offs, args...) \
-    (snprintf(filename + offs, sizeof(filename) - offs, args) && \
-    (fileExists(filename) || (requireDebug && !printf("require: no %s\n", filename))))
+    (snprintf(filename + offs, sizeof(filename) - offs, args) && fileExists(filename))
 
 #define TRY_NONEMPTY_FILE(offs, args...) \
-    (snprintf(filename + offs, sizeof(filename) - offs, args) && \
-    (fileSize(filename)>0 || (requireDebug && !printf("require: no %s\n", filename))))
+    (snprintf(filename + offs, sizeof(filename) - offs, args) && (fileSize(filename)>0))
 
     driverpath = getenv("EPICS_DRIVER_PATH");
     if (driverpath == NULL) driverpath = ".";
@@ -923,6 +930,8 @@ static int require_priv(const char* module, const char* version, const char* arg
                     #endif
                     if (dirent->d_name[0] == '.') continue;  /* ignore hidden directories */
 
+                    someVersionFound = 1;
+
                     /* Look for highest matching version. */
                     if (requireDebug)
                         printf("require: checking version %s against required %s\n",
@@ -931,16 +940,10 @@ static int require_priv(const char* module, const char* version, const char* arg
                     switch ((status = compareVersions(version, dirent->d_name)))
                     {
                         case EXACT: /* exact match found */
+                        case MATCH: /* all given numbers match. */
                         {
-                            if (requireDebug)
-                                printf("require: %s %s matches %s exactly\n",
-                                    module, dirent->d_name, version);
-                            /* We are done. */
-                            end = NULL;
-                            break;
-                        }
-                        case MATCH:       /* all given numbers match. */
-                        {
+                            someArchFound = 1;
+
                             if (requireDebug)
                                 printf("require: %s %s may match %s\n",
                                     module, dirent->d_name, version);
@@ -957,6 +960,16 @@ static int require_priv(const char* module, const char* version, const char* arg
                                     printf("require: %s %s has no support for %s %s\n",
                                         module, dirent->d_name, epicsRelease, targetArch);
                                 continue;
+                            }
+
+                            if (status == EXACT)
+                            {
+                                if (requireDebug)
+                                    printf("require: %s %s matches %s exactly\n",
+                                        module, dirent->d_name, version);
+                                /* We are done. */
+                                end = NULL;
+                                break;
                             }
 
                             /* Is it higher than the one we found before? */
@@ -996,7 +1009,7 @@ static int require_priv(const char* module, const char* version, const char* arg
             {
                 /* filename = "<dirname>/[dirlen]<module>/" */
                 if (requireDebug)
-                    printf("require: no %s\n", filename);
+                    printf("require: no %s directory\n", filename);
 
                 /* try local/old style module only if no new style candidate has been found */
                 if (!found)
@@ -1018,8 +1031,8 @@ static int require_priv(const char* module, const char* version, const char* arg
                     if (TRY_FILE(dirlen, PREFIX "%s" INFIX "%s%n" EXT, module, versionstr, &extoffs)
                     /* filename = "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
                     #ifdef vxWorks
-                        || (filename[dirlen + extoffs] = 0 && /* try without extension */
-                        (fileExists(filename) || (requireDebug && !printf("require: no %s\n", filename))))
+                        /* try without extension */
+                        || (filename[dirlen + extoffs] = 0, fileExists(filename))
                     #endif
                         )
                     {
@@ -1038,7 +1051,19 @@ static int require_priv(const char* module, const char* version, const char* arg
 
         if (!found)
         {
-            fprintf(stderr, "Module %s not found\n", module);
+            if (version && someArchFound)
+                fprintf(stderr, "Module %s version %s not found for %s (but for other architectures)\n", module, version, targetArch);
+            else
+            if (someArchFound)
+                fprintf(stderr, "Module %s not found for %s (but for other architectures)\n", module, targetArch);
+            else
+            if (version && someVersionFound)
+                fprintf(stderr, "Module %s version %s not found (but other versions are available)\n", module, version);
+            else
+            if (version)
+                fprintf(stderr, "Module %s version %s not found\n", module, version);
+            else
+                fprintf(stderr, "Module %s not found\n", module);
             return ifexists ? 0 : -1;
         }
 
