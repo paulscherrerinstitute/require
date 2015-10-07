@@ -96,6 +96,12 @@ EXPORTFILE = ${PRJ}_exportAddress.c
 SUBFUNCFILE = ${PRJ}_subRecordFunctions.dbd
 DEPFILE = ${PRJ}.dep
 
+# clear potential environment variables
+TEMPLATES=
+SOURCES=
+DBDS=
+HEADERS=
+
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules)
 default: build
@@ -470,7 +476,7 @@ $(eval $(notdir $(1))_VERSION := $(or $(patsubst $(1)/%/R${EPICSVERSION},%,$(las
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,${EPICS_MODULES}/$m)))
 
-debug:
+debug::
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
 	@echo "OS_CLASS = ${OS_CLASS}"
 	@echo "T_A = ${T_A}"
@@ -710,6 +716,21 @@ INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(notdir ${HDRS}))
 INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
 INSTALL_SCRS = $(addprefix ${INSTALL_SCR}/,$(notdir ${SCR}))
 INSTALL_CFGS = $(CFG:%=${INSTALL_CFG}/%)
+
+debug::
+	@echo "INSTALL_LIB = $(INSTALL_LIB)"
+	@echo "INSTALL_LIBS = $(INSTALL_LIBS)"
+	@echo "INSTALL_DEPS = $(INSTALL_DEPS)"
+	@echo "INSTALL_DBD = $(INSTALL_DBD)"
+	@echo "INSTALL_DBDS = $(INSTALL_DBDS)"
+	@echo "INSTALL_INCLUDE = $(INSTALL_INCLUDE)"
+	@echo "INSTALL_HDRS = $(INSTALL_HDRS)"
+	@echo "INSTALL_DB = $(INSTALL_DB)"
+	@echo "INSTALL_DBS = $(INSTALL_DBS)"
+	@echo "INSTALL_SCR = $(INSTALL_SCR)"
+	@echo "INSTALL_SCRS = $(INSTALL_SCRS)"
+	@echo "INSTALL_CFG = $(INSTALL_CFG)"
+	@echo "INSTALL_CFGS = $(INSTALL_CFGS)"
 
 INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_DEPS} ${INSTALL_CFGS}
 
