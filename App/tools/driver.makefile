@@ -420,7 +420,13 @@ else
 O.%:
 	$(MKDIR) $@
 
-install build debug: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
+ifeq ($(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$"),)
+install::
+	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
+        (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.\nNote: If you really want to overwrite then uninstall first."; false)
+endif
+
+install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
 	@${MAKE} -C O.${EPICSVERSION}_${T_A} -f ../${USERMAKEFILE} $@
 
 endif
@@ -434,7 +440,6 @@ else # in O.*
 $(foreach v, USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v_${OS_CLASS}} $${$v_${T_A}}))
 CFLAGS += ${EXTRA_CFLAGS}
 
-TESTVERSION := $(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$")
 MODULEDBD=${if $(strip ${DBDFILES}),${PRJ}.dbd}
 
 COMMON_DIR_3.14 = ../O.${EPICSVERSION}_Common
@@ -486,7 +491,6 @@ debug:
 	@echo "DBDFILES = ${DBDFILES}"
 	@echo "TEMPLS = ${TEMPLS}"
 	@echo "LIBVERSION = ${LIBVERSION}"
-	@echo "TESTVERSION = ${TESTVERSION}"
 	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
 
 ifeq (${EPICS_BASETYPE},3.13)
@@ -508,6 +512,7 @@ INSTALL_DB      = ${INSTALL_REV}/db
 INSTALL_CFG     = ${INSTALL_REV}/cfg
 INSTALL_DOC     = ${MODULE_LOCATION}/doc
 INSTALL_SCR     = ${INSTALL_REV}
+INSTALL_UI      = ${MODULE_LOCATION}/ui
 
 #INSTALL_DOCUS = $(addprefix ${INSTALL_DOC}/${PRJ}/,$(notdir ${DOCU}))
 
@@ -703,10 +708,10 @@ INSTALL_DEPS = ${DEPFILE:%=${INSTALL_LIB}/%}
 INSTALL_DBDS = ${MODULEDBD:%=${INSTALL_DBD}/%}
 INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(notdir ${HDRS}))
 INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
-INSTALL_SCRS = $(SCR:%=$(INSTALL_SCR)/%)
-INSTALL_CFGS = $(CFG:%=$(INSTALL_CFG)/%)
+INSTALL_SCRS = $(addprefix ${INSTALL_SCR}/,$(notdir ${SCR}))
+INSTALL_CFGS = $(CFG:%=${INSTALL_CFG}/%)
 
-INSTALLS += ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_DEPS} ${INSTALL_CFGS}
+INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_DEPS} ${INSTALL_CFGS}
 
 ${INSTALLRULE} ${INSTALLS}
 
@@ -726,10 +731,17 @@ ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
 	@echo "Installing module template files $^ to $(@D)"
 	$(INSTALL) -d -m444 $^ $(@D)
 
-${INSTALL_SCRS}: ${SCR}
+${INSTALL_SCRS}: $(notdir ${SCR})
 	@echo "Installing scripts $^ to $(@D)"
 	$(INSTALL) -d -m444 $^ $(@D)
 
+${INSTALL_CFGS}: ${CFGS}
+	@echo "Installing configuration files $^ to $(@D)"
+	$(INSTALL) -d -m444 $^ $(@D)
+
+${INSTALL_UIS}: $(notdir ${UIS})
+	@echo "Installing user interfaces $^ to $(@D)"
+	$(INSTALL) -d -m444 $^ $(@D)
 
 # Create SNL code from st/stt file
 # (RULES.Vx only allows ../%.st, 3.14 has no .st rules at all)
