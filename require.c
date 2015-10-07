@@ -325,6 +325,8 @@ static int findLibRelease (
 
 static void registerExternalModules()
 {
+    if (requireDebug)
+        printf("require: registerExternalModules()\n");
     /* iterate over all loaded libraries */
     dl_iterate_phdr(findLibRelease, NULL);
 }
@@ -405,13 +407,13 @@ int libversionShow(const char* pattern, int showLocation)
 #define TESTVERS 3
 #define HIGHER 3
 
-static int compareVersions(const char* request, const char* found)
+static int compareVersions(const char* found, const char* request)
 {
     int found_major, found_minor=0, found_patch=0, found_parts = 0;
     int req_major, req_minor, req_patch, req_parts;
     
     if (requireDebug)
-        printf("require: compareVersions(request=%s, found=%s)\n", request, found);
+        printf("require: compareVersions(found=%s, request=%s)\n", found, request);
         
     if (found == NULL || found[0] == 0)                /* no version found: any requested? */
     {
@@ -523,6 +525,12 @@ static int compareVersions(const char* request, const char* found)
         if (requireDebug)
             printf("require: compareVersions: MISMATCH patch level too low\n");
         return MISMATCH;
+    }
+    if (found_patch == req_patch)
+    {
+        if (requireDebug)
+            printf("require: compareVersions: MATCH patch level matches exactly requested with +\n");
+        return MATCH;
     }
     if(request[strlen(request)-1] == '+')
     {
@@ -661,11 +669,47 @@ static off_t fileSize(const char* filename)
             printf("require: %s does not exist\n", filename);
         return -1;
     }
-    if (requireDebug)
-        printf("require: %s exists and has size %ld\n", filename, filestat.st_size);
-    return filestat.st_size;
+    switch (filestat.st_mode & S_IFMT)
+    {
+        case S_IFREG:
+            if (requireDebug)
+                printf("require: file %s exists, size %ld bytes\n",
+                    filename, filestat.st_size);
+            return filestat.st_size;
+        case S_IFDIR:
+            if (requireDebug)
+                printf("require: directory %s exists\n",
+                    filename);
+            return 0;
+        case S_IFBLK:
+            if (requireDebug)
+                printf("require: %s is a block device\n",
+                    filename);
+            return -1;
+        case S_IFCHR:
+            if (requireDebug)
+                printf("require: %s is a character device\n",
+                    filename);
+            return -1;
+        case S_IFIFO:
+            if (requireDebug)
+                printf("require: %s is a FIFO/pipe\n",
+                    filename);
+            return -1;
+        case S_IFSOCK:
+            if (requireDebug)
+                printf("require: %s is a socket\n",
+                    filename);
+            return -1;
+        default:
+            if (requireDebug)
+                printf("require: %s is an unknown type of special file\n",
+                    filename);
+            return -1;
+    }
 }
 #define fileExists(filename) (fileSize(filename)>=0)
+#define fileNotEmpty(filename) (fileSize(filename)>0)
 
 static int handleDependencies(const char* module, char* depfilename)
 {
@@ -675,12 +719,6 @@ static int handleDependencies(const char* module, char* depfilename)
     char *rmodule; /* required module */
     char *rversion; /* required version */
 
-    /* parse dependency file if exists */
-    if (!fileExists(depfilename))
-    {
-        fprintf(stderr, "No dependency file %s\n", depfilename);
-        return -1;
-    }
     if (requireDebug)
         printf("require: parsing dependency file %s\n", depfilename);
     depfile = fopen(depfilename, "r");
@@ -848,7 +886,7 @@ static int require_priv(const char* module, const char* version, const char* arg
     (snprintf(filename + offs, sizeof(filename) - offs, args) && fileExists(filename))
 
 #define TRY_NONEMPTY_FILE(offs, args...) \
-    (snprintf(filename + offs, sizeof(filename) - offs, args) && (fileSize(filename)>0))
+    (snprintf(filename + offs, sizeof(filename) - offs, args) && fileNotEmpty(filename))
 
     driverpath = getenv("EPICS_DRIVER_PATH");
     if (driverpath == NULL) driverpath = ".";
@@ -867,7 +905,7 @@ static int require_priv(const char* module, const char* version, const char* arg
     if (loaded)
     {
         /* Library already loaded. Check Version. */
-        switch (compareVersions(version, loaded))
+        switch (compareVersions(loaded, version))
         {
             case TESTVERS:
                 if (version)
@@ -937,7 +975,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                         printf("require: checking version %s against required %s\n",
                                 dirent->d_name, version);
 
-                    switch ((status = compareVersions(version, dirent->d_name)))
+                    switch ((status = compareVersions(dirent->d_name, version)))
                     {
                         case EXACT: /* exact match found */
                         case MATCH: /* all given numbers match. */
@@ -976,7 +1014,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                             if (found && requireDebug)
                                 printf("require: %s %s support for %s %s found, compare against previously found %s\n",
                                     module, dirent->d_name, epicsRelease, targetArch, found);
-                            if (!found || compareVersions(found, dirent->d_name) == HIGHER)
+                            if (!found || compareVersions(dirent->d_name, found) == HIGHER)
                             {
                                 if (requireDebug)
                                     printf("require: %s %s looks promising\n", module, dirent->d_name);
@@ -1018,12 +1056,11 @@ static int require_priv(const char* module, const char* version, const char* arg
                     releasediroffs = libdiroffs = dirlen;
                     if (TRY_FILE(dirlen, "%s%s.dep", module, versionstr))
                     /* filename = "<dirname>/[dirlen][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
-                    if (fileExists(filename))
                     {
                         if (requireDebug)
                             printf("require: found old style %s\n", filename);
                         printf ("Module %s%s found in %.*s\n", module,
-                        versionstr, dirlen, filename);
+                            versionstr, dirlen, filename);
                         goto checkdep;
                     }
 
@@ -1039,7 +1076,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                         if (requireDebug)
                             printf("require: found old style %s\n", filename);
                         printf ("Module %s%s found in %.*s\n", module,
-                        versionstr, dirlen, filename);
+                            versionstr, dirlen, filename);
                         goto loadlib;
                     }
                 }
@@ -1051,19 +1088,16 @@ static int require_priv(const char* module, const char* version, const char* arg
 
         if (!found)
         {
-            if (version && someArchFound)
-                fprintf(stderr, "Module %s version %s not found for %s (but for other architectures)\n", module, version, targetArch);
-            else
             if (someArchFound)
-                fprintf(stderr, "Module %s not found for %s (but for other architectures)\n", module, targetArch);
+                fprintf(stderr, "Module%s%s%s not available for %s\n(but maybe for other EPICS versions or architectures)\n",
+                    module, version ? " version " : "", version ? version : "", targetArch);
             else
-            if (version && someVersionFound)
-                fprintf(stderr, "Module %s version %s not found (but other versions are available)\n", module, version);
+            if (someVersionFound)
+                fprintf(stderr, "Module%s%s%s not available (but other versions are available)\n",
+                    module, version ? " version " : "", version ? version : "");
             else
-            if (version)
-                fprintf(stderr, "Module %s version %s not found\n", module, version);
-            else
-                fprintf(stderr, "Module %s not found\n", module);
+                fprintf(stderr, "Module%s%s%s not available\n",
+                    module, version ? " version " : "", version ? version : "");
             return ifexists ? 0 : -1;
         }
 
@@ -1072,39 +1106,35 @@ static int require_priv(const char* module, const char* version, const char* arg
         /* founddir = "<dirname>/[dirlen]<module>/<version>" */
         printf ("Module %s version %s found in %s" OSI_PATH_SEPARATOR "\n", module, found, founddir);
 
-        snprintf(filename, sizeof(filename),
-            "%s" OSI_PATH_SEPARATOR "R%s" OSI_PATH_SEPARATOR "%n" LIBDIR "%s" OSI_PATH_SEPARATOR "%n%s.dep",
-            founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module);
-        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
-
-        /* check dependencies */
         if (requireDebug)
-            printf("require: looking for dependency file %s\n", filename);
+            printf("require: looking for dependency file\n");
 
+        if (!TRY_FILE(0, "%s" OSI_PATH_SEPARATOR "R%s" OSI_PATH_SEPARATOR "%n" LIBDIR "%s" OSI_PATH_SEPARATOR "%n%s.dep",
+            founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module))
+        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
+        {
+            fprintf(stderr, "Dependency file %s not found\n", filename);
+        }
+        else
+        {
 checkdep:
-        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
-        /* or (old)   "<dirname>/[dirlen]][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
-        if (handleDependencies(module, filename) == -1)
-            return -1;
-
-        /* load library */
-        snprintf(filename + libdiroffs, sizeof(filename) - libdiroffs,
-            PREFIX "%s" INFIX "%s%n" EXT, module, versionstr, &extoffs);
-        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs]EXT" */
-        /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
+            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
+            /* or (old)   "<dirname>/[dirlen]][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
+            if (handleDependencies(module, filename) == -1)
+                return -1;
+        }
 
         if (requireDebug)
-            printf("require: looking for library %s\n", filename);
+            printf("require: looking for library file\n");
+
+        if (!(TRY_FILE(libdiroffs, PREFIX "%s" INFIX "%s%n" EXT, module, versionstr, &extoffs)
         #ifdef vxWorks
-            if (!fileExists(filename))
-            {
-                /* try without extension */
-                filename[libdiroffs + extoffs] = 0;
-                if (requireDebug)
-                    printf("require: looking for library %s\n", filename);
-            }
+            /* try without extension */
+            || (filename[libdiroffs + extoffs] = 0, fileExists(filename))
         #endif
-        if (!fileExists(filename))
+            ))
+        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs](EXT)?" */
+        /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs](EXT)?" */
         {
             printf("Module %s has no library\n", module);
         }
@@ -1128,7 +1158,7 @@ loadlib:
             /* check what we got */
             if (requireDebug)
                 printf("require: compare requested version %s with loaded version %s\n", version, found);
-            if (compareVersions(version, found) == MISMATCH)
+            if (compareVersions(found, version) == MISMATCH)
             {
                 fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
                     module, version, found);
