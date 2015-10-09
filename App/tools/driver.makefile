@@ -885,8 +885,8 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2+%p'| sort -u >> $@
-	$(foreach m,${REQ},echo "$m $(basename ${$m_VERSION})+" >> $@;)
+	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/\([0-9.]*\)/.*%\1 \2+%p;s%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2%p'| sort -u >> $@
+	$(foreach m,${REQ},echo "$m ${$m_VERSION}$(if $(filter-out $(basename ${$m_VERSION}),${$m_VERSION}),+)" >> $@;)
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
