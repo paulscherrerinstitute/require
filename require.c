@@ -748,8 +748,10 @@ static int handleDependencies(const char* module, char* depfilename)
         end = rversion;
         /* find end of version */
         while (*end && !isspace((unsigned char)*end)) end++;
-        /* add + if not yet there */
-        if (*(end-1) != '+') *end++ = '+';
+
+        /* add + to numerial versions if not yet there */
+        if (*(end-1) != '+' && strspn(rversion, "0123456789.") == end-rversion) *end++ = '+';
+
         /* terminate version */
         *end = 0;
         printf("Module %s depends on %s %s\n", module, rmodule, rversion);
