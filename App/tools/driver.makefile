@@ -430,6 +430,11 @@ ifeq ($(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$"),)
 install::
 	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
         (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.\nNote: If you really want to overwrite then uninstall first."; false)
+else
+install::
+	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
+        (echo -e "Warning: Re-installing ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A}"; \
+         rm -rf ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A})
 endif
 
 install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
