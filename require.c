@@ -220,6 +220,36 @@ typedef struct moduleitem
 
 moduleitem* loadedModules = NULL;
 
+static int putenvprintf(const char* format, ...) __attribute__((format(printf,1,2)));
+static int putenvprintf(const char* format, ...)
+{
+    va_list ap;
+    char *var;
+
+    va_start(ap, format);
+    if (vasprintf(&var, format, ap) < 0)
+    {
+        perror("require putenv");
+        return errno;
+    }
+    va_end(ap);
+
+    if (requireDebug)
+        printf("require: putenv(\"%s\")\n", var);
+
+    putenv(var);
+    /* Why putenv()?
+       vxWorks has no setenv()
+       Epics 3.13 has no epicsEnvSet()
+       Do not free the memory given to putenv (except for vxWorks)!
+    */
+
+#ifdef vxWorks
+    free(var);
+#endif
+    return 0;
+}
+
 static void registerModule(const char* module, const char* version, const char* location)
 {
     moduleitem* m;
@@ -240,6 +270,8 @@ static void registerModule(const char* module, const char* version, const char* 
     strcpy (m->content+lm+lv, location ? location : "");
     m->next = loadedModules;
     loadedModules = m;
+    putenvprintf("%s_VERSION=%s", module, version);
+    putenvprintf("%s_DIR=%s", module, location);
 }
 
 #if defined (vxWorks)
@@ -325,8 +357,6 @@ static int findLibRelease (
 
 static void registerExternalModules()
 {
-    if (requireDebug)
-        printf("require: registerExternalModules()\n");
     /* iterate over all loaded libraries */
     dl_iterate_phdr(findLibRelease, NULL);
 }
@@ -541,29 +571,6 @@ static int compareVersions(const char* found, const char* request)
     if (requireDebug)
         printf("require: compareVersions: HIGHER patch level\n");
     return HIGHER; 
-}
-
-static int putenvprintf(const char* format, ...) __attribute__((format(printf,1,2)));
-static int putenvprintf(const char* format, ...)
-{
-    va_list ap;
-    char *var;
-
-    va_start(ap, format);
-    if (vasprintf(&var, format, ap) < 0)
-    {
-        perror("require putenv");
-        return errno;
-    }
-    va_end(ap);
-
-    if (requireDebug)
-        printf("require: putenv(\"%s\")\n", var);
-    putenv(var);
-#ifdef vxWorks
-    free(var);
-#endif
-    return 0;
 }
 
 /* require (module)
@@ -878,6 +885,8 @@ static int require_priv(const char* module, const char* version, const char* arg
     
     int someVersionFound = 0;
     int someArchFound = 0;
+    
+    static char* globalTemplates = NULL;
 
     if (requireDebug)
         printf("require: module=\"%s\" version=\"%s\" args=\"%s\"\n", module, version, args);
@@ -889,6 +898,12 @@ static int require_priv(const char* module, const char* version, const char* arg
     (snprintf(filename + offs, sizeof(filename) - offs, args) && fileNotEmpty(filename))
 
     driverpath = getenv("EPICS_DRIVER_PATH");
+    if (!globalTemplates)
+    {
+        char *t = getenv("TEMPLATES");
+        if (t) globalTemplates = strdup(t);
+    }
+    
     if (driverpath == NULL) driverpath = ".";
     if (requireDebug)
         printf("require: searchpath=%s\n", driverpath);
@@ -1212,14 +1227,8 @@ loadlib:
     status = 0;       
 
     /* set up environment */
-    /* Why putenv()?
-       vxWorks has no setenv()
-       Epics 3.13 has no epicsEnvSet()
-       Do not free the memory given to putenv (except for vxWorks)!
-    */
 
-    putenvprintf("MODULE=%s", module); /* "<dirname>/<module>/<version>/R<epicsRelease>/" */
-    putenvprintf("%s_DIR=%s", module, filename);
+    putenvprintf("MODULE=%s", module);
 
     if (requireDebug)
         printf("require: looking for template directory\n");
@@ -1239,10 +1248,12 @@ loadlib:
 
         /* set up db search path environment variables
           <module>_TEMPLATES      template path of <module>
+          <module>_DB             template path of <module>
           TEMPLATES               template path of the current module (overwritten)
           EPICS_DB_INCLUDE_PATH   template path of all loaded modules (last in front after ".")
         */
 
+        putenvprintf("%s_DB=%s", module, absdir);
         putenvprintf("%s_TEMPLATES=%s", module, absdir);
         putenvprintf("TEMPLATES=%s", absdir);
 
@@ -1282,7 +1293,10 @@ loadlib:
     }
     else
     {
-        putenvprintf("TEMPLATES=.");
+        char *t;
+        t = getenv("TEMPLATES");
+        if (globalTemplates && (!t || strcmp(globalTemplates, t) != 0))
+            putenvprintf("TEMPLATES=%s", globalTemplates);
     }
 
 #define SETUP_PATH(NAME, args...) \
