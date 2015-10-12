@@ -250,6 +250,20 @@ static int putenvprintf(const char* format, ...)
     return 0;
 }
 
+static int runLoadScript(const char* script, const char* module, const char* version)
+{
+    char *scriptpath = NULL;
+    char *subst = NULL;
+    const char *mylocation = getLibLocation("require");
+    if (!mylocation) return -1;
+    if (asprintf(&scriptpath, "%s/%s", mylocation, script) < 0) return -1;
+    if (asprintf(&subst, "MODULE=%s,VERSION=%s", module, version) < 0) return -1;
+    runScript(scriptpath, subst);
+    free(subst);
+    free(scriptpath);
+    return 0;
+}
+
 static void registerModule(const char* module, const char* version, const char* location)
 {
     moduleitem* m;
@@ -272,6 +286,15 @@ static void registerModule(const char* module, const char* version, const char* 
     loadedModules = m;
     putenvprintf("%s_VERSION=%s", module, version);
     putenvprintf("%s_DIR=%s", module, location);
+    
+    /* only do registration register stuff at init */
+    if (interruptAccept) return;
+    
+    if (runLoadScript("postModuleLoad.cmd", module, version) < 0)
+    {
+        fprintf(stderr, "require: out of memory\n");
+        return;
+    }
 }
 
 #if defined (vxWorks)
@@ -775,6 +798,12 @@ int runScript(const char* filename, const char* args)
     long line_exp_size = line_raw_size;
     char** pairs;
     int status = 0;
+    
+    if (interruptAccept)
+    {
+        fprintf(stderr, "Warning: running %s\n", filename);
+        fprintf(stderr, "Warning: running scripts after iocInit may crash the ioc.\n");
+    }
 
     pairs = (char*[]){ "", "environ", NULL, NULL };
 

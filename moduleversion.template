@@ -1,0 +1,5 @@
+record (stringin, "$(IOC):$(MODULE)_VERSION")
+{
+    field (VAL,  "$(VERSION)")
+    field (PINI, "YES")
+}
