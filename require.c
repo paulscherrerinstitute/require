@@ -264,13 +264,19 @@ static int runLoadScript(const char* script, const char* module, const char* ver
     return 0;
 }
 
-static void setupDbPath(const char* module, const char* dbdir)
+static int setupDbPath(const char* module, const char* dbdir)
 {
     char* old_path;           
     char* p;
     size_t len;
 
     char* absdir = realpath(dbdir, NULL); /* so we can change directory later safely */
+    if (absdir == NULL)
+    {
+        if (requireDebug)
+            printf("require: cannot resolve %s\n", dbdir);
+        return -1;
+    }
     len = strlen(absdir);
 
     if (requireDebug)
@@ -320,6 +326,7 @@ static void setupDbPath(const char* module, const char* dbdir)
                  absdir, old_path);
     }
     free(absdir);
+    return 0;
 }
 
 static void registerModule(const char* module, const char* version, const char* location)
@@ -1322,28 +1329,14 @@ loadlib:
     if (requireDebug)
         printf("require: looking for template directory\n");
     /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]..." */
-    if (TRY_FILE(releasediroffs, TEMPLATEDIR) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR TEMPLATEDIR))
+    if (!((TRY_FILE(releasediroffs, TEMPLATEDIR) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR TEMPLATEDIR)) && setupDbPath(module, filename)))
     {
-        setupDbPath(module, filename);
-    }
-    else
-    {
+        /* if no template directory found, restore TEMPLATES to initial value */
         char *t;
         t = getenv("TEMPLATES");
         if (globalTemplates && (!t || strcmp(globalTemplates, t) != 0))
             putenvprintf("TEMPLATES=%s", globalTemplates);
-    }
-
-#define SETUP_PATH(NAME, args...) \
-    if (TRY_FILE(releasediroffs, args)) \
-    { \
-        putenvprintf("%s_" #NAME "=%s", module, filename); \
-        putenvprintf(#NAME "=%s", filename); \
-    }\
-    else \
-    { \
-        putenvprintf(#NAME "=."); \
     }
 
     if (loaded && args == NULL) return 0; /* no need to execute startup script twice if not with new arguments */
