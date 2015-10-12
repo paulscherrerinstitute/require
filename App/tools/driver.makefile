@@ -304,7 +304,7 @@ DBD_SRCS += ${DBDS_${EPICS_BASETYPE}}
 DBD_SRCS += ${DBDS_${EPICSVERSION}}
 export DBD_SRCS
 
-RECORDS1 = $(patsubst %Record.dbd,%,$(notdir $(filter %Record.dbd, ${DBD_SRCS})))
+RECORDS1 = $(patsubst %Record.dbd, %, $(filter-out dev%, $(filter %Record.dbd, $(notdir ${DBD_SRCS}))))
 RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS}))
 RECORDS = $(sort ${RECORDS1} ${RECORDS2})
 export RECORDS
