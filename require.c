@@ -264,6 +264,64 @@ static int runLoadScript(const char* script, const char* module, const char* ver
     return 0;
 }
 
+static void setupDbPath(const char* module, const char* dbdir)
+{
+    char* old_path;           
+    char* p;
+    size_t len;
+
+    char* absdir = realpath(dbdir, NULL); /* so we can change directory later safely */
+    len = strlen(absdir);
+
+    if (requireDebug)
+        printf("require: found template directory %s\n", absdir);
+
+    /* set up db search path environment variables
+      <module>_TEMPLATES      template path of <module>
+      <module>_DB             template path of <module>
+      TEMPLATES               template path of the current module (overwritten)
+      EPICS_DB_INCLUDE_PATH   template path of all loaded modules (last in front after ".")
+    */
+
+    putenvprintf("%s_DB=%s", module, absdir);
+    putenvprintf("%s_TEMPLATES=%s", module, absdir);
+    putenvprintf("TEMPLATES=%s", absdir);
+
+    /* add directory to front of EPICS_DB_INCLUDE_PATH */
+    old_path = getenv("EPICS_DB_INCLUDE_PATH");
+    if (old_path == NULL)
+        putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s", absdir);
+    else
+    {
+        /* skip over "." at the beginning */
+        if (old_path[0] == '.' && old_path[1] == OSI_PATH_LIST_SEPARATOR[0])
+            old_path += 2;
+
+        /* If directory is already in path, move it to front */
+        p = old_path;
+        while ((p = strstr(p, absdir)) != NULL)
+        {
+            if ((p == old_path || *(p-1) == OSI_PATH_LIST_SEPARATOR[0]) &&
+                (p[len] == 0 || p[len] == OSI_PATH_LIST_SEPARATOR[0]))
+            {
+                if (p == old_path) break; /* already at front, nothing to do */
+                memmove(old_path+len+1, old_path, p-old_path-1);
+                strcpy(old_path, absdir);
+                old_path[len] = OSI_PATH_LIST_SEPARATOR[0];
+                if (requireDebug)
+                    printf("require: modified EPICS_DB_INCLUDE_PATH=%s\n", old_path);
+                break;
+            }
+            p += len;
+        }
+        if (p == NULL)
+            /* add new directory to the front (after "." )*/
+            putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s" OSI_PATH_LIST_SEPARATOR "%s",
+                 absdir, old_path);
+    }
+    free(absdir);
+}
+
 static void registerModule(const char* module, const char* version, const char* location)
 {
     moduleitem* m;
@@ -284,8 +342,8 @@ static void registerModule(const char* module, const char* version, const char* 
     strcpy (m->content+lm+lv, location ? location : "");
     m->next = loadedModules;
     loadedModules = m;
-    putenvprintf("%s_VERSION=%s", module, version);
-    putenvprintf("%s_DIR=%s", module, location);
+    if (version)  putenvprintf("%s_VERSION=%s", module, version);
+    if (location) putenvprintf("%s_DIR=%s", module, location);
     
     /* only do registration register stuff at init */
     if (interruptAccept) return;
@@ -1267,60 +1325,7 @@ loadlib:
     if (TRY_FILE(releasediroffs, TEMPLATEDIR) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR TEMPLATEDIR))
     {
-        char* old_path;           
-        char* p;
-        size_t len;
-
-        char* absdir = realpath(filename, NULL); /* so we can change directory later safely */
-        len = strlen(absdir);
-
-        if (requireDebug)
-            printf("require: found template directory %s\n", absdir);
-
-        /* set up db search path environment variables
-          <module>_TEMPLATES      template path of <module>
-          <module>_DB             template path of <module>
-          TEMPLATES               template path of the current module (overwritten)
-          EPICS_DB_INCLUDE_PATH   template path of all loaded modules (last in front after ".")
-        */
-
-        putenvprintf("%s_DB=%s", module, absdir);
-        putenvprintf("%s_TEMPLATES=%s", module, absdir);
-        putenvprintf("TEMPLATES=%s", absdir);
-
-        /* add directory to front of EPICS_DB_INCLUDE_PATH */
-        old_path = getenv("EPICS_DB_INCLUDE_PATH");
-        if (old_path == NULL)
-            putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s", absdir);
-        else
-        {
-            /* skip over "." at the beginning */
-            if (old_path[0] == '.' && old_path[1] == OSI_PATH_LIST_SEPARATOR[0])
-                old_path += 2;
-            
-            /* If directory is already in path, move it to front */
-            p = old_path;
-            while ((p = strstr(p, absdir)) != NULL)
-            {
-                if ((p == old_path || *(p-1) == OSI_PATH_LIST_SEPARATOR[0]) &&
-                    (p[len] == 0 || p[len] == OSI_PATH_LIST_SEPARATOR[0]))
-                {
-                    if (p == old_path) break; /* already at front, nothing to do */
-                    memmove(old_path+len+1, old_path, p-old_path-1);
-                    strcpy(old_path, absdir);
-                    old_path[len] = OSI_PATH_LIST_SEPARATOR[0];
-                    if (requireDebug)
-                        printf("require: modified EPICS_DB_INCLUDE_PATH=%s\n", old_path);
-                    break;
-                }
-                p += len;
-            }
-            if (p == NULL)
-                /* add new directory to the front (after "." )*/
-                putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s" OSI_PATH_LIST_SEPARATOR "%s",
-                     absdir, old_path);
-        }
-        free(absdir);
+        setupDbPath(module, filename);
     }
     else
     {
