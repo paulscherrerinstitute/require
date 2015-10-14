@@ -305,7 +305,7 @@ DBD_SRCS += ${DBDS_${EPICSVERSION}}
 export DBD_SRCS
 
 RECORDS1 = $(patsubst %Record.dbd, %, $(filter-out dev%, $(filter %Record.dbd, $(notdir ${DBD_SRCS}))))
-RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS}))
+#RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS}))
 RECORDS = $(sort ${RECORDS1} ${RECORDS2})
 export RECORDS
 
@@ -427,11 +427,11 @@ O.%:
 	$(MKDIR) $@
 
 ifeq ($(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$"),)
-install::
+install:: build
 	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
         (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.\nNote: If you really want to overwrite then uninstall first."; false)
 else
-install::
+install:: build
 	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
         (echo -e "Warning: Re-installing ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A}"; \
          rm -rf ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A})
@@ -448,7 +448,7 @@ export REQ
 else # in O.*
 ## RUN 4
 # in O.* directory
-$(foreach v, USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v_${OS_CLASS}} $${$v_${T_A}}))
+$(foreach v, USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v_${OS_CLASS}} $${$v_${T_A}} $${$v_${EPICS_BASETYPE}} $${$v_${EPICSVERSION}}))
 CFLAGS += ${EXTRA_CFLAGS}
 
 MODULEDBD=${if $(strip ${DBDFILES}),${PRJ}.dbd}
