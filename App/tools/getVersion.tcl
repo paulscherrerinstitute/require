@@ -143,6 +143,13 @@ scanmatch $git_context {^ D .*} {
     continue
 }     
 
+scanmatch $git_context {^A  .*} {
+    set file [lindex $matchInfo(line) 1]
+    puts stderr "$file: locally added => version test"
+    set version test
+    continue
+}     
+
 scanmatch $git_context {^([ MADRCU][ MADRCU]) .*} {
     set file [lindex $matchInfo(line) 1]
     puts stderr "$file: $matchInfo(submatch0) (whatever that means) => version test"
