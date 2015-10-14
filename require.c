@@ -866,8 +866,8 @@ int runScript(const char* filename, const char* args)
     
     if (interruptAccept)
     {
-        fprintf(stderr, "Warning: running %s\n", filename);
-        fprintf(stderr, "Warning: running scripts after iocInit may crash the ioc.\n");
+        fprintf(stderr, "Warning: Running script %s after iocInit may crash the ioc later.\n",
+            filename);
     }
 
     pairs = (char*[]){ "", "environ", NULL, NULL };
@@ -1354,13 +1354,18 @@ loadlib:
         )
     {
         if (args)
-            printf("Executing script %s with \"%s\"\n", filename, args);
+            printf("Executing %s with \"%s\"\n", filename, args);
+        else if (interruptAccept)
+        {
+            printf("Not executing %s after iocInit\n", filename);
+            return 0;
+        }
         else
-            printf("Executing script %s\n", filename);
+            printf("Executing %s\n", filename);
         if (runScript(filename, args) != 0)
             fprintf (stderr, "Error executing %s\n", filename);
         else
-            printf("Done with script %s\n", filename);
+            printf("Done with %s\n", filename);
     }
     return status;
 }
