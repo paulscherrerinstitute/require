@@ -1330,7 +1330,7 @@ loadlib:
         printf("require: looking for template directory\n");
     /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]..." */
     if (!((TRY_FILE(releasediroffs, TEMPLATEDIR) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR TEMPLATEDIR)) && setupDbPath(module, filename)))
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR TEMPLATEDIR)) && setupDbPath(module, filename) == 0))
     {
         /* if no template directory found, restore TEMPLATES to initial value */
         char *t;
