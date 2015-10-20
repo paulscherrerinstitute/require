@@ -54,8 +54,6 @@ epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
 
 int requireDebug=0;
 
-static int firstTime = 1;
-
 #if defined (vxWorks)
 
     #include <symLib.h>
@@ -254,8 +252,11 @@ static int runLoadScript(const char* script, const char* module, const char* ver
 {
     char *scriptpath = NULL;
     char *subst = NULL;
-    const char *mylocation = getLibLocation("require");
-    if (!mylocation) return -1;
+    const char *mylocation = getenv("require_DIR");
+    
+    if (requireDebug)
+        printf("require: runLoadScript %s, loc=%s\n", script, mylocation);
+    if (!mylocation) return 0;
     if (asprintf(&scriptpath, "%s/%s", mylocation, script) < 0) return -1;
     if (asprintf(&subst, "MODULE=%s,VERSION=%s", module, version) < 0) return -1;
     runScript(scriptpath, subst);
@@ -329,7 +330,7 @@ static int setupDbPath(const char* module, const char* dbdir)
     return 0;
 }
 
-static void registerModule(const char* module, const char* version, const char* location)
+void registerModule(const char* module, const char* version, const char* location)
 {
     moduleitem* m;
     size_t lm = strlen(module) + 1;
@@ -389,7 +390,7 @@ static BOOL findLibRelease (
     return TRUE;
 }
 
-static void registerExternalModules()
+void registerExternalModules()
 {
     /* iterate over all symbols */
     symEach(sysSymTbl, (FUNCPTR)findLibRelease, 0);
@@ -495,27 +496,34 @@ const char* getLibLocation(const char* libname)
     return NULL;
 }
 
-int libversionShow(const char* pattern, int showLocation)
+int libversionShow(int showLocation, const char* outfile)
 {
     moduleitem* m;
     int lm, lv;
+    
+    FILE* out = stdout;
 
-    if (firstTime) /* can only happen on vxWorks */
+    if (outfile)
     {
-        firstTime=0;
-        registerExternalModules();
-    }
-
+        out = fopen(outfile, "w");
+        if (out < 0)
+        {
+            fprintf(stderr, "can't open %s: %s\n",
+                outfile, strerror(errno));
+            return -1;
+        }
+    }        
     for (m = loadedModules; m; m=m->next)
     {
-        if (pattern && *pattern && !strstr(m->content, pattern)) continue;
         lm = strlen(m->content)+1;
         lv = strlen(m->content+lm)+1;
-        epicsStdoutPrintf("%20s %-20s %s\n",
+        fprintf(out, "%20s %-20s %s\n",
             m->content,
             m->content+lm,
             showLocation ? m->content+lm+lv : "");
     }
+    if (outfile)
+        fclose(out);
     return 0;
 }
 
@@ -679,12 +687,6 @@ int require(const char* module, const char* version, const char* args)
 {
     int status;
     char* versionstr;
-
-    if (firstTime) /* can only happen on vxWorks */
-    {
-        firstTime=0;
-        registerExternalModules();
-    }
 
     if (getenv("T_A") == NULL)
         putenvprintf("T_A=%s", targetArch);
@@ -908,6 +910,12 @@ int runScript(const char* filename, const char* args)
     /* execute line by line after expanding macros with arguments or environment */
     if ((line_raw = malloc(line_raw_size)) == NULL) goto error;
     if ((line_exp = malloc(line_exp_size)) == NULL) goto error;
+    if (requireDebug)
+    {
+            printf("runScript: line_raw=%p\n", line_raw);
+            printf("runScript: line_exp=%p\n", line_exp);
+    }
+    
     while (fgets(line_raw, line_raw_size, file))
     {
         const unsigned char* p;
@@ -929,8 +937,12 @@ int runScript(const char* filename, const char* args)
         {
             if (requireDebug)
                     printf("runScript: grow expand buffer: len=%ld size=%ld\n", len, line_exp_size);
-            free(line_exp);
-            if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
+            if (requireDebug)
+                    printf("runScript: free = %p\n", line_exp);
+            if ((line_exp = realloc(line_exp, line_exp_size *= 2)) == NULL) goto error;
+            sleep(1);
+            if (requireDebug)
+                    printf("runScript: alloc = %p\n", line_exp);
         }
         printf("%s\n", line_exp);
         p=(unsigned char*)line_exp;
@@ -1381,13 +1393,13 @@ static void requireFunc (const iocshArgBuf *args)
     require(args[0].sval, args[1].sval, args[2].sval);
 }
 
-static const iocshArg libversionShowArg0 = { "pattern", iocshArgString };
-static const iocshArg libversionShowArg1 = { "showLocation", iocshArgInt };
+static const iocshArg libversionShowArg0 = { "showLocation", iocshArgInt };
+static const iocshArg libversionShowArg1 = { "outputfile", iocshArgString };
 static const iocshArg * const libversionArgs[2] = { &libversionShowArg0, &libversionShowArg1 };
 static const iocshFuncDef libversionShowDef = { "libversionShow", 2, libversionArgs };
 static void libversionShowFunc (const iocshArgBuf *args)
 {
-    libversionShow(args[0].sval, args[1].ival);
+    libversionShow(args[0].ival, args[1].sval);
 }
 
 static const iocshArg ldArg0 = { "library", iocshArgString };
@@ -1409,6 +1421,7 @@ static void runScriptFunc (const iocshArgBuf *args)
 
 static void requireRegister(void)
 {
+    static int firstTime = 1;
     if (firstTime) {
         firstTime = 0;
         iocshRegister (&ldDef, ldFunc);
