@@ -388,9 +388,11 @@ $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call 
 #        (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.If you really want to overwrite then uninstall first."; false)
 
 install build::
-# Delete old build if INSTBASE has changed.
+# Delete old build if INSTBASE has changed and module depends on other modules.
 	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-            echo $(realpath ${EPICS_MODULES}) | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE - || $(RMDIR) O.${EPICSVERSION}_$$ARCH; \
+            cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE <<< '$(realpath ${EPICS_MODULES})' || \
+            ( grep -qs "^[^#]" O.${EPICSVERSION}_$$ARCH/*.dep && \
+             (echo "rebuilding $$ARCH"; $(RMDIR) O.${EPICSVERSION}_$$ARCH) ) || true; \
 	done
 
 install build debug::
@@ -448,7 +450,11 @@ export REQ
 else # in O.*
 ## RUN 4
 # in O.* directory
-$(foreach v, USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS, $(eval $v+=$${$v_${OS_CLASS}} $${$v_${T_A}} $${$v_${EPICS_BASETYPE}} $${$v_${EPICSVERSION}}))
+
+# add macros like USR_CFLAGS_vxWorks
+EXTENDED_VARS=USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS CODE_CXXFLAGS
+VAR_EXTENSIONS=OS_CLASS T_A  EPICS_BASETYPE  EPICSVERSION
+$(foreach v,${EXTENDED_VARS},$(foreach x,${VAR_EXTENSIONS},$(eval $v+=$${$v_${$x}})))
 CFLAGS += ${EXTRA_CFLAGS}
 
 MODULEDBD=${if $(strip ${DBDFILES}),${PRJ}.dbd}
