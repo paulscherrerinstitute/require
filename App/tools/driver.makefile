@@ -123,7 +123,7 @@ BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
 $(foreach v,$(sort $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
 
 #check only what is needed to build the lib? But what is that?
-VERSIONCHECKFILES = ${SOURCES} ${DBDS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v})
+VERSIONCHECKFILES = $(filter_out /%, ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v}))
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
 LIBVERSION = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
@@ -299,13 +299,15 @@ SRCS += ${SOURCES_${EPICS_BASETYPE}}
 SRCS += ${SOURCES_${EPICSVERSION}}
 export SRCS
 
-DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),${MENUS} $(wildcard *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
+DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard menu*.dbd *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
 DBD_SRCS += ${DBDS_${EPICS_BASETYPE}}
 DBD_SRCS += ${DBDS_${EPICSVERSION}}
 export DBD_SRCS
 
+#record dbd files given in DBDS
 RECORDS1 = $(patsubst %Record.dbd, %, $(filter-out dev%, $(filter %Record.dbd, $(notdir ${DBD_SRCS}))))
-#RECORDS2 = $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS}))
+#record dbd files included by files given in DBDS
+RECORDS2 = $(filter-out dev%, $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS})))
 RECORDS = $(sort ${RECORDS1} ${RECORDS2})
 export RECORDS
 
@@ -476,7 +478,7 @@ EPICS_INCLUDES =
 # Only really existing directories are added to the search path
 define ADD_FOREIGN_INCLUDES
 $(eval $(notdir $(1))_VERSION := $(patsubst $(1)/%/R${EPICSVERSION}/include,%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION}/include 2>/dev/null))))
-USR_INCLUDES += $$(patsubst %,-I$(1)/%/R${EPICSVERSION}/include,$$($(notdir $(1))_VERSION))
+INSTALL_INCLUDES += $$(patsubst %,-I$(1)/%/R${EPICSVERSION}/include,$$($(notdir $(1))_VERSION))
 endef
 # The tricky part is to sort versions numerically. Make can't but ls -v can. Only accept numerical versions.
 $(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call ADD_FOREIGN_INCLUDES,$m)))
@@ -486,6 +488,9 @@ define ADD_MANUAL_DEPENDENCIES
 $(eval $(notdir $(1))_VERSION := $(or $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null))),$(error Manually required module $(notdir $(1)) not found)))
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,${EPICS_MODULES}/$m)))
+
+# old style modules
+INSTALL_INCLUDES += -I$(INSTBASE)/iocBoot/R${EPICSVERSION}/include
 
 debug::
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
@@ -505,6 +510,7 @@ debug::
 	@echo "DBDS = ${DBDS}"
 	@echo "DBDS_${EPICS_BASETYPE} = ${DBDS_${EPICS_BASETYPE}}"
 	@echo "DBDS_${OS_CLASS} = ${DBDS_${OS_CLASS}}"
+	@echo "DBD_SRCS = ${DBD_SRCS}"
 	@echo "DBDFILES = ${DBDFILES}"
 	@echo "TEMPLS = ${TEMPLS}"
 	@echo "LIBVERSION = ${LIBVERSION}"
@@ -595,7 +601,8 @@ endif
 
 # vxWorks
 PROD_vxWorks=${MODULELIB}
-LIBOBJS += $(addsuffix $(OBJ),$(notdir $(basename $(filter-out %.o %.a,$(sort ${SRCS})))))
+LIBOBJS += $(addsuffix $(OBJ),$(notdir $(basename $(filter-out %.$(OBJ) %(LIB_SUFFIX),$(sort ${SRCS})))))
+LIBOBJS += $(filter /%.$(OBJ) /%(LIB_SUFFIX),${SRCS})
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
 LIBS = -L ${EPICS_BASE_LIB} ${BASELIBS:%=-l%}
 LINK.cpp += ${LIBS}
@@ -630,14 +637,19 @@ DBD_PATH = $(sort $(dir ${DBDFILES}))
 DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${EPICS_BASE}/dbd)
 USR_DBDFLAGS += $(DBDEXPANDPATH)
 
-ifeq (${EPICS_BASETYPE},3.13)
-USR_INCLUDES += $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
-
-else # 3.14
-
-# different macros for 3.14.12 and earlier versions
 SRC_INCLUDES = $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
+
+# different macro name for 3.14.8
 GENERIC_SRC_INCLUDES = $(SRC_INCLUDES)
+
+ifeq (${EPICS_BASETYPE},3.13)
+# 3.13
+
+# different macro name for 3.13
+USR_INCLUDES += $(SRC_INCLUDES) $(INSTALL_INCLUDES) 
+
+else
+# 3.14
 
 EXPANDARG = -3.14
 
