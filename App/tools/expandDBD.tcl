@@ -8,6 +8,7 @@ set epicsversion 3.13
 set quiet 0
 set recordtypes 0
 set seachpath {}
+set filesDone {}
 
 while {[llength $argv]} {
     switch -glob -- [lindex $argv 0] {
@@ -80,20 +81,35 @@ scanmatch $global_context {include[ \t]+"?([^"]*)"?} {
     continue
 }
 
-
-proc includeFile {context name} {
-    global global_context FileName
-    set file [opendbd $name]
-    set FileName($file) $name
+proc includeFile {context filename} {
+    global global_context FileName filesDone matchInfo quiet
+    set basename [file tail $filename]
+    if {[lsearch $filesDone $basename ] != -1} {
+        if {!$quiet} {
+            puts stderr "Warning: skipping duplicate file $basename included from $FileName($matchInfo(handle))"
+        }
+        return
+    }
+    if {$filename != "dbCommon.dbd"} { lappend filesDone [file tail $filename] }
+    set file [opendbd $filename]
+    set FileName($file) $filename
+    #puts "#include $filename from $FileName($matchInfo(handle))"
     scanfile $context $file
     close $file
 }   
 
 foreach filename $argv {
+    global filesDone quiet
+    set basename [file tail $filename]
+    if {[lsearch $filesDone $basename] != -1} {
+        if {!$quiet} {
+            puts stderr "Warning: skipping duplicate file $basename from command line"
+        }
+        continue
+    }
+    if {$basename != "dbCommon.dbd"} { lappend filesDone $basename }
     set file [open $filename]
     set FileName($file) $filename
     scanfile $global_context $file
     close $file
 }
-
-# $Header: /cvs/G/DRV/misc/App/tools/expandDBD.tcl,v 1.4 2011/12/22 10:33:20 zimoch Exp $
