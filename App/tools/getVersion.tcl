@@ -150,6 +150,13 @@ scanmatch $git_context {^A  .*} {
     continue
 }     
 
+scanmatch $git_context {^AM .*} {
+    set file [lindex $matchInfo(line) 1]
+    puts stderr "$file: locally added and modified => version test"
+    set version test
+    continue
+}     
+
 scanmatch $git_context {^([ MADRCU][ MADRCU]) .*} {
     set file [lindex $matchInfo(line) 1]
     puts stderr "$file: $matchInfo(submatch0) (whatever that means) => version test"
@@ -162,7 +169,7 @@ scanmatch $git_context {fatal: No names found} {
     set version test
 }
 
-scanmatch $git_context {([0-9]+)\.([0-9]+)(\.([0-9]+))?$} {
+scanmatch $git_context {^([0-9]+)\.([0-9]+)(\.([0-9]+))?$} {
     set major $matchInfo(submatch0)
     set minor $matchInfo(submatch1)
     set patch [expr $matchInfo(submatch3) + 0]
@@ -170,7 +177,7 @@ scanmatch $git_context {([0-9]+)\.([0-9]+)(\.([0-9]+))?$} {
     puts stderr "checking tag $matchInfo(line) => version $version"
 }
 
-scanmatch $git_context {_([0-9]+)_([0-9]+)(_([0-9]+))?$} {
+scanmatch $git_context {^[a-zA-Z0-9]+_([0-9]+)_([0-9]+)(_([0-9]+))?$} {
     set major $matchInfo(submatch0)
     set minor $matchInfo(submatch1)
     set patch [expr $matchInfo(submatch3) + 0]
@@ -181,6 +188,12 @@ scanmatch $git_context {_([0-9]+)_([0-9]+)(_([0-9]+))?$} {
 scanmatch $git_context {(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g} {
     set version test
     puts stderr "tag $matchInfo(submatch0) is $matchInfo(submatch2) commits old => version test"
+}
+
+scanmatch $git_context {Your branch is ahead of '(.*)/(.*)'} {
+    puts stderr "not pushed to server => version test"
+    puts stderr "try: git push --tags $matchInfo(submatch0) $matchInfo(submatch1)"
+    set version test
 }
 
 if {[lindex $argv 0] == "-d"} {
@@ -217,6 +230,13 @@ if {[catch {
         puts stderr "Could not find out version tag => version test"
         set version test
     }
+    
+    if {$version != "test"} {
+        set statusinfo [open "|git status 2>@ stdout"]
+        scanfile $git_context $statusinfo
+        catch {close $statusinfo}
+    }
+    
     puts $version
     exit
 }] && $debug} { puts stderr "git: $errorInfo" }
