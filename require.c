@@ -25,7 +25,7 @@
 
 #ifdef BASE_VERSION
 #define EPICS_3_13
-#define epicsStdoutPrintf printf
+#define epicsGetStdout() stdout
 extern int dbLoadDatabase(const char *filename, const char *path, const char *substitutions);
 extern int dbLoadTemplate(const char *filename);
 int dbLoadRecords(const char *filename, const char *substitutions)
@@ -501,7 +501,7 @@ int libversionShow(int showLocation, const char* outfile)
     moduleitem* m;
     int lm, lv;
     
-    FILE* out = stdout;
+    FILE* out = epicsGetStdout();
 
     if (outfile)
     {
@@ -512,7 +512,7 @@ int libversionShow(int showLocation, const char* outfile)
                 outfile, strerror(errno));
             return -1;
         }
-    }        
+    }
     for (m = loadedModules; m; m=m->next)
     {
         lm = strlen(m->content)+1;
@@ -522,6 +522,7 @@ int libversionShow(int showLocation, const char* outfile)
             m->content+lm,
             showLocation ? m->content+lm+lv : "");
     }
+    fflush(out);
     if (outfile)
         fclose(out);
     return 0;
@@ -861,7 +862,7 @@ int runScript(const char* filename, const char* args)
     FILE* file = NULL;
     char* line_raw = NULL;
     char* line_exp = NULL;
-    long line_raw_size = 100;
+    long line_raw_size = 256;
     long line_exp_size = line_raw_size;
     char** pairs;
     int status = 0;
@@ -933,16 +934,18 @@ int runScript(const char* filename, const char* args)
         if (requireDebug)
                 printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
-        while ((len = labs(macExpandString(mac, line_raw, line_exp, line_exp_size-1))) >= line_exp_size-2)
+        while ((len = labs(macExpandString(mac, line_raw, line_exp, 
+#ifdef EPICS_3_13
+        /* 3.13 version of macExpandString is broken and may write more than allowed */
+                line_exp_size/2))) >= line_exp_size/2)
+#else       
+                line_exp_size-1))) >= line_exp_size-2)
+#endif
         {
             if (requireDebug)
                     printf("runScript: grow expand buffer: len=%ld size=%ld\n", len, line_exp_size);
-            if (requireDebug)
-                    printf("runScript: free = %p\n", line_exp);
-            if ((line_exp = realloc(line_exp, line_exp_size *= 2)) == NULL) goto error;
-            sleep(1);
-            if (requireDebug)
-                    printf("runScript: alloc = %p\n", line_exp);
+            free(line_exp);
+            if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
         }
         printf("%s\n", line_exp);
         p=(unsigned char*)line_exp;
