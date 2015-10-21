@@ -392,7 +392,7 @@ $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call 
 install build::
 # Delete old build if INSTBASE has changed and module depends on other modules.
 	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-            cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE <<< '$(realpath ${EPICS_MODULES})' || \
+            echo '$(realpath ${EPICS_MODULES})' | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE || \
             ( grep -qs "^[^#]" O.${EPICSVERSION}_$$ARCH/*.dep && \
              (echo "rebuilding $$ARCH"; $(RMDIR) O.${EPICSVERSION}_$$ARCH) ) || true; \
 	done
