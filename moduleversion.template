@@ -1,4 +1,4 @@
-record (stringin, "$(IOC):$(MODULE)_VERSION")
+record (stringin, "$(IOC):$(MODULE)_VER")
 {
     field (VAL,  "$(VERSION)")
     field (PINI, "YES")
