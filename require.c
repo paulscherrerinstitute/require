@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <dirent.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -56,6 +55,7 @@ int requireDebug=0;
 
 #if defined (vxWorks)
 
+    #include <dirent.h>
     #include <symLib.h>
     #include <sysSymTbl.h>
     #include <sysLib.h>
@@ -104,6 +104,7 @@ int requireDebug=0;
 
 #elif defined (__unix)
 
+    #include <dirent.h>
     #include <dlfcn.h>
     #define HMODULE void *
 
@@ -128,6 +129,12 @@ int requireDebug=0;
     #define EXT ".dll"
 
     #define getAddress(module, name) GetProcAddress(module, name)
+    
+    /* for readdir emulation: */
+    #define DIR HANDLE
+    #define dirent _WIN32_FIND_DATA
+    #define d_name cFileName
+    
 #else
 
     #warning unknwn OS
@@ -1074,6 +1081,23 @@ static int require_priv(const char* module, const char* version, const char* arg
             if (requireDebug)
                 printf("require: trying %.*s\n", dirlen, dirname);
 
+#ifdef _WIN32
+            snprintf(filename, sizeof(filename), "%.*s" OSI_PATH_SEPARATOR "%s" OSI_PATH_SEPARATOR "%n*", 
+                dirlen, dirname, module, &modulediroffs);
+            dirlen++;
+            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]*" */
+                
+            /* Does the module directory exist? */
+            dir = FindFirstFile(filename, &dirent);
+            if (dir != INVALID_HANDLE_VALUE)
+            {
+                if (requireDebug)
+                    printf("require: found directory %s\n", filename);
+                do
+                {
+                    if (!(dirent->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue; /* not a directory */
+                    if ((dirent->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) continue; /* hidden */
+#else            
             snprintf(filename, sizeof(filename), "%.*s" OSI_PATH_SEPARATOR "%s" OSI_PATH_SEPARATOR "%n", 
                 dirlen, dirname, module, &modulediroffs);
             dirlen++;
@@ -1092,6 +1116,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                     #ifdef _DIRENT_HAVE_D_TYPE
                     if (dirent->d_type != DT_DIR && dirent->d_type != DT_UNKNOWN) continue; /* not a directory */
                     #endif
+#endif
                     if (dirent->d_name[0] == '.') continue;  /* ignore hidden directories */
 
                     someVersionFound = 1;
@@ -1167,7 +1192,12 @@ static int require_priv(const char* module, const char* version, const char* arg
                     found = founddir + modulediroffs; /* version part in the path */
                     if (status == EXACT) break;
                 }
+#ifdef _WIN32
+                while (FindNextFile(dir, &dirent);
+                FindClose(dir);
+#else
                 closedir(dir);
+#endif
             }
             else
             {
