@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <unistd.h>
+
 #include <errno.h>
 
 #include <macLib.h>
@@ -116,6 +116,7 @@ int requireDebug=0;
         #endif
     #endif
 
+    #include <unistd.h>
     #include <dlfcn.h>
     #define HMODULE void *
 
