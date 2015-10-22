@@ -22,6 +22,10 @@
 #include <macLib.h>
 #include <epicsVersion.h>
 
+#ifndef __GNUC__
+#define __attribute__()
+#endif
+
 #ifdef BASE_VERSION
 #define EPICS_3_13
 #define epicsGetStdout() stdout
@@ -53,7 +57,10 @@ epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
 
 int requireDebug=0;
 
-#if defined (vxWorks)
+#if defined(vxWorks)
+    #ifndef OS_CLASS
+        #define OS_CLASS "vxWorks"
+    #endif
 
     #include <dirent.h>
     #include <symLib.h>
@@ -102,7 +109,13 @@ int requireDebug=0;
     extern char** ppGlobalEnviron;
     extern int execute();
 
-#elif defined (__unix)
+#elif defined(__unix)
+
+    #ifndef OS_CLASS
+        #ifdef __linux
+            #define OS_CLASS "Linux"
+        #endif
+    #endif
 
     #include <dirent.h>
     #include <dlfcn.h>
@@ -123,6 +136,10 @@ int requireDebug=0;
 
 #elif defined (_WIN32)
 
+    #ifndef OS_CLASS
+        #define OS_CLASS "WIN32"
+    #endif
+
     #include <windows.h>
     #define PREFIX
     #define INFIX
@@ -134,6 +151,20 @@ int requireDebug=0;
     #define DIR HANDLE
     #define dirent _WIN32_FIND_DATA
     #define d_name cFileName
+    
+    static char* realpath(const char* path, char* buffer)
+    {
+        int len = MAX_PATH;
+        if (buffer == NULL)
+        {
+            len = GetFullPathName(path, 0, NULL, NULL);
+            if (len == 0) return NULL;
+            buffer = malloc(len);
+            if (buffer == NULL) return NULL;
+        }
+        GetFullPathName(path, len, buffer, NULL);
+        return buffer;
+    }
     
 #else
 
@@ -147,9 +178,20 @@ int requireDebug=0;
 
 #define LIBDIR "lib" OSI_PATH_SEPARATOR
 #define TEMPLATEDIR "db"
-
+ 
+#define TOSTR(s) TOSTR2(s)
+#define TOSTR2(s) #s
+#define EPICS_RELEASE TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION)"."TOSTR(EPICS_MODIFICATION)
 const char epicsRelease[] = EPICS_RELEASE;
-const char targetArch[] = T_A;
+
+#ifndef T_A
+#error T_A not defined: Compile with USR_CFLAGS += -DT_A=${T_A}
+#endif
+const char targetArch[] = TOSTR(T_A);
+
+#ifndef OS_CLASS
+#error OS_CLASS not defined: Try to compile with USR_CFLAGS += -DOS_CLASS='"${OS_CLASS}"'
+#endif
 const char osClass[] = OS_CLASS;
 
 /* loadlib (library)

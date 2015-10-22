@@ -5,7 +5,7 @@ BUILDCLASSES += Linux
 # I need to find the Linux link.h before the EPICS link.h
 USR_INCLUDES_Linux=-idirafter ${EPICS_BASE}/include 
 
-USR_CFLAGS=-DEPICS_RELEASE='"${EPICSVERSION}"' -DT_A='"${T_A}"' -DOS_CLASS='"${OS_CLASS}"'
+USR_CFLAGS += -DT_A=${T_A}
 
 SOURCES += require.c
 DBDS    += require.dbd
