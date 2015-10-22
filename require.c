@@ -62,7 +62,6 @@ int requireDebug=0;
         #define OS_CLASS "vxWorks"
     #endif
 
-    #include <dirent.h>
     #include <symLib.h>
     #include <sysSymTbl.h>
     #include <sysLib.h>
@@ -117,7 +116,6 @@ int requireDebug=0;
         #endif
     #endif
 
-    #include <dirent.h>
     #include <dlfcn.h>
     #define HMODULE void *
 
@@ -147,11 +145,6 @@ int requireDebug=0;
 
     #define getAddress(module, name) GetProcAddress(module, name)
     
-    /* for readdir emulation: */
-    #define DIR HANDLE
-    #define dirent _WIN32_FIND_DATA
-    #define d_name cFileName
-    
     static char* realpath(const char* path, char* buffer)
     {
         int len = MAX_PATH;
@@ -173,6 +166,32 @@ int requireDebug=0;
     #define INFIX
     #define EXT
     #define getAddress(module, name) NULL
+
+#endif
+
+/* for readdir: Windows or Posix */
+#if defined(_WIN32)
+    #define DIR_HANDLE HANDLE
+    #define DIR_ENTRY WIN32_FIND_DATA
+    #define IF_OPEN_DIR(f) if(snprintf(f+modulediroffs, "\\*.*"), (dir=FindFirstFile(filename, &direntry)) != INVALID_HANDLE_VALUE || (FindClose(dir), 0))
+    #define START_DIR_LOOP do
+    #define END_DIR_LOOP while(FindNextFile(dir,&direntry)); FindClose(dir);
+    #define SKIP_NON_DIR(e) if (!(e.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || (e.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)) continue;
+    #define FILENAME(e) e.cFileName
+
+#else
+    #include <dirent.h>
+    #define DIR_HANDLE DIR*
+    #define DIR_ENTRY struct dirent*
+    #define IF_OPEN_DIR(f) if ((dir = opendir(f)))
+    #define START_DIR_LOOP while ((direntry = readdir(dir)) != NULL)
+    #define END_DIR_LOOP if (dir) closedir(dir);
+    #ifdef _DIRENT_HAVE_D_TYPE
+    #define SKIP_NON_DIR(e) if (e->d_type != DT_DIR && e->d_type != DT_UNKNOWN) continue;
+    #else
+    #define SKIP_NON_DIR(e)
+    #endif
+    #define FILENAME(e) e->d_name
 
 #endif
 
@@ -1034,8 +1053,6 @@ static int require_priv(const char* module, const char* version, const char* arg
     const char* dirname;
     const char *end;
 
-    DIR* dir;
-    struct dirent* dirent;
     int releasediroffs;
     int libdiroffs;
     int extoffs;
@@ -1112,6 +1129,8 @@ static int require_priv(const char* module, const char* version, const char* arg
             /* get one directory from driverpath */
             int dirlen;
             int modulediroffs;
+            DIR_HANDLE dir;
+            DIR_ENTRY direntry;
 
             end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
             if (end && end[1] == OSI_PATH_SEPARATOR[0] && end[2] == OSI_PATH_SEPARATOR[0])   /* "http://..." and friends */
@@ -1123,52 +1142,33 @@ static int require_priv(const char* module, const char* version, const char* arg
             if (requireDebug)
                 printf("require: trying %.*s\n", dirlen, dirname);
 
-#ifdef _WIN32
-            snprintf(filename, sizeof(filename), "%.*s" OSI_PATH_SEPARATOR "%s" OSI_PATH_SEPARATOR "%n*", 
-                dirlen, dirname, module, &modulediroffs);
-            dirlen++;
-            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]*" */
-                
-            /* Does the module directory exist? */
-            dir = FindFirstFile(filename, &dirent);
-            if (dir != INVALID_HANDLE_VALUE)
-            {
-                if (requireDebug)
-                    printf("require: found directory %s\n", filename);
-                do
-                {
-                    if (!(dirent->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue; /* not a directory */
-                    if ((dirent->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) continue; /* hidden */
-#else            
             snprintf(filename, sizeof(filename), "%.*s" OSI_PATH_SEPARATOR "%s" OSI_PATH_SEPARATOR "%n", 
                 dirlen, dirname, module, &modulediroffs);
             dirlen++;
             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
 
             /* Does the module directory exist? */
-            dir = opendir(filename);
-            if (dir)
+            IF_OPEN_DIR(filename)
             {
                 if (requireDebug)
                     printf("require: found directory %s\n", filename);
-
+                    
                 /* Now look for versions. */
-                while ((dirent = readdir(dir)) != NULL)
+                START_DIR_LOOP
                 {
-                    #ifdef _DIRENT_HAVE_D_TYPE
-                    if (dirent->d_type != DT_DIR && dirent->d_type != DT_UNKNOWN) continue; /* not a directory */
-                    #endif
-#endif
-                    if (dirent->d_name[0] == '.') continue;  /* ignore hidden directories */
+                    char* currentFilename = FILENAME(direntry);
+                    
+                    SKIP_NON_DIR(direntry)
+                    if (currentFilename[0] == '.') continue;  /* ignore hidden directories */
 
                     someVersionFound = 1;
 
                     /* Look for highest matching version. */
                     if (requireDebug)
                         printf("require: checking version %s against required %s\n",
-                                dirent->d_name, version);
+                                currentFilename, version);
 
-                    switch ((status = compareVersions(dirent->d_name, version)))
+                    switch ((status = compareVersions(currentFilename, version)))
                     {
                         case EXACT: /* exact match found */
                         case MATCH: /* all given numbers match. */
@@ -1177,19 +1177,19 @@ static int require_priv(const char* module, const char* version, const char* arg
 
                             if (requireDebug)
                                 printf("require: %s %s may match %s\n",
-                                    module, dirent->d_name, version);
+                                    module, currentFilename, version);
 
                             /* Check if it has our EPICS version and architecture. */
                             /* Even if it has no library, at least it has a dep file in the lib dir */
 
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
                             if (!TRY_FILE(modulediroffs, "%s" OSI_PATH_SEPARATOR "R%s" OSI_PATH_SEPARATOR LIBDIR "%s" OSI_PATH_SEPARATOR,
-                                dirent->d_name, epicsRelease, targetArch))
+                                currentFilename, epicsRelease, targetArch))
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/lib/<targetArch>/" */
                             {
                                 if (requireDebug)
                                     printf("require: %s %s has no support for %s %s\n",
-                                        module, dirent->d_name, epicsRelease, targetArch);
+                                        module, currentFilename, epicsRelease, targetArch);
                                 continue;
                             }
 
@@ -1197,7 +1197,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                             {
                                 if (requireDebug)
                                     printf("require: %s %s matches %s exactly\n",
-                                        module, dirent->d_name, version);
+                                        module, currentFilename, version);
                                 /* We are done. */
                                 end = NULL;
                                 break;
@@ -1206,40 +1206,35 @@ static int require_priv(const char* module, const char* version, const char* arg
                             /* Is it higher than the one we found before? */
                             if (found && requireDebug)
                                 printf("require: %s %s support for %s %s found, compare against previously found %s\n",
-                                    module, dirent->d_name, epicsRelease, targetArch, found);
-                            if (!found || compareVersions(dirent->d_name, found) == HIGHER)
+                                    module, currentFilename, epicsRelease, targetArch, found);
+                            if (!found || compareVersions(currentFilename, found) == HIGHER)
                             {
                                 if (requireDebug)
-                                    printf("require: %s %s looks promising\n", module, dirent->d_name);
+                                    printf("require: %s %s looks promising\n", module, currentFilename);
                                 break;
                             }
                             if (requireDebug)
-                                printf("require: version %s is lower than %s \n", dirent->d_name, found);
+                                printf("require: version %s is lower than %s \n", currentFilename, found);
                             continue;
                         }
                         default:
                         {
                             if (requireDebug)
                                 printf("require: %s %s does not match %s\n",
-                                    module, dirent->d_name, version);
+                                    module, currentFilename, version);
                             continue;
                         }
                     }
                     /* we have found something (EXACT or MATCH) */
                     free(founddir);
                     /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]..." */
-                    if (asprintf(&founddir, "%.*s%s", modulediroffs, filename, dirent->d_name) < 0)
+                    if (asprintf(&founddir, "%.*s%s", modulediroffs, filename, currentFilename) < 0)
                         return errno;
                     /* founddir = "<dirname>/[dirlen]<module>/[modulediroffs]<version>" */
                     found = founddir + modulediroffs; /* version part in the path */
                     if (status == EXACT) break;
                 }
-#ifdef _WIN32
-                while (FindNextFile(dir, &dirent);
-                FindClose(dir);
-#else
-                closedir(dir);
-#endif
+                END_DIR_LOOP
             }
             else
             {
