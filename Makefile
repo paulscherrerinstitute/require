@@ -3,7 +3,7 @@ TOP=..
 include $(TOP)/configure/CONFIG
 
 # library
-LIBRARY = require
+LOADABLE_LIBRARY = require
 LIB_SRCS += require_registerRecordDeviceDriver.cpp
 
 #require_DBD += base.dbd
@@ -11,7 +11,7 @@ LIB_SRCS += require_registerRecordDeviceDriver.cpp
 LIB_SRCS += require.c
 LIB_SRCS_vxWorks = asprintf.c strdup.c
 
-require_DBD += $(LIBRARY).dbd
+require_DBD += require.dbd
 
 LIB_LIBS += $(EPICS_BASE_IOC_LIBS)
 
@@ -20,5 +20,6 @@ USR_INCLUDES_Linux=-idirafter ${EPICS_BASE}/include
 
 # Pass T_A to the code
 USR_CFLAGS += -DT_A=${T_A}
+USR_CFLAGS_WIN32 += -D_WIN32_WINNT=0x501
 
 include $(TOP)/configure/RULES
