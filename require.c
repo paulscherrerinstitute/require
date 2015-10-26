@@ -202,7 +202,7 @@ int requireDebug=0;
 #if defined(_WIN32)
     #define DIR_HANDLE HANDLE
     #define DIR_ENTRY WIN32_FIND_DATA
-    #define IF_OPEN_DIR(f) if(snprintf(f+modulediroffs, "\\*.*"), (dir=FindFirstFile(filename, &direntry)) != INVALID_HANDLE_VALUE || (FindClose(dir), 0))
+    #define IF_OPEN_DIR(f) if(snprintf(f+modulediroffs, sizeof(f)-modulediroffs, "\\*.*"), (dir=FindFirstFile(filename, &direntry)) != INVALID_HANDLE_VALUE || (FindClose(dir), 0))
     #define START_DIR_LOOP do
     #define END_DIR_LOOP while(FindNextFile(dir,&direntry)); FindClose(dir);
     #define SKIP_NON_DIR(e) if (!(e.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || (e.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)) continue;
