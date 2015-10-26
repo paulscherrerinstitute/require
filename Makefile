@@ -10,6 +10,7 @@ LIB_SRCS += require_registerRecordDeviceDriver.cpp
 
 LIB_SRCS += require.c
 LIB_SRCS_vxWorks = asprintf.c strdup.c
+LIB_SRCS_WIN32 = asprintf.c
 
 require_DBD += require.dbd
 
@@ -20,6 +21,8 @@ USR_INCLUDES_Linux=-idirafter ${EPICS_BASE}/include
 
 # Pass T_A to the code
 USR_CFLAGS += -DT_A=${T_A}
-USR_CFLAGS_WIN32 += -D_WIN32_WINNT=0x501
+
+# This should really go into some global WIN32 config file
+USR_CFLAGS_WIN32 += /D_WIN32_WINNT=0x501
 
 include $(TOP)/configure/RULES
