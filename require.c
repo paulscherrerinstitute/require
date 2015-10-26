@@ -1028,7 +1028,7 @@ int runScript(const char* filename, const char* args)
         long len;
 
         /* check if we have a line longer than the buffer size */
-        while (line_raw[(len = strlen(line_raw))-1] != '\n' && !feof(file))
+        while (line_raw[(len = (long)strlen(line_raw))-1] != '\n' && !feof(file))
         {
             if (requireDebug)
                     printf("runScript partial line: \"%s\"\n", line_raw);
