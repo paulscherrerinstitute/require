@@ -9,8 +9,8 @@
 int vasprintf(char** pbuffer, const char* format, va_list ap)
 {
     va_list ap2;
-    size_t len;
-    
+    int len;
+
 #if defined(vxWorks)
     FILE* f;
     /* print to null device to get required buffer length */

@@ -4,6 +4,10 @@
 extern "C" {
 #endif
 #include <stdarg.h>
+#ifndef __GNUC__
+#define __attribute__(arg)
+#endif
+
 int asprintf(char** pbuffer, const char* format, ...) __attribute__((format(printf,2,3)));
 int vasprintf(char** pbuffer, const char* format, va_list ap) __attribute__((format(printf,2,0)));
 #ifdef __cplusplus
