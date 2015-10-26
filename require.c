@@ -23,7 +23,7 @@
 #include <epicsVersion.h>
 
 #ifndef __GNUC__
-#define __attribute__()
+#define __attribute__(arg)
 #endif
 
 #ifdef BASE_VERSION
@@ -114,6 +114,30 @@ int requireDebug=0;
         #ifdef __linux
             #define OS_CLASS "Linux"
         #endif
+
+        #ifdef SOLARIS
+            #define OS_CLASS "solaris"
+        #endif
+        
+        #ifdef __rtems__
+            #define OS_CLASS "RTEMS"
+        #endif
+        
+        #ifdef CYGWIN32
+            #define OS_CLASS "cygwin32"
+        #endif
+
+        #ifdef freebsd
+            #define OS_CLASS "freebsd"
+        #endif
+
+        #ifdef darwin
+            #define OS_CLASS "Darwin"
+        #endif
+
+        #ifdef _AIX32
+            #define OS_CLASS "AIX"
+        #endif
     #endif
 
     #include <unistd.h>
@@ -140,6 +164,10 @@ int requireDebug=0;
     #endif
 
     #include <windows.h>
+    #include "asprintf.h"
+    #define snprintf _snprintf
+    #define NAME_MAX MAX_PATH
+
     #define PREFIX
     #define INFIX
     #define EXT ".dll"
@@ -568,7 +596,7 @@ const char* getLibLocation(const char* libname)
 int libversionShow(int showLocation, const char* outfile)
 {
     moduleitem* m;
-    int lm, lv;
+    size_t lm, lv;
     
     FILE* out = epicsGetStdout();
 
@@ -848,26 +876,34 @@ static off_t fileSize(const char* filename)
                 printf("require: directory %s exists\n",
                     filename);
             return 0;
+        #ifdef S_IFBLK
         case S_IFBLK:
             if (requireDebug)
                 printf("require: %s is a block device\n",
                     filename);
             return -1;
+        #endif
+        #ifdef S_IFCHR
         case S_IFCHR:
             if (requireDebug)
                 printf("require: %s is a character device\n",
                     filename);
             return -1;
+        #endif
+        #ifdef S_IFIFO
         case S_IFIFO:
             if (requireDebug)
                 printf("require: %s is a FIFO/pipe\n",
                     filename);
             return -1;
+        #endif
+        #ifdef S_IFSOCK
         case S_IFSOCK:
             if (requireDebug)
                 printf("require: %s is a socket\n",
                     filename);
             return -1;
+        #endif
         default:
             if (requireDebug)
                 printf("require: %s is an unknown type of special file\n",
@@ -1069,11 +1105,19 @@ static int require_priv(const char* module, const char* version, const char* arg
     if (requireDebug)
         printf("require: module=\"%s\" version=\"%s\" args=\"%s\"\n", module, version, args);
 
-#define TRY_FILE(offs, args...) \
-    (snprintf(filename + offs, sizeof(filename) - offs, args) && fileExists(filename))
+#if defined __GNUC__ && __GNUC__ < 3
+    #define TRY_FILE(offs, args...) \
+        (snprintf(filename + offs, sizeof(filename) - offs, args) && fileExists(filename))
 
-#define TRY_NONEMPTY_FILE(offs, args...) \
-    (snprintf(filename + offs, sizeof(filename) - offs, args) && fileNotEmpty(filename))
+    #define TRY_NONEMPTY_FILE(offs, args...) \
+        (snprintf(filename + offs, sizeof(filename) - offs, args) && fileNotEmpty(filename))
+#else
+    #define TRY_FILE(offs, ...) \
+        (snprintf(filename + offs, sizeof(filename) - offs, __VA_ARGS__) && fileExists(filename))
+
+    #define TRY_NONEMPTY_FILE(offs, ...) \
+        (snprintf(filename + offs, sizeof(filename) - offs, __VA_ARGS__) && fileNotEmpty(filename))
+#endif
 
     driverpath = getenv("EPICS_DRIVER_PATH");
     if (!globalTemplates)
@@ -1136,8 +1180,8 @@ static int require_priv(const char* module, const char* version, const char* arg
             end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
             if (end && end[1] == OSI_PATH_SEPARATOR[0] && end[2] == OSI_PATH_SEPARATOR[0])   /* "http://..." and friends */
                 end = strchr(end+2, OSI_PATH_LIST_SEPARATOR[0]);
-            if (end) dirlen = end++ - dirname;
-            else dirlen = strlen(dirname);
+            if (end) dirlen = (int)(end++ - dirname);
+            else dirlen = (int)strlen(dirname);
             if (dirlen == 0) continue; /* ignore empty driverpath elements */
 
             if (requireDebug)
@@ -1345,7 +1389,7 @@ loadlib:
             if (asprintf (&symbolname, "_%sLibRelease", module) < 0)
                 return errno;
 
-            found = getAddress(libhandle, symbolname);
+            found = (const char*) getAddress(libhandle, symbolname);
             free(symbolname);
             printf("Loaded %s version %s\n", module, found);
 
