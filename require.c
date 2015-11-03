@@ -1327,14 +1327,14 @@ static int require_priv(const char* module, const char* version, const char* arg
         if (!found)
         {
             if (someArchFound)
-                fprintf(stderr, "Module%s%s%s not available for %s\n(but maybe for other EPICS versions or architectures)\n",
+                fprintf(stderr, "Module %s%s%s not available for %s\n(but maybe for other EPICS versions or architectures)\n",
                     module, version ? " version " : "", version ? version : "", targetArch);
             else
             if (someVersionFound)
-                fprintf(stderr, "Module%s%s%s not available (but other versions are available)\n",
+                fprintf(stderr, "Module %s%s%s not available (but other versions are available)\n",
                     module, version ? " version " : "", version ? version : "");
             else
-                fprintf(stderr, "Module%s%s%s not available\n",
+                fprintf(stderr, "Module %s%s%s not available\n",
                     module, version ? " version " : "", version ? version : "");
             return ifexists ? 0 : -1;
         }
