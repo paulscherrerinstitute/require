@@ -6,13 +6,14 @@ include $(TOP)/configure/CONFIG
 LOADABLE_LIBRARY = require
 LIB_SRCS += require_registerRecordDeviceDriver.cpp
 
-#require_DBD += base.dbd
-
 LIB_SRCS += require.c
+LIB_SRCS += runScript.c
 LIB_SRCS_vxWorks = asprintf.c strdup.c
 LIB_SRCS_WIN32 = asprintf.c
 
-require_DBD += require.dbd
+DBD = requireSup.dbd
+requireSup_DBD += require.dbd
+requireSup_DBD += runScript.dbd
 
 LIB_LIBS += $(EPICS_BASE_IOC_LIBS)
 

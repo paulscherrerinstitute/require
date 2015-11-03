@@ -4,6 +4,8 @@ BUILDCLASSES += Linux
 
 SOURCES += require.c
 DBDS    += require.dbd
+SOURCES += runScript.c
+DBDS    += runScript.dbd
 
 #HEADERS += require.h
 

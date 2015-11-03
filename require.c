@@ -16,10 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
 #include <errno.h>
 
-#include <macLib.h>
 #include <epicsVersion.h>
 
 #ifndef __GNUC__
@@ -44,7 +42,7 @@ extern volatile int interruptAccept;
 
 #include <iocsh.h>
 #include <dbAccess.h>
-epicsShareFunc int epicsShareAPI iocshCmd (const char *cmd);
+epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #include <epicsExit.h>
 #include <epicsStdio.h>
 #include <dbLoadTemplate.h>
@@ -105,9 +103,6 @@ int requireDebug=0;
         return buf;
     }
 
-    extern char** ppGlobalEnviron;
-    extern int execute();
-
 #elif defined(__unix)
 
     #ifndef OS_CLASS
@@ -140,7 +135,6 @@ int requireDebug=0;
         #endif
     #endif
 
-    #include <unistd.h>
     #include <dlfcn.h>
     #define HMODULE void *
 
@@ -155,7 +149,6 @@ int requireDebug=0;
         #define INFIX
         #define EXT ".so"
     #endif
-    extern char** environ;
 
 #elif defined (_WIN32)
 
@@ -355,8 +348,7 @@ static int runLoadScript(const char* script, const char* module, const char* ver
         printf("require: runLoadScript %s, loc=%s\n", script, mylocation);
     if (!mylocation) return 0;
     if (asprintf(&scriptpath, "%s/%s", mylocation, script) < 0) return -1;
-    if (asprintf(&subst, "MODULE=%s,VERSION=%s", module, version) < 0) return -1;
-    runScript(scriptpath, subst);
+    runScript(scriptpath,NULL);
     free(subst);
     free(scriptpath);
     return 0;
@@ -447,7 +439,8 @@ void registerModule(const char* module, const char* version, const char* locatio
     strcpy (m->content+lm+lv, location ? location : "");
     m->next = loadedModules;
     loadedModules = m;
-    if (version)  putenvprintf("%s_VERSION=%s", module, version);
+    putenvprintf("MODULE=%s", module);
+    putenvprintf("%s_VERSION=%s", module, version ? version : "");
     if (location) putenvprintf("%s_DIR=%s", module, location);
     
     /* only do registration register stuff at init */
@@ -961,123 +954,6 @@ static int handleDependencies(const char* module, char* depfilename)
     return 0;
 }
 
-int runScript(const char* filename, const char* args)
-{
-    MAC_HANDLE *mac = NULL;
-    FILE* file = NULL;
-    char* line_raw = NULL;
-    char* line_exp = NULL;
-    long line_raw_size = 256;
-    long line_exp_size = line_raw_size;
-    char** pairs;
-    int status = 0;
-    
-    if (interruptAccept)
-    {
-        fprintf(stderr, "Warning: Running script %s after iocInit may crash the ioc later.\n",
-            filename);
-    }
-
-    pairs = (char*[]){ "", "environ", NULL, NULL };
-
-    if ((file = fopen(filename, "r")) == NULL) { perror(filename); return errno; }
-    if (macCreateHandle(&mac, pairs) != 0) goto error;
-    macSuppressWarning(mac, 1);
-    #ifdef EPICS_3_13
-    /* Have no environment macro substitution, thus load envionment explicitly */
-    /* Actually environmant macro substitution was introduced in 3.14.3 */
-    for (pairs = environ; *pairs; pairs++)
-    {
-        char* var, *eq;
-        if (requireDebug)
-            printf("runScript: environ %s\n", *pairs);
-
-        /* take a copy to replace '=' with 0 */
-        if ((var = strdup(*pairs)) == NULL) goto error;
-        eq = strchr(var, '=');
-        if (eq)
-        {
-            *eq = 0;
-            macPutValue(mac, var, eq+1);
-        }
-        free(var);            
-    }
-    #endif
-
-    if (args)
-    {
-        if (requireDebug)
-                printf("runScript: macParseDefns \"%s\"\n", args);
-        macParseDefns(mac, (char*)args, &pairs);
-        macInstallMacros(mac, pairs);
-        free(pairs);
-    }
-
-    /* execute line by line after expanding macros with arguments or environment */
-    if ((line_raw = malloc(line_raw_size)) == NULL) goto error;
-    if ((line_exp = malloc(line_exp_size)) == NULL) goto error;
-    if (requireDebug)
-    {
-            printf("runScript: line_raw=%p\n", line_raw);
-            printf("runScript: line_exp=%p\n", line_exp);
-    }
-    
-    while (fgets(line_raw, line_raw_size, file))
-    {
-        const unsigned char* p;
-        long len;
-
-        /* check if we have a line longer than the buffer size */
-        while (line_raw[(len = (long)strlen(line_raw))-1] != '\n' && !feof(file))
-        {
-            if (requireDebug)
-                    printf("runScript partial line: \"%s\"\n", line_raw);
-            if ((line_raw = realloc(line_raw, line_raw_size *= 2)) == NULL) goto error;
-            if (fgets(line_raw + len, line_raw_size - len, file) == NULL) break;
-        }
-        line_raw[--len] = 0; /* get rid of '\n' */
-        if (requireDebug)
-                printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
-        /* expand and check the buffer size (different epics versions write different may number of bytes)*/
-        while ((len = labs(macExpandString(mac, line_raw, line_exp, 
-#ifdef EPICS_3_13
-        /* 3.13 version of macExpandString is broken and may write more than allowed */
-                line_exp_size/2))) >= line_exp_size/2)
-#else       
-                line_exp_size-1))) >= line_exp_size-2)
-#endif
-        {
-            if (requireDebug)
-                    printf("runScript: grow expand buffer: len=%ld size=%ld\n", len, line_exp_size);
-            free(line_exp);
-            if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
-        }
-        printf("%s\n", line_exp);
-        p=(unsigned char*)line_exp;
-        while (isspace(*p)) p++;
-        if (*p == 0 || *p == '#') continue;
-#ifdef vxWorks
-        status = execute(line_exp);
-#else
-        status = iocshCmd(line_exp);
-#endif
-        if (status != 0) break;
-    }
-    goto end;
-error:
-    if (errno)
-    {
-        status = errno;
-        perror("runScript");
-    }
-end:
-    free(line_raw);
-    free(line_exp);
-    if (mac) macDeleteHandle(mac);
-    if (file) fclose(file);
-    return status;
-}
-
 static int require_priv(const char* module, const char* version, const char* args,
     const char* versionstr  /* "-<version>" or "" (for old style only */ )
 {
@@ -1162,6 +1038,7 @@ static int require_priv(const char* module, const char* version, const char* arg
         if (requireDebug)
             printf("require: library found in %s\n", dirname);
         snprintf(filename, sizeof(filename), "%s%n", dirname, &releasediroffs);
+        putenvprintf("MODULE=%s", module);
     }
     else
     {
@@ -1449,10 +1326,6 @@ loadlib:
 
     status = 0;       
 
-    /* set up environment */
-
-    putenvprintf("MODULE=%s", module);
-
     if (requireDebug)
         printf("require: looking for template directory\n");
     /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]..." */
@@ -1525,15 +1398,6 @@ static void ldFunc (const iocshArgBuf *args)
     loadlib(args[0].sval);
 }
 
-static const iocshArg runScriptArg0 = { "filename", iocshArgString };
-static const iocshArg runScriptArg1 = { "substitutions", iocshArgString };
-static const iocshArg * const runScriptArgs[2] = { &runScriptArg0, &runScriptArg1 };
-static const iocshFuncDef runScriptDef = { "runScript", 2, runScriptArgs };
-static void runScriptFunc (const iocshArgBuf *args)
-{
-    runScript(args[0].sval, args[1].sval);
-}
-
 static void requireRegister(void)
 {
     static int firstTime = 1;
@@ -1542,7 +1406,6 @@ static void requireRegister(void)
         iocshRegister (&ldDef, ldFunc);
         iocshRegister (&libversionShowDef, libversionShowFunc);
         iocshRegister (&requireDef, requireFunc);
-        iocshRegister (&runScriptDef, runScriptFunc);
         registerExternalModules();
     }
 }

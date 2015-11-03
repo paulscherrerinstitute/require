@@ -1,0 +1,2 @@
+registrar(runScriptRegister)
+variable(runScriptDebug,int)
