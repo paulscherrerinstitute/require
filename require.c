@@ -20,10 +20,6 @@
 
 #include <epicsVersion.h>
 
-#ifndef __GNUC__
-#define __attribute__(arg)
-#endif
-
 #ifdef BASE_VERSION
 #define EPICS_3_13
 #define epicsGetStdout() stdout
@@ -309,14 +305,15 @@ typedef struct moduleitem
 
 moduleitem* loadedModules = NULL;
 
+#ifdef __GNUC__
 static int putenvprintf(const char* format, ...) __attribute__((format(printf,1,2)));
+#endif
 static int putenvprintf(const char* format, ...)
 {
     va_list ap;
     char *var;
-#ifndef vxWorks
     char *val;
-#endif
+    int status = 0;
 
     va_start(ap, format);
     if (vasprintf(&var, format, ap) < 0)
@@ -329,24 +326,31 @@ static int putenvprintf(const char* format, ...)
     if (requireDebug)
         printf("require: putenv(\"%s\")\n", var);
 
-#ifdef vxWorks
-    putenv(var); /* vxWorks putenv() makes a copy */
-#else
     val = strchr(var, '=');
     if (!val) 
     {
         fprintf(stderr, "putenvprintf: string contains no =: %s\n", var);
-        return -1;
+        status = -1;
     }
-    *val++ = 0;
-    if (setenv(var, val, 1) == -1)
+    else
     {
-        perror("require putenvprintf: setenv failed");
-        return errno;
-    }
+#ifdef vxWorks
+        if (putenv(var) != 0) /* vxWorks putenv() makes a copy */
+        {
+            perror("require putenvprintf: putenv failed");
+            status = errno;
+        }
+#else
+        *val++ = 0;
+        if (setenv(var, val, 1) != 0)
+        {
+            perror("require putenvprintf: setenv failed");
+            status = errno;
+        }
 #endif
+    }
     free(var);
-    return 0;
+    return status;
 }
 
 static int runLoadScript(const char* script, const char* module, const char* version)
