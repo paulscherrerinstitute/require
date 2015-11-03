@@ -159,6 +159,7 @@ int requireDebug=0;
     #include <windows.h>
     #include "asprintf.h"
     #define snprintf _snprintf
+    #define setenv(name,value,overwrite) _putenv_s(name,value)
     #define NAME_MAX MAX_PATH
 
     #define PREFIX
@@ -313,11 +314,14 @@ static int putenvprintf(const char* format, ...)
 {
     va_list ap;
     char *var;
+#ifndef vxWorks
+    char *val;
+#endif
 
     va_start(ap, format);
     if (vasprintf(&var, format, ap) < 0)
     {
-        perror("require putenv");
+        perror("require putenvprintf");
         return errno;
     }
     va_end(ap);
@@ -325,16 +329,23 @@ static int putenvprintf(const char* format, ...)
     if (requireDebug)
         printf("require: putenv(\"%s\")\n", var);
 
-    putenv(var);
-    /* Why putenv()?
-       vxWorks has no setenv()
-       Epics 3.13 has no epicsEnvSet()
-       Do not free the memory given to putenv (except for vxWorks)!
-    */
-
 #ifdef vxWorks
-    free(var);
+    putenv(var); /* vxWorks putenv() makes a copy */
+#else
+    val = strchr(var, '=');
+    if (!val) 
+    {
+        fprintf(stderr, "putenvprintf: string contains no =: %s\n", var);
+        return -1;
+    }
+    *val++ = 0;
+    if (setenv(var, val, 1) == -1)
+    {
+        perror("require putenvprintf: setenv failed");
+        return errno;
+    }
 #endif
+    free(var);
     return 0;
 }
 
