@@ -612,6 +612,13 @@ PRODUCT_OBJS = ${LIBOBJS}
 LOADABLE_LIBRARY=$(if ${LIBOBJS},${PRJ},)
 LIBRARY_OBJS = ${LIBOBJS}
 
+# Hack needed needed for 3.14.8 host arch when no Makefile exists (but only for example GNUmakefile)
+ifeq (${EPICSVERSION}-${T_A},3.14.8-${EPICS_HOST_ARCH})
+ifeq ($(wildcard ../Makefile),)
+LOADABLE_BUILD_LIBRARY = ${LOADABLE_LIBRARY}
+endif
+endif
+
 # Handle registry stuff automagically if we have a dbd file.
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
 LIBOBJS += $(if $(MODULEDBD),$(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
@@ -707,7 +714,7 @@ EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 $(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),\
     $(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
 
-# Do not tread %.dbd the same way because it creates a circular dependency
+# Do not treat %.dbd the same way because it creates a circular dependency
 # if a source dbd has the same name as the project dbd. Have to clear %.dbd.
 # But the %Record.h and menu%.h rules need to find their dbd files (example: asyn)
 vpath %.dbd
@@ -715,7 +722,7 @@ vpath %Record.dbd ${DBD_PATH}
 vpath menu%.dbd ${DBD_PATH}
 
 # find header files to install
-vpath %.h $(addprefix ../,$(sort $(dir ${HDRS} ${SRCS})))
+vpath %.h $(addprefix ../,$(sort $(dir $(filter-out /%,${HDRS}) ${SRCS}))) $(sort $(dir $(filter /%,${HDRS})))
 
 PRODUCTS = ${MODULELIB} ${MODULEDBD} ${DEPFILE}
 MODULEINFOS:
