@@ -190,6 +190,7 @@ int requireDebug=0;
 
 /* for readdir: Windows or Posix */
 #if defined(_WIN32)
+    #define ENABLE_N_IN_PRINTF _set_printf_count_output(1);
     #define DIR_HANDLE HANDLE
     #define DIR_ENTRY WIN32_FIND_DATA
     #define IF_OPEN_DIR(f) if(snprintf(f+modulediroffs, sizeof(f)-modulediroffs, "\\*.*"), (dir=FindFirstFile(filename, &direntry)) != INVALID_HANDLE_VALUE || (FindClose(dir), 0))
@@ -200,6 +201,7 @@ int requireDebug=0;
 
 #else
     #include <dirent.h>
+    #define ENABLE_N_IN_PRINTF 
     #define DIR_HANDLE DIR*
     #define DIR_ENTRY struct dirent*
     #define IF_OPEN_DIR(f) if ((dir = opendir(f)))
@@ -1418,7 +1420,8 @@ static void requireRegister(void)
     static int firstTime = 1;
     if (firstTime) {
         firstTime = 0;
-        iocshRegister (&ldDef, ldFunc);
+		ENABLE_N_IN_PRINTF;
+		iocshRegister (&ldDef, ldFunc);
         iocshRegister (&libversionShowDef, libversionShowFunc);
         iocshRegister (&requireDef, requireFunc);
         registerExternalModules();
