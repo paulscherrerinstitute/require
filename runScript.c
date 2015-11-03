@@ -36,6 +36,12 @@ int runScript(const char* filename, const char* args)
     char** pairs;
     int status = 0;
     
+    if (!filename)
+    {
+        fprintf(stderr, "Usage: runScript filename [macro=value,...]\n");
+        return -1;
+    }
+    
     if (interruptAccept)
     {
         fprintf(stderr, "Warning: Running script %s after iocInit may crash the ioc later.\n",
