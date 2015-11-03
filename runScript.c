@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
-#include <dbAccess.h>
 #include <macLib.h>
 #include <epicsVersion.h>
 
@@ -14,7 +13,6 @@ extern int execute(const char*);
 #ifdef BASE_VERSION
 #define EPICS_3_13
 #include <strdup.h>
-extern volatile int interruptAccept;
 extern char** environ;
 #else
 #include <iocsh.h>
@@ -42,12 +40,6 @@ int runScript(const char* filename, const char* args)
         return -1;
     }
     
-    if (interruptAccept)
-    {
-        fprintf(stderr, "Warning: Running script %s after iocInit may crash the ioc later.\n",
-            filename);
-    }
-
     pairs = (char*[]){ "", "environ", NULL, NULL };
 
     if ((file = fopen(filename, "r")) == NULL) { perror(filename); return errno; }
