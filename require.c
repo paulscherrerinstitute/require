@@ -305,10 +305,7 @@ typedef struct moduleitem
 
 moduleitem* loadedModules = NULL;
 
-#ifdef __GNUC__
-static int putenvprintf(const char* format, ...) __attribute__((format(printf,1,2)));
-#endif
-static int putenvprintf(const char* format, ...)
+int putenvprintf(const char* format, ...)
 {
     va_list ap;
     char *var;
