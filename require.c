@@ -1359,6 +1359,7 @@ loadlib:
                 TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr) ||
                 TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "dbd" OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
                 TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr))
+				TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "dbd" OSI_PATH_SEPARATOR "%s.dbd", module)) //org EPICSbase
             {
                 printf("Loading dbd file %s\n", filename);
                 if (dbLoadDatabase(filename, NULL, NULL) != 0)
