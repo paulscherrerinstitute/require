@@ -485,7 +485,7 @@ $(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call 
 
 # manually required modules
 define ADD_MANUAL_DEPENDENCIES
-$(eval $(notdir $(1))_VERSION := $(or $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null))),$(error Manually required module $(notdir $(1)) not found)))
+$(eval $(notdir $(1))_VERSION := $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null))))
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,${EPICS_MODULES}/$m)))
 
