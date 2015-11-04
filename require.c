@@ -153,6 +153,9 @@ int requireDebug=0;
     #endif
 
     #include <windows.h>
+    #include <Psapi.h>
+    #pragma comment(lib, "kernel32.lib")
+    #pragma comment(lib, "psapi.lib")
     #include "asprintf.h"
     #define snprintf _snprintf
     #define setenv(name,value,overwrite) _putenv_s(name,value)
@@ -561,7 +564,61 @@ static void registerExternalModules()
 
 static void registerExternalModules()
 {
-    fprintf (stderr, "How to find symbols on Windows?\n");
+    HMODULE hMods[1024];
+	HANDLE hProcess = GetCurrentProcess();
+	DWORD cbNeeded;
+	char* p;
+	char* version;
+	char* symname;
+	char* name;
+	char location[MAX_PATH];
+	unsigned int i;
+	
+	if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded))
+	{
+		
+		for (i = 0; i < (cbNeeded / sizeof(HMODULE)); i++)
+		{
+			TCHAR szModName[MAX_PATH];
+		
+			// Get the full path to the module's file.
+
+			if (GetModuleFileNameEx(hProcess, hMods[i], szModName,
+				sizeof(szModName) / sizeof(TCHAR)))
+			{
+				// Print the module name and handle value.
+				name = malloc(strlen(szModName) + strlen("LibRelease"));
+				strcpy(name, szModName);
+
+				p = strrchr(name, 92);                        /* find file name part in "<location>/lib<module>.so" */
+				if (p) { *p = 0; strcpy(location, name); }               /* terminate "<location>/" */
+				else p = szModName;
+				symname = p;
+				symname[0] = '_';
+				p = strchr(symname, '.');                               /* replace ".so" with "LibRelease" */
+				if (p == NULL) p = symname + strlen(symname);
+				strcpy(p, "LibRelease");
+
+				version = (char*)GetProcAddress(hMods[i],symname);
+				if (version){
+					registerModule(symname, version, location);
+				}
+
+				free(name);
+
+			}
+		}
+		
+	}
+
+	// Release the handle to the process.
+
+	CloseHandle(hProcess);
+
+
+
+
+
 }
 
 
