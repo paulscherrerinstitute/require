@@ -12,8 +12,8 @@ extern int execute(const char*);
 
 #ifdef BASE_VERSION
 #define EPICS_3_13
+extern char** ppGlobalEnviron;
 #include <strdup.h>
-extern char** environ;
 #else
 #include <iocsh.h>
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
@@ -48,7 +48,7 @@ int runScript(const char* filename, const char* args)
     #ifdef EPICS_3_13
     /* Have no environment macro substitution, thus load envionment explicitly */
     /* Actually, environmant macro substitution was introduced in 3.14.3 */
-    for (pairs = environ; *pairs; pairs++)
+    for (pairs = ppGlobalEnviron; *pairs; pairs++)
     {
         char* var, *eq;
         if (runScriptDebug)
