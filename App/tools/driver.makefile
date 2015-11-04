@@ -327,7 +327,7 @@ TEMPLS += ${TEMPLATES_${EPICS_BASETYPE}}
 TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
 
-SCR = $(or ${SCRIPTS},$(wildcard *.cmd))
+SCR = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd))
 SCR += ${SCRIPTS_${EPICS_BASETYPE}}
 SCR += ${SCRIPTS_${EPICSVERSION}}
 export SCR
