@@ -486,12 +486,15 @@ $(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call 
 
 # manually required modules
 define ADD_MANUAL_DEPENDENCIES
-$(eval $(notdir $(1))_VERSION := $(basename $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null)))))
+$(eval $(notdir $(1))_VERSION := $(or $(basename $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null)))),$(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(notdir $(basename $(1))).dep))))))
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,${EPICS_MODULES}/$m)))
 
+ifneq ($(wildcard ${MAKEHOME}/getPrerequisites.tcl),)
 # old style modules
-INSTALL_INCLUDES += -I$(INSTBASE)/iocBoot/R${EPICSVERSION}/include
+OLD_INCLUDE = $(wildcard ${INSTBASE}/iocBoot/R${EPICSVERSION}/include)
+INSTALL_INCLUDES += $(addprefix -I,${OLD_INCLUDE})
+endif
 
 debug::
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
@@ -911,8 +914,14 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
+	# dependencies on other module headers
 	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/\([0-9]*\.[0-9]*\)\.[0-9]*/.*%\1 \2%p;s%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2%p'| sort -u >> $@
-	$(foreach m,${REQ},echo "$m ${$m_VERSION}" >> $@;)
+	# manully added dependencies: ${REQ}
+	$(foreach m,${REQ},echo "$m $(or ${$m_VERSION},$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numbered version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
+ifdef OLD_INCLUDE
+	# dependencies on old style driver headers
+	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw ${PRJ} >> $@; true
+endif
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
