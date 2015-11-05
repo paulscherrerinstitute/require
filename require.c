@@ -817,6 +817,8 @@ int require(const char* module, const char* version, const char* args)
         printf("If available, runs startup script snippet or loads substitution file or templates with args\n");
         return -1;
     }
+    
+    if (version && version[0] == 0) version = NULL;
 
     /* either order for version and args, either may be empty or NULL */
     if (version && strchr(version, '='))
@@ -956,15 +958,19 @@ static int handleDependencies(const char* module, char* depfilename)
         /* ignore spaces */
         while (isspace((unsigned char)*rversion)) rversion++;
         /* rversion at start of version */
-        end = rversion;
-        /* find end of version */
-        while (*end && !isspace((unsigned char)*end)) end++;
+        
+        if (*rversion)
+        {
+            end = rversion;
+            /* find end of version */
+            while (*end && !isspace((unsigned char)*end)) end++;
 
-        /* add + to numerial versions if not yet there */
-        if (*(end-1) != '+' && strspn(rversion, "0123456789.") == end-rversion) *end++ = '+';
+            /* add + to numerial versions if not yet there */
+            if (*(end-1) != '+' && strspn(rversion, "0123456789.") == end-rversion) *end++ = '+';
 
-        /* terminate version */
-        *end = 0;
+            /* terminate version */
+            *end = 0;
+        }
         printf("Module %s depends on %s %s\n", module, rmodule, rversion);
         if (require(rmodule, rversion, NULL) != 0)
         {
