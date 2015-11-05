@@ -485,7 +485,7 @@ $(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call 
 
 # manually required modules
 define ADD_MANUAL_DEPENDENCIES
-$(eval $(notdir $(1))_VERSION := $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null))))
+$(eval $(notdir $(1))_VERSION := $(basename $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null)))))
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,${EPICS_MODULES}/$m)))
 
@@ -910,8 +910,8 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/\([0-9.]*\)/.*%\1 \2+%p;s%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2%p'| sort -u >> $@
-	$(foreach m,${REQ},echo "$m ${$m_VERSION}$(if $(filter-out $(basename ${$m_VERSION}),${$m_VERSION}),+)" >> $@;)
+	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/\([0-9]*\.[0-9]*\)\.[0-9]*/.*%\1 \2%p;s%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2%p'| sort -u >> $@
+	$(foreach m,${REQ},echo "$m ${$m_VERSION}" >> $@;)
 
 $(BUILDRULE)
 	$(RM) MakefileInclude
