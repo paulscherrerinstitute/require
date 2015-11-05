@@ -447,6 +447,7 @@ install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
 endif
 
 REQ = ${REQUIRED} ${REQUIRED_${OS_CLASS}} ${REQUIRED_${T_A}} ${REQUIRED_${EPICS_BASETYPE}} ${REQUIRED_${EPICSVERSION}}
+REQ += $(if $(filter %.st %.stt,${SRCS}),seq)
 export REQ
 
 else # in O.*
