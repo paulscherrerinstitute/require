@@ -478,23 +478,23 @@ EPICS_INCLUDES =
 # The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!)
 # Only really existing directories are added to the search path
 define ADD_FOREIGN_INCLUDES
-$(eval $(notdir $(1))_VERSION := $(patsubst $(1)/%/R${EPICSVERSION}/include,%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION}/include 2>/dev/null))))
-INSTALL_INCLUDES += $$(patsubst %,-I$(1)/%/R${EPICSVERSION}/include,$$($(notdir $(1))_VERSION))
+$(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,%,$(lastword $(shell ls -dv ${EPICS_MODULES}/$(1)/*.*.*/R${EPICSVERSION}/include 2>/dev/null))))
+INSTALL_INCLUDES += $$(patsubst %,-I${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,$$($(1)_VERSION))
 endef
 # The tricky part is to sort versions numerically. Make can't but ls -v can. Only accept numerical versions.
-$(eval $(foreach m,$(filter-out %/$(PRJ),$(wildcard ${EPICS_MODULES}/*)),$(call ADD_FOREIGN_INCLUDES,$m)))
-
-# manually required modules
-define ADD_MANUAL_DEPENDENCIES
-$(eval $(notdir $(1))_VERSION := $(or $(basename $(patsubst $(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv $(1)/*.*.*/R${EPICSVERSION} 2>/dev/null)))),$(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(notdir $(basename $(1))).dep))))))
-endef
-$(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,${EPICS_MODULES}/$m)))
+$(eval $(foreach m,$(filter-out $(PRJ),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_FOREIGN_INCLUDES,$m)))
 
 ifneq ($(wildcard ${MAKEHOME}/getPrerequisites.tcl),)
-# old style modules
+# Include path for old style modules
 OLD_INCLUDE = $(wildcard ${INSTBASE}/iocBoot/R${EPICSVERSION}/include)
 INSTALL_INCLUDES += $(addprefix -I,${OLD_INCLUDE})
 endif
+
+# manually required modules
+define ADD_MANUAL_DEPENDENCIES
+$(eval $(1)_VERSION := $(or $(basename $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv ${EPICS_MODULES}/$(1)/*.*.*/R${EPICSVERSION} 2>/dev/null)))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
+endef
+$(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,$m)))
 
 debug::
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
