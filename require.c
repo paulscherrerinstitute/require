@@ -312,6 +312,7 @@ int putenvprintf(const char* format, ...)
     char *val;
     int status = 0;
 
+    if (!format) return -1;
     va_start(ap, format);
     if (vasprintf(&var, format, ap) < 0)
     {
@@ -436,10 +437,18 @@ void registerModule(const char* module, const char* version, const char* locatio
     moduleitem* m;
     size_t lm = strlen(module) + 1;
     size_t lv = (version ? strlen(version) : 0) + 1;
-    size_t ll = (location ? strlen(location) : 0) + 1;
-
+    size_t ll = 1;
+    char* abslocation;
+    
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
+        
+    if (location)
+    {
+        abslocation = realpath(location, NULL);
+        if (!abslocation) abslocation = (char*)location;
+        ll +=  strlen(abslocation);
+    }
     m = (moduleitem*) malloc(sizeof(moduleitem) + lm + lv + ll);
     if (m == NULL)
     {
@@ -448,12 +457,13 @@ void registerModule(const char* module, const char* version, const char* locatio
     }
     strcpy (m->content, module);
     strcpy (m->content+lm, version ? version : "");
-    strcpy (m->content+lm+lv, location ? location : "");
+    strcpy (m->content+lm+lv, abslocation ? abslocation : "");
     m->next = loadedModules;
     loadedModules = m;
     putenvprintf("MODULE=%s", module);
     putenvprintf("%s_VERSION=%s", module, version ? version : "");
-    if (location) putenvprintf("%s_DIR=%s", module, location);
+    if (abslocation) putenvprintf("%s_DIR=%s", module, abslocation);
+    if (abslocation != location) free(abslocation);
     
     /* only do registration register stuff at init */
     if (interruptAccept) return;
