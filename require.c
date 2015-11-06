@@ -153,6 +153,9 @@ int requireDebug=0;
     #endif
 
     #include <windows.h>
+    #include <Psapi.h>
+    #pragma comment(lib, "kernel32.lib")
+    #pragma comment(lib, "psapi.lib")
     #include "asprintf.h"
     #define snprintf _snprintf
     #define setenv(name,value,overwrite) _putenv_s(name,value)
@@ -438,7 +441,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     size_t lm = strlen(module) + 1;
     size_t lv = (version ? strlen(version) : 0) + 1;
     size_t ll = 1;
-    char* abslocation;
+    char* abslocation = NULL;
     
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
@@ -492,12 +495,10 @@ static BOOL findLibRelease (
     if (lm <= 10) /* strlen("LibRelease") */ return TRUE;
     lm -= 10;
     if (strcmp(name+lm, "LibRelease") != 0) return TRUE;
-    module = strdup(name+1);
-    module[lm-1]=0;
+    module = strdup(name+1);                  /* remove '_' */
+    module[lm-1]=0;                           /* remove "libRelase" */
     if (getLibVersion(module) == NULL)
-    {
         registerModule(module, (char*)val, NULL);
-    }
     free(module);
     return TRUE;
 }
@@ -518,41 +519,32 @@ static int findLibRelease (
     void *data                 /* user-supplied arg */
 ) {
     void *handle;
-    char* name;
     char* location = NULL;
     char* p;
     char* version;
     char* symname;
+    char name[NAME_MAX + 11];                               /* get space for library path + "LibRelease" */
 
     /* find a symbol with a name like "_<module>LibRelease"
        where <module> is from the library name "<location>/lib<module>.so" */
     if (info->dlpi_name == NULL || info->dlpi_name[0] == 0) return 0;  /* no library name */
-    name = malloc(strlen(info->dlpi_name)+11);              /* get a modifiable copy + space for "LibRelease" */
-    if (name == NULL)
-    {
-        perror("require");
-        return 0;
-    }
-    strcpy(name, info->dlpi_name);
+    strcpy(name, info->dlpi_name);                          /* get a modifiable copy of the library name */
     handle = dlopen(info->dlpi_name, RTLD_LAZY);            /* re-open already loaded library */
     p = strrchr(name, '/');                                 /* find file name part in "<location>/lib<module>.so" */
-    if (p) {location = name; *++p=0;}                       /* terminate "<location>/" */
-    else p=name;
-    symname = p+2;                                          /* replace "lib" with "_" */
-    symname[0] = '_';
-    p = strchr(symname, '.');                               /* replace ".so" with "LibRelease" */
-    if (p == NULL) p = symname + strlen(symname);
-    strcpy(p, "LibRelease");
+    if (p) {location = name; *++p=0;} else p=name;          /* terminate "<location>/" (if exists) */
+    *(symname = p+2) = '_';                                 /* replace "lib" with "_" */
+    p = strchr(symname, '.');                               /* find ".so" extension */
+    if (p == NULL) p = symname + strlen(symname);           /* no file extension ? */
+    strcpy(p, "LibRelease");                                /* append "LibRelease" to module name */
     version = dlsym(handle, symname);                       /* find symbol "_<module>LibRelease" */
     if (version)
     {
-        *p=0; symname++;                                    /* build module name "<module>" */
-        if ((p = strstr(name, OSI_PATH_SEPARATOR LIBDIR)) != NULL)
-            p[1]=0;                                         /* cut "<location>" before libdir */
-        registerModule(symname, version, location);
+        *p=0; symname++;                                    /* get "<module>" from "_<module>LibRelease" */
+        if ((p = strstr(name, "/" LIBDIR)) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
+        if (getLibVersion(symname) == NULL)
+            registerModule(symname, version, location);
     }
     dlclose(handle);
-    free(name);
     return 0;
 }
 
@@ -566,7 +558,42 @@ static void registerExternalModules()
 
 static void registerExternalModules()
 {
-    fprintf (stderr, "How to find symbols on Windows?\n");
+    HMODULE hMods[100];
+    HANDLE hProcess = GetCurrentProcess();
+    DWORD cbNeeded;
+    char* location = NULL;
+    char* p;
+    char* version;
+    char* symname;
+    unsigned int i;
+    char name [MAX_PATH+11];                                     /* get space for library path + "LibRelease" */
+    
+    /* iterate over all loaded libraries */
+    if (!EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) return;
+    for (i = 0; i < (cbNeeded / sizeof(HMODULE)); i++)
+    {
+        /* Get the full path to the module's file. */
+        if (!GetModuleFileName(hMods[i], name, MAX_PATH)) continue;  /* no library name */
+        name[sizeof(name)-1] = 0;                                /* WinXP may not terminate the string */
+        p = strrchr(name, '\\');                                 /* find file name part in "<location>/<module>.dll" */
+        if (p) { location = name; } else p=name;                 /* find end of "<location>\\" (if exists) */
+        symname = p;
+        p = strchr(symname, '.');                                /* find ".dll" */
+        if (p == NULL) p = symname + strlen(symname);            /* no file extension ? */
+        memmove(symname+2, symname, p - symname);                /* make room for 0 and '_' */
+        *symname++ = 0;                                          /* terminate "<location>/" */
+        *symname = '_';                                          /* prefix module name with '_' */
+        strcpy((p+=2), "LibRelease");                            /* append "LibRelease" to module name */
+
+        version = (char*)GetProcAddress(hMods[i], symname);      /* find symbol "_<module>LibRelease" */
+        if (version)
+        {
+            *p=0; symname++;                                     /* get "<module>" from "_<module>LibRelease" */
+            if ((p = strstr(name, "\\" LIBDIR)) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
+            if (getLibVersion(symname) == NULL)
+                registerModule(symname, version, location);
+        }
+    }
 }
 
 
@@ -814,12 +841,10 @@ int require(const char* module, const char* version, const char* args)
 #ifndef EPICS_3_13
         printf("And calls <module>_registerRecordDeviceDriver\n");
 #endif
-        printf("If available, runs startup script snippet or loads substitution file or templates with args\n");
+        printf("If available, runs startup script snippet (only before iocInit)\n");
         return -1;
     }
     
-    if (version && version[0] == 0) version = NULL;
-
     /* either order for version and args, either may be empty or NULL */
     if (version && strchr(version, '='))
     {
@@ -828,6 +853,15 @@ int require(const char* module, const char* version, const char* args)
         args = v;
         if (requireDebug)
             printf("require: swap version and args\n");
+    }
+
+    if (version && version[0] == 0) version = NULL;
+
+    if (version && strcmp(version, "none") == 0)
+    {
+        if (requireDebug)
+            printf("require: skip version=none\n");
+        return 0;
     }
 
     if (version)
@@ -1021,6 +1055,11 @@ static int require_priv(const char* module, const char* version, const char* arg
 
     #define TRY_NONEMPTY_FILE(offs, ...) \
         (snprintf(filename + offs, sizeof(filename) - offs, __VA_ARGS__) && fileNotEmpty(filename))
+#endif
+
+#if defined (_WIN32)
+    /* enable %n in printf */
+    _set_printf_count_output(1);
 #endif
 
     driverpath = getenv("EPICS_DRIVER_PATH");
@@ -1312,7 +1351,8 @@ loadlib:
             if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
                 TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr) ||
                 TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "dbd" OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr))
+                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
+                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "dbd" OSI_PATH_SEPARATOR "%s.dbd", module)) /* org EPICSbase */
             {
                 printf("Loading dbd file %s\n", filename);
                 if (dbLoadDatabase(filename, NULL, NULL) != 0)
