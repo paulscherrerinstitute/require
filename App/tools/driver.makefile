@@ -634,6 +634,30 @@ ifneq ($(MODULELIB),)
 LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
 endif # MODULELIB
 
+# for backward compatibility
+ifdef LIBVERSION
+ifneq (${LIBVERSION},test)
+# Provide a global symbol for every version with the same
+# major and equal or smaller minor version number.
+# Other code using this will look for one of those symbols.
+# Add an undefined symbol for the version of every used driver.
+# This is done with the #define in the used headers (see below).
+MAJOR_MINOR_PATCH=$(subst ., ,${LIBVERSION})
+MAJOR=$(word 1,${MAJOR_MINOR_PATCH})
+MINOR=$(word 2,${MAJOR_MINOR_PATCH})
+PATCH=$(word 3,${MAJOR_MINOR_PATCH})
+ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
+PREREQUISITES = $(shell ${MAKEHOME}/getPrerequisites.tcl ${INSTALL_INCLUDE} | grep -vw ${PRJ})
+ifeq (${OS_CLASS}, vxWorks)
+PROVIDES = ${ALLMINORS:%=--defsym __${PRJ}Lib_${MAJOR}.%=0}
+endif # vxWorks
+ifeq (${OS_CLASS}, Linux)
+PROVIDES = ${ALLMINORS:%=-Wl,--defsym,${PRJ}Lib_${MAJOR}.%=0}
+endif # Linux
+endif # !test
+endif # LIBVERSION defined
+LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
+
 # Create and include dependency files
 CPPFLAGS += -MD
 # 3.14.12 already defines -MDD here (what we don't want):
