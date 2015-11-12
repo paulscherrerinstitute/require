@@ -354,22 +354,6 @@ int putenvprintf(const char* format, ...)
     return status;
 }
 
-static int runLoadScript(const char* script, const char* module, const char* version)
-{
-    char *scriptpath = NULL;
-    char *subst = NULL;
-    const char *mylocation = getenv("require_DIR");
-    
-    if (requireDebug)
-        printf("require: runLoadScript %s, loc=%s\n", script, mylocation);
-    if (!mylocation) return 0;
-    if (asprintf(&scriptpath, "%s/%s", mylocation, script) < 0) return -1;
-    runScript(scriptpath,NULL);
-    free(subst);
-    free(scriptpath);
-    return 0;
-}
-
 static int setupDbPath(const char* module, const char* dbdir)
 {
     char* old_path;           
@@ -442,6 +426,8 @@ void registerModule(const char* module, const char* version, const char* locatio
     size_t lv = (version ? strlen(version) : 0) + 1;
     size_t ll = 1;
     char* abslocation = NULL;
+    int addSlash=0;
+    const char *mylocation;
     
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
@@ -450,9 +436,14 @@ void registerModule(const char* module, const char* version, const char* locatio
     {
         abslocation = realpath(location, NULL);
         if (!abslocation) abslocation = (char*)location;
-        ll +=  strlen(abslocation);
+        ll = strlen(abslocation) + 1;
+        /* linux realpath removes trailing slash */
+        if (abslocation[ll-1-strlen(OSI_PATH_SEPARATOR)] != OSI_PATH_SEPARATOR[0])
+        {
+            addSlash = strlen(OSI_PATH_SEPARATOR);
+        }
     }
-    m = (moduleitem*) malloc(sizeof(moduleitem) + lm + lv + ll);
+    m = (moduleitem*) malloc(sizeof(moduleitem) + lm + lv + ll + addSlash);
     if (m == NULL)
     {
         fprintf(stderr, "require: out of memory\n");
@@ -461,21 +452,24 @@ void registerModule(const char* module, const char* version, const char* locatio
     strcpy (m->content, module);
     strcpy (m->content+lm, version ? version : "");
     strcpy (m->content+lm+lv, abslocation ? abslocation : "");
+    if (addSlash) strcpy (m->content+lm+lv+ll-1, OSI_PATH_SEPARATOR);
     m->next = loadedModules;
     loadedModules = m;
+    if (abslocation != location) free(abslocation);
+
     putenvprintf("MODULE=%s", module);
     putenvprintf("%s_VERSION=%s", module, version ? version : "");
-    if (abslocation) putenvprintf("%s_DIR=%s", module, abslocation);
-    if (abslocation != location) free(abslocation);
+    if (location) putenvprintf("%s_DIR=%s", m->content+lm+lv);
     
     /* only do registration register stuff at init */
     if (interruptAccept) return;
     
-    if (runLoadScript("postModuleLoad.cmd", module, version) < 0)
-    {
-        fprintf(stderr, "require: out of memory\n");
-        return;
-    }
+    /* create a record with the version string */
+    mylocation = getenv("require_DIR");
+    if (mylocation == NULL) return;
+    if (asprintf(&abslocation, "%s/postModuleLoad.cmd", mylocation) < 0) return;
+    runScript(abslocation,NULL);
+    free(abslocation);
 }
 
 #if defined (vxWorks)
