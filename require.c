@@ -17,7 +17,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
-
+#include <recSup.h>
+#include <initHooks.h>
+#include <dbAccess.h>
 #include <epicsVersion.h>
 
 #ifdef BASE_VERSION
@@ -306,7 +308,10 @@ typedef struct moduleitem
     char content[0];
 } moduleitem;
 
-moduleitem* loadedModules = NULL;
+static moduleitem* loadedModules = NULL;
+static unsigned long moduleCount = 0;
+static unsigned long moduleListBufferSize = 1;
+static unsigned long maxModuleNameLength = 0;
 
 int putenvprintf(const char* format, ...)
 {
@@ -419,15 +424,81 @@ static int setupDbPath(const char* module, const char* dbdir)
     return 0;
 }
 
+static int getRecordHandle(const char* namepart, short type, long minsize, DBADDR* paddr)
+{
+    char recordname[PVNAME_STRINGSZ];
+
+    sprintf(recordname, "%.*s%s", (int)(PVNAME_STRINGSZ-strlen(namepart)-1), getenv("IOC"), namepart);
+    if (dbNameToAddr(recordname, paddr) != 0)
+    {
+        fprintf(stderr, "require: record %s not found\n",
+            recordname);
+        return -1;
+    }
+    if (paddr->field_type != type)
+    {
+        fprintf(stderr, "require: record %s has wrong type\n",
+            recordname);
+        return -1;
+    }
+    if (paddr->no_elements < minsize)
+    {
+        fprintf(stderr, "require: record %s has not enough elements: %lu instead of %lu\n",
+            recordname, paddr->no_elements, minsize);
+        return -1;
+    }
+    if (paddr->pfield == NULL)
+    {
+        fprintf(stderr, "require: record %s has not yet allocated memory\n",
+            recordname);
+        return -1;
+    }
+    return 0;
+}
+
+static void fillModuleListRecord(initHookState state)
+{
+    if (state == initHookAfterFinishDevSup) /* MODULES record exists and has allocated memory */
+    {
+        DBADDR modules, versions, modver;
+        int have_modules, have_versions, have_modver;
+        moduleitem *m;
+        int i = 0;
+        long c = 0;
+
+        have_modules  = (getRecordHandle(":MODULES",  DBF_STRING, moduleCount, &modules) == 0);
+        have_versions = (getRecordHandle(":VERSIONS", DBF_STRING, moduleCount, &versions) == 0);
+        
+        moduleListBufferSize += moduleCount * maxModuleNameLength;
+        have_modver   = (getRecordHandle(":MOD_VER",  DBF_CHAR, moduleListBufferSize, &modver) == 0);
+
+        for (m = loadedModules, i = 0; m; m=m->next, i++)
+        {
+            size_t lm = strlen(m->content)+1;
+            if (have_modules) sprintf((char*)(modules.pfield) + i * MAX_STRING_SIZE,
+                "%.*s", MAX_STRING_SIZE-1, m->content);
+            if (have_versions) sprintf((char*)(versions.pfield) + i * MAX_STRING_SIZE,
+                "%.*s", MAX_STRING_SIZE-1, m->content+lm);
+            if (have_modver) c += sprintf((char*)(modver.pfield) + c,
+                "%-*s%s\n", (int)maxModuleNameLength, m->content, m->content+lm);
+        }
+        if (have_modules) dbGetRset(&modules)->put_array_info(&modules, i);
+        if (have_versions) dbGetRset(&versions)->put_array_info(&versions, i);
+        if (have_modver) dbGetRset(&modver)->put_array_info(&modver, c+1);
+    }
+}
+
 void registerModule(const char* module, const char* version, const char* location)
 {
-    moduleitem* m;
+    moduleitem *m, **pm;
     size_t lm = strlen(module) + 1;
     size_t lv = (version ? strlen(version) : 0) + 1;
     size_t ll = 1;
     char* abslocation = NULL;
+    char* argstring = NULL;
     int addSlash=0;
     const char *mylocation;
+    static int initHookRegistered = 0;
     
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
@@ -449,17 +520,21 @@ void registerModule(const char* module, const char* version, const char* locatio
         fprintf(stderr, "require: out of memory\n");
         return;
     }
+    m->next = NULL;
     strcpy (m->content, module);
     strcpy (m->content+lm, version ? version : "");
     strcpy (m->content+lm+lv, abslocation ? abslocation : "");
     if (addSlash) strcpy (m->content+lm+lv+ll-1, OSI_PATH_SEPARATOR);
-    m->next = loadedModules;
-    loadedModules = m;
     if (abslocation != location) free(abslocation);
+    for (pm = &loadedModules; *pm != NULL; pm = &(*pm)->next);
+    *pm = m;
+    if (lm > maxModuleNameLength) maxModuleNameLength = lm;
+    moduleListBufferSize += lv;
+    moduleCount++;
 
     putenvprintf("MODULE=%s", module);
     putenvprintf("%s_VERSION=%s", module, version ? version : "");
-    if (location) putenvprintf("%s_DIR=%s", m->content+lm+lv);
+    if (location) putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
     
     /* only do registration register stuff at init */
     if (interruptAccept) return;
@@ -468,8 +543,17 @@ void registerModule(const char* module, const char* version, const char* locatio
     mylocation = getenv("require_DIR");
     if (mylocation == NULL) return;
     if (asprintf(&abslocation, "%s/postModuleLoad.cmd", mylocation) < 0) return;
-    runScript(abslocation,NULL);
+    if (asprintf(&argstring, "MODULE_COUNT=%lu, BUFFER_SIZE=%lu", moduleCount,
+        moduleListBufferSize+maxModuleNameLength*moduleCount) < 0) return;
+    runScript(abslocation, argstring);
+    free(argstring);
     free(abslocation);
+    
+    if (!initHookRegistered)
+    {
+        initHookRegistered = 1;
+        initHookRegister(fillModuleListRecord);
+    }
 }
 
 #if defined (vxWorks)
@@ -650,8 +734,8 @@ int libversionShow(int showLocation, const char* outfile)
     {
         lm = strlen(m->content)+1;
         lv = strlen(m->content+lm)+1;
-        fprintf(out, "%20s %-20s %s\n",
-            m->content,
+        fprintf(out, "%-*s%-20s %s\n",
+            (int)maxModuleNameLength, m->content,
             m->content+lm,
             showLocation ? m->content+lm+lv : "");
     }
