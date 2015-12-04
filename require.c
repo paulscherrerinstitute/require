@@ -51,7 +51,7 @@ epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 
 #include "require.h"
 
-int requireDebug=0;
+int requireDebug;
 
 #if defined(vxWorks)
     #ifndef OS_CLASS
