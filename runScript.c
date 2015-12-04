@@ -113,6 +113,11 @@ int runScript(const char* filename, const char* args)
         while (isspace(*p)) p++;
         if (*p == 0 || *p == '#') continue;
 #ifdef vxWorks
+        if (strlen(line_exp) >= 120)
+        {
+            sprintf("runScript: Line too long (>=120):\n%s\n", line_exp);
+            return -1;
+        }
         status = execute(line_exp);
 #else
         status = iocshCmd(line_exp);
