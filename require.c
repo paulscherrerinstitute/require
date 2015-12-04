@@ -475,12 +475,33 @@ static void fillModuleListRecord(initHookState state)
         for (m = loadedModules, i = 0; m; m=m->next, i++)
         {
             size_t lm = strlen(m->content)+1;
-            if (have_modules) sprintf((char*)(modules.pfield) + i * MAX_STRING_SIZE,
-                "%.*s", MAX_STRING_SIZE-1, m->content);
-            if (have_versions) sprintf((char*)(versions.pfield) + i * MAX_STRING_SIZE,
-                "%.*s", MAX_STRING_SIZE-1, m->content+lm);
-            if (have_modver) c += sprintf((char*)(modver.pfield) + c,
-                "%-*s%s\n", (int)maxModuleNameLength, m->content, m->content+lm);
+            if (have_modules)
+            {
+                if (requireDebug)
+                    printf("require: %s[%d] = \"%.*s\"\n",
+                    modules.precord->name, i, 
+                    MAX_STRING_SIZE-1, m->content);
+                sprintf((char*)(modules.pfield) + i * MAX_STRING_SIZE, "%.*s",
+                    MAX_STRING_SIZE-1, m->content);
+            }
+            if (have_versions)
+            {
+                if (requireDebug)
+                    printf("require: %s[%d] = \"%.*s\"\n",
+                    versions.precord->name, i, 
+                    MAX_STRING_SIZE-1, m->content+lm);
+                sprintf((char*)(versions.pfield) + i * MAX_STRING_SIZE, "%.*s",
+                    MAX_STRING_SIZE-1, m->content+lm);
+            }
+            if (have_modver)
+            {
+                if (requireDebug)
+                    printf("require: %s+=\"%-*s%s\"\n",
+                        modver.precord->name,
+                        (int)maxModuleNameLength, m->content, m->content+lm);
+                c += sprintf((char*)(modver.pfield) + c, "%-*s%s\n",
+                        (int)maxModuleNameLength, m->content, m->content+lm);
+            }
         }
         if (have_modules) dbGetRset(&modules)->put_array_info(&modules, i);
         if (have_versions) dbGetRset(&versions)->put_array_info(&versions, i);
@@ -503,6 +524,8 @@ void registerModule(const char* module, const char* version, const char* locatio
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
         
+    if (!version) version="";
+        
     if (location)
     {
         abslocation = realpath(location, NULL);
@@ -522,7 +545,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     }
     m->next = NULL;
     strcpy (m->content, module);
-    strcpy (m->content+lm, version ? version : "");
+    strcpy (m->content+lm, version);
     strcpy (m->content+lm+lv, abslocation ? abslocation : "");
     if (addSlash) strcpy (m->content+lm+lv+ll-1, OSI_PATH_SEPARATOR);
     if (abslocation != location) free(abslocation);
@@ -533,7 +556,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     moduleCount++;
 
     putenvprintf("MODULE=%s", module);
-    putenvprintf("%s_VERSION=%s", module, version ? version : "");
+    putenvprintf("%s_VERSION=%s", module, version);
     if (location) putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
     
     /* only do registration register stuff at init */
@@ -542,10 +565,12 @@ void registerModule(const char* module, const char* version, const char* locatio
     /* create a record with the version string */
     mylocation = getenv("require_DIR");
     if (mylocation == NULL) return;
-    if (asprintf(&abslocation, "%s/postModuleLoad.cmd", mylocation) < 0) return;
-    if (asprintf(&argstring, "MODULE_COUNT=%lu, BUFFER_SIZE=%lu", moduleCount,
+    if (asprintf(&abslocation, "%s/db/moduleversion.template", mylocation) < 0) return;
+    if (asprintf(&argstring, "IOC=%s, MODULE=%s, VERSION=%s, MODULE_COUNT=%lu, BUFFER_SIZE=%lu",
+        getenv("IOC"), module, version, moduleCount,
         moduleListBufferSize+maxModuleNameLength*moduleCount) < 0) return;
-    runScript(abslocation, argstring);
+    printf("Loading module info records\n");
+    dbLoadRecords(abslocation, argstring);
     free(argstring);
     free(abslocation);
     
