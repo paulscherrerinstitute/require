@@ -460,7 +460,9 @@ VAR_EXTENSIONS=OS_CLASS T_A  EPICS_BASETYPE  EPICSVERSION
 $(foreach v,${EXTENDED_VARS},$(foreach x,${VAR_EXTENSIONS},$(eval $v+=$${$v_${$x}})))
 CFLAGS += ${EXTRA_CFLAGS}
 
-MODULEDBD=${if $(strip ${DBDFILES}),${PRJ}.dbd}
+ifneq ($(strip ${DBDFILES}),)
+MODULEDBD=${PRJ}.dbd
+endif
 
 COMMON_DIR_3.14 = ../O.${EPICSVERSION}_Common
 COMMON_DIR_3.13 = .
@@ -625,7 +627,9 @@ endif
 
 # Handle registry stuff automagically if we have a dbd file.
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
-LIBOBJS += $(if $(MODULEDBD),$(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
+ifneq ($(MODULELIB),)
+LIBOBJS += $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE}))
+endif
 
 endif # both, 3.13 and 3.14 from here
 
@@ -635,8 +639,6 @@ LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
 endif # MODULELIB
 
 # for backward compatibility
-ifdef LIBVERSION
-ifneq (${LIBVERSION},test)
 # Provide a global symbol for every version with the same
 # major and equal or smaller minor version number.
 # Other code using this will look for one of those symbols.
@@ -646,6 +648,7 @@ MAJOR_MINOR_PATCH=$(subst ., ,${LIBVERSION})
 MAJOR=$(word 1,${MAJOR_MINOR_PATCH})
 MINOR=$(word 2,${MAJOR_MINOR_PATCH})
 PATCH=$(word 3,${MAJOR_MINOR_PATCH})
+ifneq (${MINOR},)
 ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
 PREREQUISITES = $(shell ${MAKEHOME}/getPrerequisites.tcl ${INSTALL_INCLUDE} | grep -vw ${PRJ})
 ifeq (${OS_CLASS}, vxWorks)
@@ -654,8 +657,7 @@ endif # vxWorks
 ifeq (${OS_CLASS}, Linux)
 PROVIDES = ${ALLMINORS:%=-Wl,--defsym,${PRJ}Lib_${MAJOR}.%=0}
 endif # Linux
-endif # !test
-endif # LIBVERSION defined
+endif # MINOR
 LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
 
 # Create and include dependency files
@@ -940,8 +942,10 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "# Generated file. Do not edit." > $@
 	# dependencies on other module headers
 	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/\([0-9]*\.[0-9]*\)\.[0-9]*/.*%\1 \2%p;s%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2%p'| sort -u >> $@
+ifneq ($(strip ${REQ}),)
 	# manully added dependencies: ${REQ}
 	$(foreach m,${REQ},echo "$m $(or ${$m_VERSION},$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numbered version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
+endif
 ifdef OLD_INCLUDE
 	# dependencies on old style driver headers
 	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw ${PRJ} >> $@; true
