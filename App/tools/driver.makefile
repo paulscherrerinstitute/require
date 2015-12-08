@@ -460,10 +460,6 @@ VAR_EXTENSIONS=OS_CLASS T_A  EPICS_BASETYPE  EPICSVERSION
 $(foreach v,${EXTENDED_VARS},$(foreach x,${VAR_EXTENSIONS},$(eval $v+=$${$v_${$x}})))
 CFLAGS += ${EXTRA_CFLAGS}
 
-ifneq ($(strip ${DBDFILES}),)
-MODULEDBD=${PRJ}.dbd
-endif
-
 COMMON_DIR_3.14 = ../O.${EPICSVERSION}_Common
 COMMON_DIR_3.13 = .
 COMMON_DIR = ${COMMON_DIR_${EPICS_BASETYPE}}
@@ -497,30 +493,6 @@ define ADD_MANUAL_DEPENDENCIES
 $(eval $(1)_VERSION := $(or $(basename $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv ${EPICS_MODULES}/$(1)/*.*.*/R${EPICSVERSION} 2>/dev/null)))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,$m)))
-
-debug::
-	@echo "BUILDCLASSES = ${BUILDCLASSES}"
-	@echo "OS_CLASS = ${OS_CLASS}"
-	@echo "T_A = ${T_A}"
-	@echo "ARCH_PARTS = ${ARCH_PARTS}"
-	@echo "MODULEDBD = ${MODULEDBD}"
-	@echo "RECORDS = ${RECORDS}"
-	@echo "MENUS = ${MENUS}"
-	@echo "BPTS = ${BPTS}"
-	@echo "HDRS = ${HDRS}"
-	@echo "SOURCES = ${SOURCES}" 
-	@echo "SOURCES_${EPICS_BASETYPE} = ${SOURCES_${EPICS_BASETYPE}}" 
-	@echo "SOURCES_${OS_CLASS} = ${SOURCES_${OS_CLASS}}" 
-	@echo "SRCS = ${SRCS}" 
-	@echo "LIBOBJS = ${LIBOBJS}"
-	@echo "DBDS = ${DBDS}"
-	@echo "DBDS_${EPICS_BASETYPE} = ${DBDS_${EPICS_BASETYPE}}"
-	@echo "DBDS_${OS_CLASS} = ${DBDS_${OS_CLASS}}"
-	@echo "DBD_SRCS = ${DBD_SRCS}"
-	@echo "DBDFILES = ${DBDFILES}"
-	@echo "TEMPLS = ${TEMPLS}"
-	@echo "LIBVERSION = ${LIBVERSION}"
-	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
 
 ifeq (${EPICS_BASETYPE},3.13)
 INSTALLRULE=install::
@@ -668,7 +640,7 @@ HDEPENDS_CMD =
 -include *.d
 
 # need to find source dbd files relative to .. but generated dbd files in .
-DBDFILES = ${DBD_SRCS:%=../%}
+DBDFILES += ${DBD_SRCS:%=../%}
 DBD_PATH = $(sort $(dir ${DBDFILES}))
 
 DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${EPICS_BASE}/dbd)
@@ -717,6 +689,34 @@ SNC=${SNCSEQ}/bin/$(EPICS_HOST_ARCH)/snc
 SNC_CFLAGS=-I ${SNCSEQ}/include
 
 endif # 3.14
+
+ifneq ($(strip ${DBDFILES}),)
+MODULEDBD=${PRJ}.dbd
+endif
+
+debug::
+	@echo "BUILDCLASSES = ${BUILDCLASSES}"
+	@echo "OS_CLASS = ${OS_CLASS}"
+	@echo "T_A = ${T_A}"
+	@echo "ARCH_PARTS = ${ARCH_PARTS}"
+	@echo "MODULEDBD = ${MODULEDBD}"
+	@echo "RECORDS = ${RECORDS}"
+	@echo "MENUS = ${MENUS}"
+	@echo "BPTS = ${BPTS}"
+	@echo "HDRS = ${HDRS}"
+	@echo "SOURCES = ${SOURCES}" 
+	@echo "SOURCES_${EPICS_BASETYPE} = ${SOURCES_${EPICS_BASETYPE}}" 
+	@echo "SOURCES_${OS_CLASS} = ${SOURCES_${OS_CLASS}}" 
+	@echo "SRCS = ${SRCS}" 
+	@echo "LIBOBJS = ${LIBOBJS}"
+	@echo "DBDS = ${DBDS}"
+	@echo "DBDS_${EPICS_BASETYPE} = ${DBDS_${EPICS_BASETYPE}}"
+	@echo "DBDS_${OS_CLASS} = ${DBDS_${OS_CLASS}}"
+	@echo "DBD_SRCS = ${DBD_SRCS}"
+	@echo "DBDFILES = ${DBDFILES}"
+	@echo "TEMPLS = ${TEMPLS}"
+	@echo "LIBVERSION = ${LIBVERSION}"
+	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
 
 ${BUILDRULE} MODULEINFOS
 ${BUILDRULE} ${MODULEDBD}
