@@ -599,9 +599,7 @@ endif
 
 # Handle registry stuff automagically if we have a dbd file.
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
-ifneq ($(MODULELIB),)
-LIBOBJS += $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE}))
-endif
+LIBOBJS += $(if $(MODULEDBD), $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
 
 endif # both, 3.13 and 3.14 from here
 
