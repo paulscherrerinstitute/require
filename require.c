@@ -24,6 +24,9 @@
 
 #ifdef BASE_VERSION
 #define EPICS_3_13
+
+#include <epicsDynLink.h>
+
 #define epicsGetStdout() stdout
 extern int dbLoadDatabase(const char *filename, const char *path, const char *substitutions);
 extern int dbLoadTemplate(const char *filename);
@@ -437,8 +440,8 @@ static int getRecordHandle(const char* namepart, short type, long minsize, DBADD
     }
     if (paddr->field_type != type)
     {
-        fprintf(stderr, "require: record %s has wrong type\n",
-            recordname);
+        fprintf(stderr, "require: record %s has wrong type %s instead of %s\n",
+            recordname, pamapdbfType[paddr->field_type].strvalue, pamapdbfType[type].strvalue);
         return -1;
     }
     if (paddr->no_elements < minsize)
@@ -456,6 +459,12 @@ static int getRecordHandle(const char* namepart, short type, long minsize, DBADD
     return 0;
 }
 
+/*
+We can fill the records only after they have been initialized, at initHookAfterFinishDevSup.
+But use double indirection here because in 3.13 we must
+wait until initHooks is loaded before we can register the hook.
+*/
+
 static void fillModuleListRecord(initHookState state)
 {
     if (state == initHookAfterFinishDevSup) /* MODULES record exists and has allocated memory */
@@ -465,6 +474,9 @@ static void fillModuleListRecord(initHookState state)
         moduleitem *m;
         int i = 0;
         long c = 0;
+        
+        if (requireDebug)
+            printf("require: fillModuleListRecord\n");
 
         have_modules  = (getRecordHandle(":MODULES",  DBF_STRING, moduleCount, &modules) == 0);
         have_versions = (getRecordHandle(":VERSIONS", DBF_STRING, moduleCount, &versions) == 0);
@@ -519,11 +531,27 @@ void registerModule(const char* module, const char* version, const char* locatio
     char* argstring = NULL;
     int addSlash=0;
     const char *mylocation;
-    static int initHookRegistered = 0;
+    static int firstRun = 1;
     
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
         
+    if (firstRun)
+    {
+#ifdef EPICS_3_13
+        int (*initHookRegister)() = NULL;
+        SYM_TYPE type;
+        symFindByNameEPICS(sysSymTbl, "initHookRegister", (void *) &initHookRegister, &type);
+        if (initHookRegister)
+#endif
+        {
+            firstRun = 0;
+            initHookRegister(fillModuleListRecord);
+            if (requireDebug)
+                printf("require: initHookRegister\n");
+        }
+    }
+    
     if (!version) version="";
         
     if (location)
@@ -569,16 +597,10 @@ void registerModule(const char* module, const char* version, const char* locatio
     if (asprintf(&argstring, "IOC=%s, MODULE=%s, VERSION=%s, MODULE_COUNT=%lu, BUFFER_SIZE=%lu",
         getenv("IOC"), module, version, moduleCount,
         moduleListBufferSize+maxModuleNameLength*moduleCount) < 0) return;
-    printf("Loading module info records\n");
+    printf("Loading module info records for %s\n", module);
     dbLoadRecords(abslocation, argstring);
     free(argstring);
     free(abslocation);
-    
-    if (!initHookRegistered)
-    {
-        initHookRegistered = 1;
-        initHookRegister(fillModuleListRecord);
-    }
 }
 
 #if defined (vxWorks)
@@ -1584,4 +1606,3 @@ static void requireRegister(void)
 epicsExportRegistrar(requireRegister);
 epicsExportAddress(int, requireDebug);
 #endif
-
