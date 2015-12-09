@@ -795,7 +795,7 @@ int libversionShow(int showLocation, const char* outfile)
 #define MISMATCH -1
 #define EXACT 0
 #define MATCH 1
-#define TESTVERS 3
+#define TESTVERS 2
 #define HIGHER 3
 
 static int compareVersions(const char* found, const char* request)
@@ -1214,7 +1214,7 @@ static int require_priv(const char* module, const char* version, const char* arg
         {
             case TESTVERS:
                 if (version)
-                    printf("Warning: Module %s version %s already loaded where %s was requested\n",
+                    printf("Warning: Module %s test version %s already loaded where %s was requested\n",
                         module, loaded, version);
             case EXACT:
             case MATCH:
