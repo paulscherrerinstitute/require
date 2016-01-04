@@ -177,7 +177,7 @@ scanmatch $git_context {^([0-9]+)\.([0-9]+)(\.([0-9]+))?$} {
     puts stderr "checking tag $matchInfo(line) => version $version"
 }
 
-scanmatch $git_context {_([0-9]+)_([0-9]+)(_([0-9]+))?$} {
+scanmatch $git_context {[a-zA-Z]+[a-zA-Z0-9]*_([0-9]+)_([0-9]+)(_([0-9]+))?$} {
     set major $matchInfo(submatch0)
     set minor $matchInfo(submatch1)
     set patch [expr $matchInfo(submatch3) + 0]
@@ -191,7 +191,7 @@ scanmatch $git_context {(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g} {
 }
 
 scanmatch $git_context {Your branch is ahead of '(.*)/(.*)'} {
-    puts stderr "not pushed to server => version test"
+    puts stderr "branch \"$matchInfo(submatch1)\" not yet pushed to remote \"$matchInfo(submatch0)\" => version test"
     puts stderr "try: git push --tags $matchInfo(submatch0) $matchInfo(submatch1)"
     set version test
 }
