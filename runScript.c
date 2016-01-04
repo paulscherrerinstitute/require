@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -8,12 +9,13 @@
 
 #ifdef vxWorks
 extern int execute(const char*);
+#include "asprintf.h"
+#include "strdup.h"
 #endif
 
 #ifdef BASE_VERSION
 #define EPICS_3_13
 extern char** ppGlobalEnviron;
-#include <strdup.h>
 #else
 #include <iocsh.h>
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
@@ -23,6 +25,107 @@ epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #include "require.h"
 
 int runScriptDebug=0;
+
+static int parseExpr(const char** pp, int* v);
+
+static int parseValue(const char** pp, int* v)
+{
+    int val;
+    const char *p = *pp;
+    int neg = 0;
+
+    while (isspace((unsigned char)*p)) p++;
+    if (*p == '+' || *p == '-') neg = *p++ == '-';
+    while (isspace((unsigned char)*p)) p++;
+    if (*p == '(')
+    {
+        p++;
+        if (!parseExpr(&p, &val)) return 0;
+        if (*p++ != ')') return 0;
+    }
+    else
+    {
+        char* e;
+        val = strtol(p, &e, 0);
+        if (e == p) return 0;
+        p = e;
+    }
+    if (neg) val = -val;
+    if (*p == '?')
+    {
+        p++;
+        val = (val != 0);
+    }
+    *pp = p;
+    *v = val;
+    if (runScriptDebug > 1) printf("parseValue: %d rest=\"%s\"\n", *v, p);
+    return 1;
+}
+
+static int parseExpr(const char** pp, int* v)
+{
+    const char *p = *pp;
+    const char *q;
+    int o;
+    int val;
+    int val2;
+    int status = 0;
+
+    *v = 0;
+    do {
+        if (!parseValue(&p, &val)) return status;
+        if (runScriptDebug > 1) printf("parseExp val=%d rest=%s\n", val, p);
+        q = p;
+        while (isspace((unsigned char)*q)) q++;
+        o = *q;
+        while (o == '*' || o == '/' || o == '%')
+        {
+            q++;
+            if (!parseValue(&q, &val2)) break;
+            if (o == '*') val *= val2;
+            else if (val2 == 0) val = 0;
+            else if (o == '/') val /= val2;
+            else val %= val2;
+            p = q;
+            while (isspace((unsigned char)*p)) p++;
+            o = *p;
+        }
+        status = 1;
+        *v += val;
+        *pp = p;
+        if (runScriptDebug > 1) printf("parseExpr: sum %d rest=\"%s\"\n", *v, p);
+    } while (o == '+' || o == '-');
+    return 1;
+}
+
+const char* getFormat(const char** pp)
+{
+    static char format [20];
+    const char* p = *pp;
+    int i = 1;
+    if (runScriptDebug > 1) printf ("getFormat %s\n", p);
+    if ((format[0] = *p++) == '%')
+    {
+        if (runScriptDebug > 1) printf ("getFormat0 %s\n", p);
+        while (i < sizeof(format) && strchr(" #-+0", *p))
+            format[i++] = *p++;
+        if (runScriptDebug > 1) printf ("getFormat1 %s\n", p);
+        while (i < sizeof(format) && strchr("0123456789", *p))
+            format[i++] = *p++;
+        if (runScriptDebug > 1) printf ("getFormat2 %s\n", p);
+        if (i < sizeof(format) && strchr("diouxXc", *p))
+        {
+            format[i++] = *p++;
+            format[i] = 0;
+            *pp = p;
+            if (runScriptDebug > 1) printf ("format=%s\n", format);
+            return format;
+        }
+    }
+    if (runScriptDebug > 1) printf ("no format\n");
+    return NULL;
+}
+
 int runScript(const char* filename, const char* args)
 {
     MAC_HANDLE *mac = NULL;
@@ -80,7 +183,7 @@ int runScript(const char* filename, const char* args)
     if ((line_exp = malloc(line_exp_size)) == NULL) goto error;
     while (fgets(line_raw, line_raw_size, file))
     {
-        const unsigned char* p;
+        char* p;
         long len;
 
         /* check if we have a line longer than the buffer size */
@@ -109,9 +212,84 @@ int runScript(const char* filename, const char* args)
             if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
         }
         printf("%s\n", line_exp);
-        p=(unsigned char*)line_exp;
-        while (isspace(*p)) p++;
+        p = line_exp;
+        while (isspace((unsigned char)*p)) p++;
         if (*p == 0 || *p == '#') continue;
+        
+        /* find local variable assignments */
+        {
+            unsigned int vlen = 0;
+            while (!isspace((unsigned char)p[vlen]) && p[vlen] != '=') vlen++;
+            if (p[vlen] == '=')
+            {
+                const char* r;
+                char* w;
+                int val;
+
+                p[vlen++] = 0;
+                r = p+vlen;
+                w = line_raw;
+                while (*r)
+                {
+                    if (runScriptDebug > 1) printf ("expr %s\n", r);
+                    if (*r == '%')
+                    {
+                        const char* r2 = r;
+                        const char* f;
+                        if ((f = getFormat(&r2)) && parseExpr(&r2, &val))
+                        {
+                            w += sprintf(w, f , val);
+                            r = r2;
+                        }
+                        else
+                        {
+                            if (runScriptDebug > 1) printf ("skip %c\n", *r);
+                            *w++ = *r++;
+                        }
+                        continue;
+                    }
+                    if (parseExpr(&r, &val))
+                    {
+                        if (runScriptDebug > 1) printf ("val=%d, rest=%s\n", val, r);
+                        w += sprintf(w, "%d", val);
+                        if (runScriptDebug > 1) printf ("rest=%s\n", r);
+                    }
+                    else if (*r == '(' || *r == '+')
+                    {
+                        if (runScriptDebug > 1) printf ("skip %c\n", *r);
+                        *w++ = *r++;
+                        continue;
+                    }
+                    while (1)
+                    {
+                        if ((*r >= '0' && *r <= '9') || *r == '(' || *r == '%') break;
+                        if (*r == '"' || *r == '\'')
+                        {
+                            char c = *r++;
+                            if (runScriptDebug > 1) printf ("string %c\n", c);
+                            while (*r && *r != c) {
+                                *w++ = *r++;
+                            }
+                            *w = 0;
+                            if (*r) r++;
+                            if (*r == '+')
+                            {
+                                if (runScriptDebug > 1) printf ("skip %c\n", *r);
+                                *w++ = *r++;
+                            }
+                            break;
+                        }
+                        if (runScriptDebug > 1) printf ("copy %c\n", *r);
+                        if (!(*w++ = *r)) break;
+                        r++;
+                    };
+                }
+                if (runScriptDebug)
+                    printf("runScript: assign %s=%s\n", p, line_raw);
+                macPutValue(mac, p, line_raw);
+                continue;
+            }
+        }
 #ifdef vxWorks
         if (strlen(line_exp) >= 120)
         {
