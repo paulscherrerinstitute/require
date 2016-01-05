@@ -212,6 +212,9 @@ if {$debug} {
 
 if {[catch {
     # fails if we have no git:
+    if {$debug} {
+        puts stderr "git status --porcelain $topfiles $argv"
+    }
     set statusinfo [open "|git status --porcelain $topfiles $argv 2>@ stdout"]
     scanfile $git_context $statusinfo
     # fails if this is no git repo
@@ -222,6 +225,9 @@ if {[catch {
         exit
     }   
     
+    if {$debug} {
+        puts stderr "git describe --tags HEAD"
+    }
     set statusinfo [open "|git describe --tags HEAD 2>@ stdout"]
     scanfile $git_context $statusinfo
     catch {close $statusinfo}
@@ -232,6 +238,9 @@ if {[catch {
     }
     
     if {$version != "test"} {
+        if {$debug} {
+            puts stderr "git status"
+        }
         set statusinfo [open "|git status 2>@ stdout"]
         scanfile $git_context $statusinfo
         catch {close $statusinfo}
@@ -248,6 +257,9 @@ if {[catch {
 # fix: check local and non local files separately
 
     # fails if we have no cvs or server has a problem
+    if {$debug} {
+        puts stderr "cvs status -l -v $topfiles $argv"
+    }
     set statusinfo [open "|cvs status -l -v $topfiles $argv 2>@ stdout"]
     scanfile $global_context $statusinfo
     # fails if this is no cvs repo
