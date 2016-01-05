@@ -172,7 +172,7 @@ int runScript(const char* filename, const char* args)
     if (args)
     {
         if (runScriptDebug)
-                printf("runScript: macParseDefns \"%s\"\n", args);
+            printf("runScript: macParseDefns \"%s\"\n", args);
         macParseDefns(mac, (char*)args, &pairs);
         macInstallMacros(mac, pairs);
         free(pairs);
@@ -207,10 +207,12 @@ int runScript(const char* filename, const char* args)
 #endif
         {
             if (runScriptDebug)
-                    printf("runScript: grow expand buffer: len=%ld size=%ld\n", len, line_exp_size);
+                printf("runScript: grow expand buffer: len=%ld size=%ld\n", len, line_exp_size);
             free(line_exp);
             if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
         }
+        if (runScriptDebug)
+                printf("runScript expanded line (%ld chars): '%s'\n", len, line_exp);
         printf("%s\n", line_exp);
         p = line_exp;
         while (isspace((unsigned char)*p)) p++;
@@ -219,7 +221,7 @@ int runScript(const char* filename, const char* args)
         /* find local variable assignments */
         {
             unsigned int vlen = 0;
-            while (!isspace((unsigned char)p[vlen]) && p[vlen] != '=') vlen++;
+            while (isalnum(p[vlen]) || p[vlen] == '_') vlen++;
             if (p[vlen] == '=')
             {
                 const char* r;
@@ -293,11 +295,13 @@ int runScript(const char* filename, const char* args)
 #ifdef vxWorks
         if (strlen(line_exp) >= 120)
         {
-            sprintf("runScript: Line too long (>=120):\n%s\n", line_exp);
+            fprintf(stderr, "runScript: Line too long (>=120):\n%s\n", line_exp);
             return -1;
         }
         status = execute(line_exp);
 #else
+        if (runScriptDebug)
+            printf("runScript: iocshCmd: '%s'\n", line_exp);
         status = iocshCmd(line_exp);
 #endif
         if (status != 0) break;
