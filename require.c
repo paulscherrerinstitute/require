@@ -7,9 +7,16 @@
 *
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
+
+#ifdef __unix
+/* for vasprintf and dl_iterate_phdr */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#endif
+
+/* for 64 bit (NFS) file systems */
+#define _FILE_OFFSET_BITS 64
 
 #include <sys/stat.h>
 #include <stdio.h>
@@ -209,10 +216,10 @@ int requireDebug;
 #else
     #include <dirent.h>
     #define DIR_HANDLE DIR*
-    #define DIR_ENTRY struct dirent*
     #define IF_OPEN_DIR(f) if ((dir = opendir(f)))
-    #define START_DIR_LOOP while ((direntry = readdir(dir)) != NULL)
-    #define END_DIR_LOOP if (dir) closedir(dir);
+    #define DIR_ENTRY struct dirent*
+    #define START_DIR_LOOP while ((errno = 0, direntry = readdir(dir)) != NULL)
+    #define END_DIR_LOOP if (errno) fprintf(stderr, "error reading directory %s: %s\n", filename, strerror(errno)); if (dir) closedir(dir);
     #ifdef _DIRENT_HAVE_D_TYPE
     #define SKIP_NON_DIR(e) if (e->d_type != DT_DIR && e->d_type != DT_UNKNOWN) continue;
     #else
@@ -1044,8 +1051,8 @@ static off_t fileSize(const char* filename)
     {
         case S_IFREG:
             if (requireDebug)
-                printf("require: file %s exists, size %ld bytes\n",
-                    filename, filestat.st_size);
+                printf("require: file %s exists, size %lld bytes\n",
+                    filename, (unsigned long long)filestat.st_size);
             return filestat.st_size;
         case S_IFDIR:
             if (requireDebug)
