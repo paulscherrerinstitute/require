@@ -123,13 +123,16 @@ BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
 $(foreach v,$(sort $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
 
 #check only what is needed to build the lib? But what is that?
-VERSIONCHECKFILES = $(filter-out /% -none-, ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v}))
+VERSIONCHECKFILES = $(filter-out /% -none-, $(wildcard *makefile* *Makefile* *.db *.template *.subs *.dbd *.cmd) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v}))
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
 LIBVERSION = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 
-# Default project name is name of current directory.
+# Default module name is name of current directory.
 # But don't use "src" or "snl", go up directory tree instead.
+# Avoid using environment variables for MODULE or PROJECT
+MODULE=
+PROJECT=
 PRJDIR:=$(subst -,_,$(subst .,_,$(notdir $(patsubst %Lib,%,$(patsubst %/snl,%,$(patsubst %/src,%,${PWD}))))))
 PRJ = $(or ${MODULE},${PROJECT},${PRJDIR})
 export PRJ
@@ -603,11 +606,6 @@ LIBOBJS += $(if $(MODULEDBD), $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EX
 
 endif # both, 3.13 and 3.14 from here
 
-# If we build a library, provide a version variable.
-ifneq ($(MODULELIB),)
-LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
-endif # MODULELIB
-
 # for backward compatibility
 # Provide a global symbol for every version with the same
 # major and equal or smaller minor version number.
@@ -691,6 +689,11 @@ endif # 3.14
 ifneq ($(strip ${DBDFILES}),)
 MODULEDBD=${PRJ}.dbd
 endif
+
+# If we build a library, provide a version variable.
+ifneq ($(MODULELIB),)
+LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
+endif # MODULELIB
 
 debug::
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
@@ -790,7 +793,7 @@ debug::
 	@echo "INSTALL_CFG = $(INSTALL_CFG)"
 	@echo "INSTALL_CFGS = $(INSTALL_CFGS)"
 
-INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_DEPS} ${INSTALL_CFGS}
+INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_DEPS}
 
 ${INSTALLRULE} ${INSTALLS}
 
