@@ -815,7 +815,7 @@ ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
 
 ${INSTALL_SCRS}: $(notdir ${SCR})
 	@echo "Installing scripts $^ to $(@D)"
-	$(INSTALL) -d -m444 $^ $(@D)
+	$(INSTALL) -d -m555 $^ $(@D)
 
 ${INSTALL_CFGS}: ${CFGS}
 	@echo "Installing configuration files $^ to $(@D)"
