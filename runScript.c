@@ -183,7 +183,7 @@ int runScript(const char* filename, const char* args)
     if ((line_exp = malloc(line_exp_size)) == NULL) goto error;
     while (fgets(line_raw, line_raw_size, file))
     {
-        char* p;
+        char* p, *x;
         long len;
 
         /* check if we have a line longer than the buffer size */
@@ -219,78 +219,74 @@ int runScript(const char* filename, const char* args)
         if (*p == 0 || *p == '#') continue;
         
         /* find local variable assignments */
+        if ((x = strpbrk(p, "=(, \t\n")) != NULL && *x=='=')
         {
-            unsigned int vlen = 0;
-            while (isalnum((unsigned char)p[vlen]) || p[vlen] == '_') vlen++;
-            if (p[vlen] == '=')
-            {
-                const char* r;
-                char* w;
-                int val;
+            const char* r;
+            char* w;
+            int val;
 
-                p[vlen++] = 0;
-                r = p+vlen;
-                w = line_raw;
-                while (*r)
+            *x++ = 0;
+            r = x;
+            w = line_raw;
+            while (*r)
+            {
+                if (runScriptDebug > 1) printf ("expr %s\n", r);
+                if (*r == '%')
                 {
-                    if (runScriptDebug > 1) printf ("expr %s\n", r);
-                    if (*r == '%')
+                    const char* r2 = r;
+                    const char* f;
+                    if ((f = getFormat(&r2)) && parseExpr(&r2, &val))
                     {
-                        const char* r2 = r;
-                        const char* f;
-                        if ((f = getFormat(&r2)) && parseExpr(&r2, &val))
-                        {
-                            w += sprintf(w, f , val);
-                            r = r2;
+                        w += sprintf(w, f , val);
+                        r = r2;
+                    }
+                    else
+                    {
+                        if (runScriptDebug > 1) printf ("skip %c\n", *r);
+                        *w++ = *r++;
+                    }
+                    continue;
+                }
+                if (parseExpr(&r, &val))
+                {
+                    if (runScriptDebug > 1) printf ("val=%d, rest=%s\n", val, r);
+                    w += sprintf(w, "%d", val);
+                    if (runScriptDebug > 1) printf ("rest=%s\n", r);
+                }
+                else if (*r == '(' || *r == '+')
+                {
+                    if (runScriptDebug > 1) printf ("skip %c\n", *r);
+                    *w++ = *r++;
+                    continue;
+                }
+                while (1)
+                {
+                    if ((*r >= '0' && *r <= '9') || *r == '(' || *r == '%') break;
+                    if (*r == '"' || *r == '\'')
+                    {
+                        char c = *r++;
+                        if (runScriptDebug > 1) printf ("string %c\n", c);
+                        while (*r && *r != c) {
+                            *w++ = *r++;
                         }
-                        else
+                        *w = 0;
+                        if (*r) r++;
+                        if (*r == '+')
                         {
                             if (runScriptDebug > 1) printf ("skip %c\n", *r);
                             *w++ = *r++;
                         }
-                        continue;
+                        break;
                     }
-                    if (parseExpr(&r, &val))
-                    {
-                        if (runScriptDebug > 1) printf ("val=%d, rest=%s\n", val, r);
-                        w += sprintf(w, "%d", val);
-                        if (runScriptDebug > 1) printf ("rest=%s\n", r);
-                    }
-                    else if (*r == '(' || *r == '+')
-                    {
-                        if (runScriptDebug > 1) printf ("skip %c\n", *r);
-                        *w++ = *r++;
-                        continue;
-                    }
-                    while (1)
-                    {
-                        if ((*r >= '0' && *r <= '9') || *r == '(' || *r == '%') break;
-                        if (*r == '"' || *r == '\'')
-                        {
-                            char c = *r++;
-                            if (runScriptDebug > 1) printf ("string %c\n", c);
-                            while (*r && *r != c) {
-                                *w++ = *r++;
-                            }
-                            *w = 0;
-                            if (*r) r++;
-                            if (*r == '+')
-                            {
-                                if (runScriptDebug > 1) printf ("skip %c\n", *r);
-                                *w++ = *r++;
-                            }
-                            break;
-                        }
-                        if (runScriptDebug > 1) printf ("copy %c\n", *r);
-                        if (!(*w++ = *r)) break;
-                        r++;
-                    };
-                }
-                if (runScriptDebug)
-                    printf("runScript: assign %s=%s\n", p, line_raw);
-                macPutValue(mac, p, line_raw);
-                continue;
+                    if (runScriptDebug > 1) printf ("copy %c\n", *r);
+                    if (!(*w++ = *r)) break;
+                    r++;
+                };
             }
+            if (runScriptDebug)
+                printf("runScript: assign %s=%s\n", p, line_raw);
+            macPutValue(mac, p, line_raw);
+            continue;
         }
 #ifdef vxWorks
         if (strlen(line_exp) >= 120)
