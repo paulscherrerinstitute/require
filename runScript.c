@@ -8,9 +8,15 @@
 #include <epicsVersion.h>
 
 #ifdef vxWorks
-extern int execute(const char*);
 #include "asprintf.h"
+#ifdef _WRS_VXWORKS_MAJOR
+/* vxWorks 6+ */
+#include <private/shellLibP.h>
+#else
+/* vxWorks 5 */
+#include <shellLib.h>
 #include "strdup.h"
+#endif
 #endif
 
 #ifdef BASE_VERSION
@@ -288,7 +294,18 @@ int runScript(const char* filename, const char* args)
             macPutValue(mac, p, line_raw);
             continue;
         }
-#ifdef vxWorks
+#ifdef _WRS_VXWORKS_MAJOR
+        if (strlen(line_exp) >= 255)
+        {
+            fprintf(stderr, "runScript: Line too long (>=255):\n%s\n", line_exp);
+            return -1;
+        }
+        else
+        {
+            SHELL_EVAL_VALUE result;
+            status = shellInterpEvaluate(line_exp, "C", &result);
+        }
+#elif defined(vxWorks)
         if (strlen(line_exp) >= 120)
         {
             fprintf(stderr, "runScript: Line too long (>=120):\n%s\n", line_exp);

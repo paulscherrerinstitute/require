@@ -9,7 +9,8 @@ DBDS    += runScript.dbd
 
 #HEADERS += require.h
 
-SOURCES_vxWorks += strdup.c asprintf.c
+SOURCES_T2 += strdup.c
+SOURCES_vxWorks   += asprintf.c
 HEADERS += strdup.h asprintf.h
 
 # We need to find the Linux link.h before the EPICS link.h

@@ -293,10 +293,13 @@ static HMODULE loadlib(const char* libname)
         {
             errno = 0;
             libhandle = loadModule(fd, LOAD_GLOBAL_SYMBOLS);
+#ifndef _WRS_VXWORKS_MAJOR
+/* vxWorks 5 */
             if (errno == S_symLib_SYMBOL_NOT_FOUND)
             {
                 libhandle = NULL;
             }
+#endif
             loaderror = errno;
             close (fd);
         }
