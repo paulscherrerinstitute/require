@@ -453,6 +453,11 @@ REQ = ${REQUIRED} ${REQUIRED_${OS_CLASS}} ${REQUIRED_${T_A}} ${REQUIRED_${EPICS_
 REQ += $(if $(filter %.st %.stt,${SRCS}),seq)
 export REQ
 
+# add sources for specific epics types (3.13 or 3.14) or architectures
+ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
+SRCS += $(foreach PART, ${ARCH_PARTS}, ${SOURCES_${PART}})
+SRCS += $(foreach PART, ${ARCH_PARTS}, ${SOURCES_${EPICS_BASETYPE}_${PART}})
+
 else # in O.*
 ## RUN 4
 # in O.* directory
@@ -540,13 +545,6 @@ INSTALL_UI      = ${MODULE_LOCATION}/ui
 #	$(CP) $^ >> $@
 #	chmod 444 $@
 #	$(SETLINKS) ${INSTALL_TEMPL} .db $(basename $(notdir $^))
-
-# add sources for specific epics types (3.13 or 3.14) or architectures
-ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
-SRCS += $(foreach PART, ${ARCH_PARTS}, ${SRCS_${PART}})
-SRCS += $(foreach PART, ${ARCH_PARTS}, ${SRCS_${EPICS_BASETYPE}_${PART}})
-DBD_SRCS += $(foreach PART, ${ARCH_PARTS}, ${DBD_SRCS_${PART}})
-DBD_SRCS += $(foreach PART, ${ARCH_PARTS}, ${DBD_SRCS_${EPICS_BASETYPE}_${PART}})
 
 # Different settings required to build library in 3.13. and 3.14
 
