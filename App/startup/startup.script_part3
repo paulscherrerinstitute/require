@@ -8,7 +8,7 @@ rsh BOOTPC, "dbl2odb.sh", IOC, bootInfo("%B"), getenv("EPICS_CA_SERVER_PORT")
 
 # insert library list into database
 sprintf STRINGBUFFER, "/home/ioc/%s.libs", IOC
-libversionShow 1, STRINGBUFFER
+libversionShow STRINGBUFFER
 rsh BOOTPC, "upload_libinfo.sh", "-r -i", IOC, "-l", STRINGBUFFER
 
 # set the prompt

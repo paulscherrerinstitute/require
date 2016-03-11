@@ -770,7 +770,7 @@ const char* getLibLocation(const char* libname)
     return NULL;
 }
 
-int libversionShow(int showLocation, const char* outfile)
+int libversionShow(const char* outfile)
 {
     moduleitem* m;
     size_t lm, lv;
@@ -793,8 +793,7 @@ int libversionShow(int showLocation, const char* outfile)
         lv = strlen(m->content+lm)+1;
         fprintf(out, "%-*s%-20s %s\n",
             (int)maxModuleNameLength, m->content,
-            m->content+lm,
-            showLocation ? m->content+lm+lv : "");
+            m->content+lm, m->content+lm+lv);
     }
     fflush(out);
     if (outfile)
@@ -1577,24 +1576,23 @@ loadlib:
 static const iocshArg requireArg0 = { "module", iocshArgString };
 static const iocshArg requireArg1 = { "[version]", iocshArgString };
 static const iocshArg requireArg2 = { "[substitutions]", iocshArgString };
-static const iocshArg * const requireArgs[3] = { &requireArg0, &requireArg1, &requireArg2 };
+static const iocshArg * const requireArgs[] = { &requireArg0, &requireArg1, &requireArg2 };
 static const iocshFuncDef requireDef = { "require", 3, requireArgs };
 static void requireFunc (const iocshArgBuf *args)
 {
     require(args[0].sval, args[1].sval, args[2].sval);
 }
 
-static const iocshArg libversionShowArg0 = { "showLocation", iocshArgInt };
-static const iocshArg libversionShowArg1 = { "outputfile", iocshArgString };
-static const iocshArg * const libversionArgs[2] = { &libversionShowArg0, &libversionShowArg1 };
-static const iocshFuncDef libversionShowDef = { "libversionShow", 2, libversionArgs };
+static const iocshArg libversionShowArg0 = { "outputfile", iocshArgString };
+static const iocshArg * const libversionArgs[] = { &libversionShowArg0 };
+static const iocshFuncDef libversionShowDef = { "libversionShow", 1, libversionArgs };
 static void libversionShowFunc (const iocshArgBuf *args)
 {
-    libversionShow(args[0].ival, args[1].sval);
+    libversionShow(args[0].ival);
 }
 
 static const iocshArg ldArg0 = { "library", iocshArgString };
-static const iocshArg * const ldArgs[1] = { &ldArg0 };
+static const iocshArg * const ldArgs[] = { &ldArg0 };
 static const iocshFuncDef ldDef = { "ld", 1, ldArgs };
 static void ldFunc (const iocshArgBuf *args)
 {
