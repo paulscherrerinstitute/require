@@ -9,7 +9,7 @@
 EPICS_MODULES = "/ioc/modules"
 
 # find a better way later to know current require version
-REQUIRE_VERSION="2.3.5"
+REQUIRE_VERSION="2.3.6"
 
 #set EPICS_HOST_ARCH according to vxWorks version and cpu type
 VX6=(*runtimeVersion>>24)&255-'5'
