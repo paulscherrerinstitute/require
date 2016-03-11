@@ -1588,7 +1588,7 @@ static const iocshArg * const libversionArgs[] = { &libversionShowArg0 };
 static const iocshFuncDef libversionShowDef = { "libversionShow", 1, libversionArgs };
 static void libversionShowFunc (const iocshArgBuf *args)
 {
-    libversionShow(args[0].ival);
+    libversionShow(args[0].sval);
 }
 
 static const iocshArg ldArg0 = { "library", iocshArgString };
