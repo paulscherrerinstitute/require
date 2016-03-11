@@ -1,0 +1,22 @@
+# all hw-independent require statments
+# common to all iocs
+#
+require "SynApps"
+require "array"
+require "ipac"
+require "hytec"
+require "Hytec8003"
+require "statusString"
+require "cnvrLvl3"
+require "BitMapIn"
+require "setclr"
+require "ArrOfStr"
+
+#
+# Special require configured at IOC level
+#
+#require "HarpByDoelling"
+#require "StepFunc"
+#require "faccel1"
+#require "BeamNoise"
+#require "gpmm"

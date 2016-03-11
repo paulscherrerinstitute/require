@@ -1,0 +1,14 @@
+# $Source: /cvs/A/CS/startup/startup.script_win64,v $
+dlload misc
+dbLoadDatabase "../../../dbd/misc.dbd"
+misc_registerRecordDeviceDriver pdbbase
+
+winunixconv EPICSBASE
+winunixconv SOFTIOC
+
+epicsEnvSet STREAM_PROTOCOL_PATH, $(SOFTIOC)/iocBoot/ioc/$(IOC)/cfg
+epicsEnvSet EPICS_DRIVER_PATH, $(SOFTIOC)/bin/$(T_A)
+epicsEnvSet TEMPLATES, $(SOFTIOC)db
+epicsEnvSet CFG, $(SOFTIOC)/iocBoot/ioc/$(IOC)/cfg
+pwd
+

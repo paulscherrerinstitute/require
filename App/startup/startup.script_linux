@@ -1,0 +1,13 @@
+# $Source: /cvs/A/CS/startup/startup.script_linux,v $
+
+# set EPICS according to BASE (set by iocsh wrapper)
+epicsEnvSet EPICS, R$(BASE)
+
+#epicsEnvSet EPICS_DRIVER_PATH, bin:snl:$(INSTBASE)/iocBoot/$(EPICS)/$(EPICS_HOST_ARCH)
+epicsEnvSet TEMPLATES, $(INSTBASE)/iocBoot/templates
+epicsEnvSet CFG, $(PWD)/cfg
+epicsEnvSet STREAM_PROTOCOL_PATH, .:$(PWD)/cfg
+
+require sysmon
+
+! iocBootNotify.sh $(IOC) - \${SHELLBOX#*:} - $(_) $(PWD)/startup.script - $(EPICS) -

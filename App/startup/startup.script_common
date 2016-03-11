@@ -1,0 +1,110 @@
+# $Source: /cvs/A/CS/startup/startup.script_common,v $
+# This is the common part of all startup scripts
+# It is included by all generated scripts
+
+# The following variables should be set before:
+# * INSTBASE where to boot from
+# * EPICS    the epics release (e.g "R3.13.9")
+
+EPICS_MODULES = "/ioc/modules"
+
+# find a better way later to know current require version
+REQUIRE_VERSION="2.3.5"
+
+#set EPICS_HOST_ARCH according to vxWorks version and cpu type
+VX6=(*runtimeVersion>>24)&255-'5'
+VMI=(*runtimeVersion>>8)&255
+EPICS_HOST_ARCH=malloc(16)
+sprintf(EPICS_HOST_ARCH,"%s%c-ppc60%d",VX6?"V6":"T",VX6?VMI:VMI>'3'?'2':'1',sysCpu-90)
+
+#set target name as IOC name
+IOC=&sysBootParams+60
+
+BOOTPC=&sysBootHost
+
+STRINGBUFFER=malloc(256)
+
+# set the prompt
+sprintf STRINGBUFFER, "%s (startup.script aborted) > ", IOC
+shellPromptSet STRINGBUFFER
+
+# do the NFS mounts and other network dependend stuff
+< ../../startup/network
+
+sprintf STRINGBUFFER, "IOC=%s", IOC
+putenv STRINGBUFFER
+
+# setup logging on boot PC
+sprintf STRINGBUFFER, "EPICS_IOC_LOG_INET=%s", BOOTPC
+putenv STRINGBUFFER
+putenv "EPICS_IOC_LOG_PORT=6500"
+
+# create some path variables
+HOME=malloc(80)
+sprintf HOME, "/ioc/%s", IOC
+cd HOME
+
+CFG=malloc(80)
+sprintf CFG, "%s/cfg", HOME
+
+STREAM_PROTOCOL_DIR=malloc(80)
+sprintf STREAM_PROTOCOL_DIR, "%s/cfg", HOME
+
+LIB=malloc(80)
+sprintf LIB, "%s/iocBoot/%s/%s", INSTBASE, EPICS, EPICS_HOST_ARCH
+
+DBD=malloc(80)
+sprintf DBD, "dbd:%s/iocBoot/%s/dbd", INSTBASE, EPICS
+
+sprintf STRINGBUFFER, "EPICS_DRIVER_PATH=.:bin:snl:%s:%s", EPICS_MODULES, LIB
+putenv STRINGBUFFER
+
+TEMPLATES=malloc(80)
+sprintf TEMPLATES, ".:%s/iocBoot/templates", INSTBASE
+
+# time server (must be set before any drivers are configured)
+putenv "EPICS_TS_NTP_INET=129.129.190.1"
+
+# Release memory above 32 MB
+# Code loaded after this must be compiled with -mlongcall
+# at the moment snp24 does not work with this
+memAddToPool (sysMemTop(),sysPhysMemTop()-sysMemTop())
+EXTENDED_MEMORY=0
+#EXTENDED_MEMORY=sysPhysMemTop()-sysMemTop()
+
+# load EPICS system core (different names for 3.13 and 3.14)
+sprintf STRINGBUFFER, "%s/iocCore%s", LIB, strncmp(EPICS,"R3.13",5) ? "Library.munch" : ""
+ld 0, 0, STRINGBUFFER
+
+# TIMEZONE must be set after loading iocCoreLibrary.munch and before iocInit
+# 2016: 
+putenv "TIMEZONE=MET::-60:032702:103003"
+putenv "EPICS_TS_MIN_WEST=-60"
+
+# load "require"
+sprintf STRINGBUFFER, "require_VERSION=%s", getenv("require_VERSION") ? getenv("require_VERSION") : REQUIRE_VERSION
+putenv STRINGBUFFER
+sprintf STRINGBUFFER, "require_DIR=%s/require/%s/%s/", EPICS_MODULES, getenv("require_VERSION"), EPICS
+putenv STRINGBUFFER
+sprintf STRINGBUFFER, "%s/lib/%s/requireLib.munch", getenv("require_DIR"), EPICS_HOST_ARCH
+ld 0, 0, STRINGBUFFER
+
+#load standard drivers (allow user to specify version in environment variable)
+require "base", getenv("base_VERSION")
+registerModule "require", getenv("require_VERSION"), getenv("require_DIR")
+require "utilities", getenv("utilities_VERSION")
+require "misc", getenv("misc_VERSION")
+require "iocmon", getenv("iocmon_VERSION")
+#require "genTime", getenv("genTime_VERSION")
+
+# run EPICS only on 1st network port
+putenv "EPICS_CA_AUTO_ADDR_LIST=NO"
+putenv bootInfo("EPICS_CA_ADDR_LIST=%B")
+putenv bootInfo("EPICS_CAS_INTF_ADDR_LIST=%e")
+putenv "EPICS_CAS_AUTO_BEACON_ADDR_LIST=NO"
+putenv bootInfo("EPICS_CAS_BEACON_ADDR_LIST=%B")
+
+# insert boot infos into database
+bootNotify INSTBASE, "sls/bin/iocBootNotify.sh"
+
+# end of startup.script_common

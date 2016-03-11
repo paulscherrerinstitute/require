@@ -1,0 +1,16 @@
+# $Source: /cvs/A/CS/startup/startup.script_part3,v $
+
+# insert record list into database
+sprintf STRINGBUFFER, "/home/ioc/%s.dbl", IOC
+listRecords STRINGBUFFER, "RTYP DESC"
+sprintf STRINGBUFFER, "%s/sls/bin/dbl2odb.sh", INSTBASE
+rsh BOOTPC, "dbl2odb.sh", IOC, bootInfo("%B"), getenv("EPICS_CA_SERVER_PORT")
+
+# insert library list into database
+sprintf STRINGBUFFER, "/home/ioc/%s.libs", IOC
+libversionShow 1, STRINGBUFFER
+rsh BOOTPC, "upload_libinfo.sh", "-r -i", IOC, "-l", STRINGBUFFER
+
+# set the prompt
+sprintf STRINGBUFFER, "%s > ", IOC
+shellPromptSet STRINGBUFFER

@@ -1,0 +1,1 @@
+require "autoSRarray" "$(autoSRarray_VERSION=)"
