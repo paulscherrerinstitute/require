@@ -219,7 +219,7 @@ int requireDebug;
     #define IF_OPEN_DIR(f) if ((dir = opendir(f)))
     #define DIR_ENTRY struct dirent*
     #define START_DIR_LOOP while ((errno = 0, direntry = readdir(dir)) != NULL)
-    #define END_DIR_LOOP if (errno) fprintf(stderr, "error reading directory %s: %s\n", filename, strerror(errno)); if (dir) closedir(dir);
+    #define END_DIR_LOOP if (!direntry && errno) fprintf(stderr, "error reading directory %s: %s\n", filename, strerror(errno)); if (dir) closedir(dir);
     #ifdef _DIRENT_HAVE_D_TYPE
     #define SKIP_NON_DIR(e) if (e->d_type != DT_DIR && e->d_type != DT_UNKNOWN) continue;
     #else
