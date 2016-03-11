@@ -864,9 +864,10 @@ SNCFLAGS += -r
 	${LN} $< $(*F).gt
 	gdc $(*F).gt
 
-# The original 3.13 munching rule does not really work well
-ifeq (${EPICS_BASETYPE},3.13)
-MUNCH=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
+# The original EPICS munching rules do not really work well
+MUNCH_5=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
+MUNCH_6=tclsh $(VX_DIR)/host/resource/hutils/tcl/munch.tcl
+MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
 %.munch: CMPLR=TRAD
 %.munch: %
 	@echo Munching $<
@@ -874,7 +875,11 @@ MUNCH=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
 	$(NM) $< | $(MUNCH) > ctdt.c
 	$(COMPILE.c) ctdt.c
 	$(LINK.c) $@ $< ctdt.o
-endif
+
+%_ctdt.c : %.nm
+	@echo Munching $*
+	@$(RM) $@
+	$(MUNCH) < $< > $@ 
 
 ${VERSIONFILE}:
 	echo "char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
