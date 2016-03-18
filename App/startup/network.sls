@@ -17,3 +17,6 @@ nfsMount ("slsfs","/export/csa/releases/work","/work")
 nfsMount ("slsfs","/export/csa/releases/prod","/prod")
 nfsMount ("slsfs","/export/csa/releases/devl","/devl")
 nfsMount ("slsfs","/export/exchange","/exchange")
+
+# overwrite driver module location
+EPICS_MODULES = "/work/iocBoot/modules"
