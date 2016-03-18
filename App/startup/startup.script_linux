@@ -32,7 +32,6 @@ epicsEnvSet TEMPLATES, $(INSTBASE)/iocBoot/templates
 epicsEnvSet CFG, $(PWD)/cfg
 epicsEnvSet STREAM_PROTOCOL_PATH, .:$(PWD)/cfg
 
-
-require sysmon
+require sysmon,$(sysmon_VERSION=ifexists)
 
 ! iocBootNotify.sh $(IOC) - \"\${SHELLBOX#*:}\" - $(_) $(PWD)/startup.script - $(EPICS) -
