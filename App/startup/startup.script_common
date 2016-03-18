@@ -28,6 +28,9 @@ STRINGBUFFER=malloc(256)
 sprintf STRINGBUFFER, "%s (startup.script aborted) > ", IOC
 shellPromptSet STRINGBUFFER
 
+# time server
+putenv "EPICS_TS_NTP_INET=129.129.190.1"
+
 # do the NFS mounts and other network dependend stuff
 < ../../startup/network
 
@@ -62,9 +65,6 @@ putenv STRINGBUFFER
 TEMPLATES=malloc(80)
 sprintf TEMPLATES, ".:%s/iocBoot/templates", INSTBASE
 
-# time server (must be set before any drivers are configured)
-putenv "EPICS_TS_NTP_INET=129.129.190.1"
-
 # Release memory above 32 MB
 # Code loaded after this must be compiled with -mlongcall
 # at the moment snp24 does not work with this
@@ -81,6 +81,12 @@ ld 0, 0, STRINGBUFFER
 putenv "TIMEZONE=MET::-60:032702:103003"
 putenv "EPICS_TS_MIN_WEST=-60"
 
+# try for user-defined menus scan and convert
+dbLoadDatabase "dbd/scan.dbd"
+dbLoadDatabase "dbd/convert.dbd"
+dbLoadDatabase "dbd/slsConvert.dbd"
+taskDelay sysClkRateGet()
+
 # load "require"
 sprintf STRINGBUFFER, "require_VERSION=%s", getenv("require_VERSION") ? getenv("require_VERSION") : REQUIRE_VERSION
 putenv STRINGBUFFER
@@ -95,7 +101,8 @@ registerModule "require", getenv("require_VERSION"), getenv("require_DIR")
 require "utilities", getenv("utilities_VERSION")
 require "misc", getenv("misc_VERSION")
 require "iocmon", getenv("iocmon_VERSION")
-#require "genTime", getenv("genTime_VERSION")
+require "genTime", getenv("genTime_VERSION") ? getenv("genTime_VERSION") : "ifexists"
+require "seq", "ifexists"
 
 # run EPICS only on 1st network port
 putenv "EPICS_CA_AUTO_ADDR_LIST=NO"
