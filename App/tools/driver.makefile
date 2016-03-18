@@ -865,8 +865,11 @@ SNCFLAGS += -r
 	gdc $(*F).gt
 
 # The original EPICS munching rules do not really work well
+# Call the native vxWorks munch program
 MUNCH_5=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
 MUNCH_6=tclsh $(VX_DIR)/host/resource/hutils/tcl/munch.tcl
+MUNCH_=$(MUNCH_5)
+# VXWORKS_MAJOR_VERSION exsists since EPICS 3.14.12 or so
 MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
 %.munch: CMPLR=TRAD
 %.munch: %
