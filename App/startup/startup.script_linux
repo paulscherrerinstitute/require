@@ -27,13 +27,12 @@ epicsEnvSet EPICS_CA_AUTO_ADDR_LIST,"$(CA_AUTO_$(NET1=).$(NET2=).$(NET3=)=$(CA_A
 epicsEnvSet EPICS_CAS_BEACON_ADDR_LIST,"$(CA_BEACON_$(NET1=).$(NET2=).$(NET3=)=$(CA_BEACON_$(NET1=).$(NET2=)=))"
 epicsEnvSet EPICS_CAS_BEACON_AUTO_ADDR_LIST,"$(CA_AUTO_BEACON_$(NET1=).$(NET2=).$(NET3=)=$(CA_AUTO_BEACON_$(NET1=).$(NET2=)=YES))"
 
-
 epicsEnvSet TEMPLATES, $(INSTBASE)/iocBoot/templates
 epicsEnvSet CFG, $(PWD)/cfg
 epicsEnvSet STREAM_PROTOCOL_PATH, .:$(PWD)/cfg
 
-epicsEnvSet LIBRARY_DEFAULT_VERSION_R3.14.8 ""
-epicsEnvSet LIBRARY_DEFAULT_VERSION "$(LIBRARY_DEFAULT_VERSION_$(EPICS)=ifexists)"
-require sysmon $(sysmon_VERSION=$(LIBRARY_DEFAULT_VERSION))
+# disable sysmon for IFC
+epicsEnvSet sysmon_VERSION_eldk52-e500v2 none
+require sysmon $(sysmon_VERSION=$(sysmon_VERSION_$(T_A=)=))
 
 ! iocBootNotify.sh $(IOC) - \"\${SHELLBOX#*:}\" - $(_) $(PWD)/startup.script - $(EPICS) -
