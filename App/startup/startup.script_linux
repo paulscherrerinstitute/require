@@ -1,4 +1,3 @@
-# $Source: /cvs/A/CS/startup/startup.script_linux,v $
 
 # set EPICS according to BASE or default to 3.14.12
 epicsEnvSet EPICS, R$(BASE=3.14.12)
@@ -22,6 +21,7 @@ epicsEnvSet CA_AUTO_BEACON_172.26,NO
 # Apply settings dependent on network
 system ("/sbin/ifconfig  | awk -F '[.: ]+' -v P='epicsEnvSet NET' -v K=, '/192.168/ {next} /Bcast/ {print P 1 K $9; print P 2 K $10; print P 3 K $11; exit}'>/tmp/$(IOC).net")
 < /tmp/$(IOC).net
+system ("rm /tmp/$(IOC).net")
 epicsEnvSet EPICS_CA_ADDR_LIST,"$(CA_$(NET1=).$(NET2=).$(NET3=)=$(CA_$(NET1=).$(NET2=)=))"
 epicsEnvSet EPICS_CA_AUTO_ADDR_LIST,"$(CA_AUTO_$(NET1=).$(NET2=).$(NET3=)=$(CA_AUTO_$(NET1=).$(NET2=)=YES))"
 epicsEnvSet EPICS_CAS_BEACON_ADDR_LIST,"$(CA_BEACON_$(NET1=).$(NET2=).$(NET3=)=$(CA_BEACON_$(NET1=).$(NET2=)=))"
