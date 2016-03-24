@@ -45,10 +45,14 @@ putenv "EPICS_IOC_LOG_PORT=6500"
 # create some path variables
 HOME=malloc(80)
 sprintf HOME, "/ioc/%s", IOC
+sprintf STRINGBUFFER, "HOME=%s", HOME
+putenv STRINGBUFFER
 cd HOME
 
 CFG=malloc(80)
 sprintf CFG, "%s/cfg", HOME
+sprintf STRINGBUFFER, "CFG=%s", CFG
+putenv STRINGBUFFER
 
 STREAM_PROTOCOL_DIR=malloc(80)
 sprintf STREAM_PROTOCOL_DIR, "%s/cfg", HOME
