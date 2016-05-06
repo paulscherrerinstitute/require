@@ -183,7 +183,8 @@ help:
 	@echo "  EXCLUDE_VERSIONS () [versions not to build, e.g. 3.14]"
 	@echo "  EXCLUDE_ARCHS    () [target architectures not to build]"
 	@echo "  ARCH_FILTER      () [target architectures to build, e.g. SL6%]"
-	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"       
+	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"
+	@echo "  <module>_VERSION () [build against specific version of other module]"
 
 # "make version" shows the version and why it is how it is.       
 version: ${IGNOREFILES}
