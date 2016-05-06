@@ -455,17 +455,20 @@ export REQ
 
 # add sources for specific epics types (3.13 or 3.14) or architectures
 ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
-SRCS += $(foreach PART, ${ARCH_PARTS}, ${SOURCES_${PART}})
-SRCS += $(foreach PART, ${ARCH_PARTS}, ${SOURCES_${EPICS_BASETYPE}_${PART}})
+VAR_EXTENSIONS = ${EPICS_BASETYPE} ${EPICSVERSION} ${ARCH_PARTS} ${ARCH_PARTS:%=${EPICS_BASETYPE}_%} ${ARCH_PARTS:%=${EPICSVERSION}_%}
+export VAR_EXTENSIONS
+
+SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
+USR_LIBOBJS += ${LIBOBJS} $(foreach x,${VAR_EXTENSIONS},${LIBOBJS_$x})
+export USR_LIBOBJS
 
 else # in O.*
 ## RUN 4
 # in O.* directory
 
 # add macros like USR_CFLAGS_vxWorks
-EXTENDED_VARS=USR_INCLUDES USR_CFLAGS USR_CXXFLAGS USR_CPPFLAGS CODE_CXXFLAGS
-VAR_EXTENSIONS=OS_CLASS T_A  EPICS_BASETYPE  EPICSVERSION
-$(foreach v,${EXTENDED_VARS},$(foreach x,${VAR_EXTENSIONS},$(eval $v+=$${$v_${$x}})))
+EXTENDED_VARS=INCLUDES CFLAGS CXXFLAGS CPPFLAGS CODE_CXXFLAGS LDFLAGS
+$(foreach v,${EXTENDED_VARS},$(foreach x,${VAR_EXTENSIONS},$(eval $v+=$${$v_$x}) $(eval USR_$v+=$${USR_$v_$x})))
 CFLAGS += ${EXTRA_CFLAGS}
 
 COMMON_DIR_3.14 = ../O.${EPICSVERSION}_Common
@@ -547,7 +550,6 @@ INSTALL_UI      = ${MODULE_LOCATION}/ui
 #	$(SETLINKS) ${INSTALL_TEMPL} .db $(basename $(notdir $^))
 
 # Different settings required to build library in 3.13. and 3.14
-
 ifeq (${EPICS_BASETYPE},3.13) # only 3.13 from here
 
 # Convert sources to object code, skip .a and .o here
@@ -573,9 +575,9 @@ else # only 3.14 from here
 ifeq (${OS_CLASS},vxWorks)
 # only install the munched lib
 INSTALL_PROD=
-MODULELIB = $(if $(strip ${LIBOBJS}),${PRJ}Lib.munch,)
+MODULELIB = $(if $(strip ${LIBOBJS} ${USR_LIBOBJS}),${PRJ}Lib.munch,)
 else
-MODULELIB = $(if $(strip ${LIBOBJS}),${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
+MODULELIB = $(if $(strip ${LIBOBJS} ${USR_LIBOBJS}),${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
 endif
 
 # vxWorks
@@ -585,11 +587,11 @@ LIBOBJS += $(filter /%.$(OBJ) /%(LIB_SUFFIX),${SRCS})
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
 LIBS = -L ${EPICS_BASE_LIB} ${BASELIBS:%=-l%}
 LINK.cpp += ${LIBS}
-PRODUCT_OBJS = ${LIBOBJS}
+PRODUCT_OBJS = ${LIBOBJS} ${USR_LIBOBJS}
 
 # Linux
-LOADABLE_LIBRARY=$(if ${LIBOBJS},${PRJ},)
-LIBRARY_OBJS = ${LIBOBJS}
+LOADABLE_LIBRARY=$(if $(strip ${LIBOBJS} ${USR_LIBOBJS}),${PRJ},)
+LIBRARY_OBJS = ${LIBOBJS} ${USR_LIBOBJS}
 
 # Hack needed needed for 3.14.8 host arch when no Makefile exists (but only for example GNUmakefile)
 ifeq (${EPICSVERSION}-${T_A},3.14.8-${EPICS_HOST_ARCH})
@@ -697,7 +699,6 @@ debug::
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
 	@echo "OS_CLASS = ${OS_CLASS}"
 	@echo "T_A = ${T_A}"
-	@echo "ARCH_PARTS = ${ARCH_PARTS}"
 	@echo "MODULEDBD = ${MODULEDBD}"
 	@echo "RECORDS = ${RECORDS}"
 	@echo "MENUS = ${MENUS}"
