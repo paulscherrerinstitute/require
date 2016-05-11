@@ -72,7 +72,6 @@ BUILDCLASSES = vxWorks
 EPICS_MODULES ?= /ioc/modules
 MODULE_LOCATION = ${EPICS_MODULES}/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
 EPICS_LOCATION = /usr/local/epics
-SNCSEQ=${EPICS_BASE}/../seq
 
 DOCUEXT = txt html htm doc pdf ps tex dvi gif jpg png
 DOCUEXT += TXT HTML HTM DOC PDF PS TEX DVI GIF JPG PNG
@@ -142,6 +141,7 @@ export OS_CLASS_LIST
 
 export ARCH_FILTER
 export EXCLUDE_ARCHS
+export MAKE_FIRST
 
 # shell commands
 RMDIR = rm -rf
@@ -180,6 +180,8 @@ help:
 	@echo "  HEADERS          () [only those to install]"
 	@echo "  TEMPLATES        (*.template *.db *.subs) [db files]"
 	@echo "  SCRIPTS          (*.cmd) [startup and other scripts]"
+	@echo "  BINS             () [programs to install]"
+	@echo "  UIS              (*.ui) [user interfaces to install]"
 	@echo "  EXCLUDE_VERSIONS () [versions not to build, e.g. 3.14]"
 	@echo "  EXCLUDE_ARCHS    () [target architectures not to build]"
 	@echo "  ARCH_FILTER      () [target architectures to build, e.g. SL6%]"
@@ -336,8 +338,6 @@ SCR += ${SCRIPTS_${EPICS_BASETYPE}}
 SCR += ${SCRIPTS_${EPICSVERSION}}
 export SCR
 
-export CFG
-
 DOCUDIR = .
 #DOCU = $(foreach DIR,${DOCUDIR},$(wildcard ${DIR}/*README*) $(foreach EXT,${DOCUEXT}, $(wildcard ${DIR}/*.${EXT})))
 export DOCU
@@ -359,7 +359,7 @@ SRCS_vxWorks += ${SOURCES_${EPICS_BASETYPE}_vxWorks}
 SRCS_vxWorks += ${SOURCES_vxWorks_${EPICS_BASETYPE}}
 export SRCS_vxWorks
 
-install build debug::
+install build debug:: $(MAKE_FIRST)
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
 
 uninstall::
@@ -450,18 +450,24 @@ install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
 
 endif
 
-REQ = ${REQUIRED} ${REQUIRED_${OS_CLASS}} ${REQUIRED_${T_A}} ${REQUIRED_${EPICS_BASETYPE}} ${REQUIRED_${EPICSVERSION}}
-REQ += $(if $(filter %.st %.stt,${SRCS}),seq)
-export REQ
-
 # add sources for specific epics types (3.13 or 3.14) or architectures
 ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
 VAR_EXTENSIONS = ${EPICS_BASETYPE} ${EPICSVERSION} ${ARCH_PARTS} ${ARCH_PARTS:%=${EPICS_BASETYPE}_%} ${ARCH_PARTS:%=${EPICSVERSION}_%}
 export VAR_EXTENSIONS
 
+REQ = ${REQUIRED} $(foreach x, ${VAR_EXTENSIONS}, ${REQUIRED_$x})
+export REQ
+
 SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
 USR_LIBOBJS += ${LIBOBJS} $(foreach x,${VAR_EXTENSIONS},${LIBOBJS_$x})
 export USR_LIBOBJS
+
+BINS += $(foreach x, ${VAR_EXTENSIONS}, ${BINS_$x})
+export BINS
+
+export CFG
+
+export UIS
 
 else # in O.*
 ## RUN 4
@@ -560,6 +566,8 @@ LIBOBJS += $(filter /%.o /%.a,${SRCS})
 # add all .a and .o with relative path, but prefix with ../
 LIBOBJS += $(patsubst %,../%,$(filter-out /%,$(filter %.o %.a,${SRCS})))
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
+LIBOBJS += $(foreach l,${USR_LIBOBJS}, $(addprefix ../,$(filter-out /%,$l)) $(filter /%,$l))
+
 LIBNAME = $(if $(strip ${LIBOBJS}),${PRJ}Lib,)   # must be the un-munched name
 MODULELIB = ${LIBNAME:%=%.munch}
 PROD = ${MODULELIB}
@@ -573,12 +581,14 @@ PROD = ${MODULELIB}
 
 else # only 3.14 from here
 
+LIBRARY_OBJS = $(strip ${LIBOBJS} $(foreach l,${USR_LIBOBJS},$(addprefix ../,$(filter-out /%,$l))$(filter /%,$l)))
+
 ifeq (${OS_CLASS},vxWorks)
 # only install the munched lib
 INSTALL_PROD=
-MODULELIB = $(if $(strip ${LIBOBJS} ${USR_LIBOBJS}),${PRJ}Lib.munch,)
+MODULELIB = $(if ${LIBRARY_OBJS},${PRJ}Lib.munch,)
 else
-MODULELIB = $(if $(strip ${LIBOBJS} ${USR_LIBOBJS}),${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
+MODULELIB = $(if ${LIBRARY_OBJS},${LIB_PREFIX}${PRJ}${SHRLIB_SUFFIX},)
 endif
 
 # vxWorks
@@ -588,11 +598,10 @@ LIBOBJS += $(filter /%.$(OBJ) /%(LIB_SUFFIX),${SRCS})
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
 LIBS = -L ${EPICS_BASE_LIB} ${BASELIBS:%=-l%}
 LINK.cpp += ${LIBS}
-PRODUCT_OBJS = ${LIBOBJS} ${USR_LIBOBJS}
+PRODUCT_OBJS = ${LIBRARY_OBJS}
 
 # Linux
-LOADABLE_LIBRARY=$(if $(strip ${LIBOBJS} ${USR_LIBOBJS}),${PRJ},)
-LIBRARY_OBJS = ${LIBOBJS} ${USR_LIBOBJS}
+LOADABLE_LIBRARY=$(if ${LIBRARY_OBJS},${PRJ},)
 
 # Hack needed needed for 3.14.8 host arch when no Makefile exists (but only for example GNUmakefile)
 ifeq (${EPICSVERSION}-${T_A},3.14.8-${EPICS_HOST_ARCH})
@@ -680,10 +689,8 @@ DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 #$(shell awk '$(maksubfuncfile)' $(addprefix ../,$(filter %.c %.cc %.C %.cpp, $(SRCS))) > ${SUBFUNCFILE})
 #DBDFILES += $(if $(shell cat ${SUBFUNCFILE}),${SUBFUNCFILE})
 
-# snc location in 3.14
-#-include ${SNCSEQ}/configure/RULES_BUILD # incompatible to 3.15
-SNC=${SNCSEQ}/bin/$(EPICS_HOST_ARCH)/snc
-SNC_CFLAGS=-I ${SNCSEQ}/include
+# snc location in 3.14: from latest version module seq or fall back to globally installed
+SNC=$(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/*.*.*/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
 
 endif # 3.14
 
@@ -776,7 +783,9 @@ INSTALL_DBDS = ${MODULEDBD:%=${INSTALL_DBD}/%}
 INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(notdir ${HDRS}))
 INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
 INSTALL_SCRS = $(addprefix ${INSTALL_SCR}/,$(notdir ${SCR}))
+INSTALL_BINS = $(addprefix ${INSTALL_BIN}/,$(notdir ${BINS}))
 INSTALL_CFGS = $(CFG:%=${INSTALL_CFG}/%)
+INSTALL_UIS  = $(addprefix ${INSTALL_UI}/,$(notdir ${UIS}))
 
 debug::
 	@echo "INSTALL_LIB = $(INSTALL_LIB)"
@@ -792,8 +801,12 @@ debug::
 	@echo "INSTALL_SCRS = $(INSTALL_SCRS)"
 	@echo "INSTALL_CFG = $(INSTALL_CFG)"
 	@echo "INSTALL_CFGS = $(INSTALL_CFGS)"
+	@echo "INSTALL_BIN = $(INSTALL_BIN)"
+	@echo "INSTALL_BINS = $(INSTALL_BINS)"
+	@echo "INSTALL_UI = $(INSTALL_UI)"
+	@echo "INSTALL_UIS = $(INSTALL_UIS)"
 
-INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_DEPS}
+INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_BINS} ${INSTALL_DEPS} ${INSTALL_UIS} 
 
 ${INSTALLRULE} ${INSTALLS}
 
@@ -825,6 +838,10 @@ ${INSTALL_UIS}: $(notdir ${UIS})
 	@echo "Installing user interfaces $^ to $(@D)"
 	$(INSTALL) -d -m444 $^ $(@D)
 
+${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
+	@echo "Installing binaries $^ to $(@D)"
+	$(INSTALL) -d -m555 $^ $(@D)
+
 # Create SNL code from st/stt file
 # (RULES.Vx only allows ../%.st, 3.14 has no .st rules at all)
 # Important to have %.o: %.st and %.o: %.stt rule before %.o: %.c rule!
@@ -844,8 +861,10 @@ SNCFLAGS += -r
 	@echo "Compiling $(*F).c"
 	$(RM) $@
 	$(COMPILE.c) ${SNC_CFLAGS} $(*F).c
+ifneq (${EPICS_BASETYPE},3.13)
 	@echo "Building $(*F)_snl.dbd"
-	awk -F '[ ;]' '/extern struct seqProgram/ { print "registrar (" $$4 "Registrar)"}' $(*F).c > $(*F)_snl.dbd
+	awk -F [\(\)]  '/epicsExportRegistrar/ { print "registrar (" $$2 ")"}' $(*F).c > $(*F)_snl.dbd
+endif
 
 %$(OBJ) %_snl.dbd: %.stt
 	@echo "Preprocessing $(<F)"
@@ -857,8 +876,10 @@ SNCFLAGS += -r
 	@echo "Compiling $(*F).c"
 	$(RM) $@
 	$(COMPILE.c) ${SNC_CFLAGS} $(*F).c
+ifneq (${EPICS_BASETYPE},3.13)
 	@echo "Building $(*F)_snl.dbd"
-	awk -F '[ ;]' '/extern struct seqProgram/ { print "registrar (" $$4 "Registrar)"}' $(*F).c > $(*F)_snl.dbd
+	awk -F [\(\)]  '/epicsExportRegistrar/ { print "registrar(" $$2 ")"}' $(*F).c > $(*F)_snl.dbd
+endif
 
 # Create GPIB code from gt file
 %.c %.dbd %.list: %.gt
@@ -949,15 +970,15 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	# dependencies on other module headers
+	# check dependencies on other module headers
 	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/\([0-9]*\.[0-9]*\)\.[0-9]*/.*%\1 \2%p;s%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2%p'| sort -u >> $@
 ifneq ($(strip ${REQ}),)
 	# manully added dependencies: ${REQ}
 	$(foreach m,${REQ},echo "$m $(or ${$m_VERSION},$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numbered version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
 endif
 ifdef OLD_INCLUDE
-	# dependencies on old style driver headers
-	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw ${PRJ} >> $@; true
+	# check dependencies on old style driver headers
+	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw -e ${PRJ} -e ^$$ >> $@ && echo "Warning: dependency on old style driver"; true;
 endif
 
 $(BUILDRULE)
