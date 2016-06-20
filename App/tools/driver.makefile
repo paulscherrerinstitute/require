@@ -508,7 +508,7 @@ endif
 
 # manually required modules
 define ADD_MANUAL_DEPENDENCIES
-$(eval $(1)_VERSION := $(or $(basename $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv ${EPICS_MODULES}/$(1)/*.*.*/R${EPICSVERSION} 2>/dev/null)))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
+$(eval $(1)_VERSION := $(or $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv ${EPICS_MODULES}/$(1)/*.*.*/R${EPICSVERSION} 2>/dev/null))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,$m)))
 
