@@ -690,7 +690,7 @@ DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 #DBDFILES += $(if $(shell cat ${SUBFUNCFILE}),${SUBFUNCFILE})
 
 # snc location in 3.14: from latest version module seq or fall back to globally installed
-SNC=$(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/*.*.*/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
+SNC=$(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/$(or $(seq_VERSION),*.*.*)/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
 
 endif # 3.14
 
