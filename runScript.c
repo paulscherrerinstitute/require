@@ -140,6 +140,7 @@ int runScript(const char* filename, const char* args)
     char* line_exp = NULL;
     long line_raw_size = 256;
     long line_exp_size = line_raw_size;
+    long len;
     char** pairs;
     int status = 0;
     
@@ -151,10 +152,9 @@ int runScript(const char* filename, const char* args)
     
     pairs = (char*[]){ "", "environ", NULL, NULL };
 
-    if ((file = fopen(filename, "r")) == NULL) { perror(filename); return errno; }
     if (macCreateHandle(&mac, pairs) != 0) goto error;
     macSuppressWarning(mac, 1);
-    #ifdef EPICS_3_13
+#ifdef EPICS_3_13
     /* Have no environment macro substitution, thus load envionment explicitly */
     /* Actually, environmant macro substitution was introduced in 3.14.3 */
     for (pairs = ppGlobalEnviron; *pairs; pairs++)
@@ -173,8 +173,31 @@ int runScript(const char* filename, const char* args)
         }
         free(var);            
     }
-    #endif
+#endif
 
+    if ((line_exp = malloc(line_exp_size)) == NULL) goto error;
+    if ((line_raw = malloc(line_raw_size)) == NULL) goto error;
+
+#ifdef vxWorks
+    /* expand macros (environment variables) in file name because vxWorks shell can't do it */
+#ifdef EPICS_3_13
+    /* 3.13 version of macExpandString is broken and may write more than allowed */
+    while ((len = labs(macExpandString(mac, (char*)filename, line_exp, 
+            line_exp_size/2))) >= line_exp_size/2)
+#else       
+    while ((len = labs(macExpandString(mac, filename, line_exp, 
+            line_exp_size-1))) >= line_exp_size-2)
+#endif
+    {
+        if (runScriptDebug)
+            printf("runScript: grow expand buffer: len=%ld size=%ld\n", len, line_exp_size);
+        free(line_exp);
+        if ((line_exp = malloc(line_exp_size *= 2)) == NULL) goto error;
+    }
+    filename = line_exp;
+#endif
+
+    /* add args to macro definitions */
     if (args)
     {
         if (runScriptDebug)
@@ -184,13 +207,12 @@ int runScript(const char* filename, const char* args)
         free(pairs);
     }
 
+    if ((file = fopen(filename, "r")) == NULL) { perror(filename); return errno; }
+
     /*  line by line after expanding macros with arguments or environment */
-    if ((line_raw = malloc(line_raw_size)) == NULL) goto error;
-    if ((line_exp = malloc(line_exp_size)) == NULL) goto error;
     while (fgets(line_raw, line_raw_size, file))
     {
         char* p, *x;
-        long len;
 
         /* check if we have a line longer than the buffer size */
         while (line_raw[(len = (long)strlen(line_raw))-1] != '\n' && !feof(file))
