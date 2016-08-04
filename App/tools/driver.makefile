@@ -1,20 +1,18 @@
 # driver.makefile
 #
-# $Header: /cvs/G/DRV/misc/App/tools/driver.makefile,v 1.100 2014/12/10 14:15:29 zimoch Exp $
-#
 # This generic makefile compiles EPICS modules (drivers, records, snl, ...)
-# for all installed EPICS versions in parallel.
+# for all installed EPICS versions.
 # Read this documentation and the inline comments carefully before
 # changing anything in this file.
 #
 # Usage: Create a Makefile containig the line:
-#          include /ioc/tool/driver.makefile
+#        include /ioc/tool/driver.makefile
 #        Optionally add variable definitions below that line.
 #
 # This makefile automatically finds the source file (unless overwritten with
-# the SOURCES variable in your Makefile) and generates a
-# library for each EPICS version and each target architecture.
-# Therefore, it calls Makefile (i.e. itself) recursively.
+# the SOURCES variable in your Makefile) and generates a module consisting
+# of a library and .dbd file for each EPICS version and each target architecture.
+# Therefore, it calls itself recursively.
 #
 # - First run: (see comment ## RUN 1)
 #   Find out what to build
@@ -33,13 +31,13 @@
 # - Fourth run: (see comment ## RUN 4)
 #   Compile everything.
 #
-# Library names are derived from the directory name (unless overwritten
+# Module names are derived from the directory name (unless overwritten
 # with the MODULE variable in your Makefile).
 # A LIBVERSION number is generated from the latest CVS or GIT tag of the sources.
 # If any file is not up-to-date in CVS/GIT, not tagged, or tagged differently from the
 # other files, the version is a test version and labelled with the user name.
 # The library is installed to ${EPICS_MODULES}/${MODULE}/${LIBVERSION}/lib/${T_A}/.
-# The library can be loaded with  require "<libname>" [,"<version>"] [,"<variable>=<substitution>, ..."]
+# A module can be loaded with  require "<module>" [,"<version>"] [,"<variable>=<substitution>, ..."]
 #
 # User variables (add them to your Makefile, none is required):
 # MODULE
@@ -48,7 +46,7 @@
 # SOURCES
 #    All source files to compile. 
 #    If not defined, default is all *.c *.cc *.cpp *.st *.stt in
-#    the source directory (where your Makefile is).
+#    the source directory (where you run make).
 #    If you define this, you must list ALL sources.
 # DBDS
 #    All dbd files of the project.
@@ -58,8 +56,8 @@
 #    If not defined, all headers are for local use only.
 # EXCLUDE_VERSIONS
 #    EPICS versions to skip. Usually 3.13 or 3.14
-# EXCLUDE_ARCHS
-#    Skip architectures that start or end with the pattern, e.g. T2 or ppc604 
+# ARCH_FILTER
+#    Sub set of architectures to build for, e.g. %-ppc604
 
 # get the location of this file 
 MAKEHOME:=$(dir $(lastword ${MAKEFILE_LIST}))
@@ -104,6 +102,8 @@ HEADERS=
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules)
 default: build
+
+.PHONY: build clean install uninstall debug help version
 
 IGNOREFILES = .cvsignore .gitignore
 %: ${IGNOREFILES}
@@ -168,6 +168,7 @@ help:
 	@for target in '' build '<EPICS version>' \
 	install 'install.<EPICS version>' \
 	uninstall 'uninstall.<EPICS version>' \
+        installqt uninstallqt \
 	clean help version; \
 	do echo "  make $$target"; \
 	done
@@ -216,6 +217,7 @@ build install debug:: ${IGNOREFILES}
 # make 3.13 or make 3.14 instead of make
 
 define VERSIONRULES
+.PHONY: $(1) %.$(1)
 $(1): ${IGNOREFILES}
 	for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
 
@@ -228,6 +230,7 @@ $(foreach v,$(sort $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIO
 # make <action>.<version> instead of make <action> or
 # make <version> instead of make
 # EPICS version must be installed but need not be in EPICS_VERSIONS
+.PHONY: ${INSTALLED_EPICS_VERSIONS} ${INSTALLED_EPICS_VERSIONS:%=build.%} ${INSTALLED_EPICS_VERSIONS:%=install.%} ${INSTALLED_EPICS_VERSIONS:%=debug.%}
 ${INSTALLED_EPICS_VERSIONS}:
 	${MAKEVERSION} EPICSVERSION=$@ build
 
@@ -239,6 +242,33 @@ ${INSTALLED_EPICS_VERSIONS:%=install.%}:
 
 ${INSTALLED_EPICS_VERSIONS:%=debug.%}:
 	${MAKEVERSION} EPICSVERSION=${@:debug.%=%} debug
+
+
+# Install user interfaces to global location
+
+.PHONY: installui uninstallui
+
+define INSTALL_UI_RULE
+INSTALL_$(1)=$(2)
+$(1)_FILES=$$(wildcard $$(or $${$(1)},$(3)))
+.PHONY: install$(1) uninstall$(1)
+installui: install$(1)
+install$(1):
+#	@echo $(1)=$${$(1)}
+	@$$(if $${$(1)_FILES},echo "Installing $(1) user interfaces";$$(MKDIR) $${INSTALL_$(1)})
+	$$(if $$(wildcard $${INSTALL_$(1)}/.$${PRJ}-*.txt),$$(RM) $$(addprefix $${INSTALL_$(1)}/,$$(filter-out $$(notdir $${$(1)_FILES}),$$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt))
+	$$(if $${$(1)_FILES},install -C -m444 $${$(1)_FILES} -t $${INSTALL_$(1)})
+	@$$(if $${$(1)_FILES},echo $$(notdir $${$(1)_FILES}) > $${INSTALL_$(1)}/.$${PRJ}-$$(LIBVERSION).txt)
+
+uninstallui: uninstall$(1)
+uninstall$(1):
+	@echo "Removing $(1) user interfaces"
+	$$(RM) $$(addprefix $${INSTALL_$(1)}/,$$(sort $$(notdir $${$(1)_FILES}) $$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt)
+endef
+
+#$(eval $(call INSTALL_UI_RULE,VARIABLE,installdir,sourcedefaultlocation))
+$(eval $(call INSTALL_UI_RULE,QT,${CONFIGBASE}/qt,qt/*))
+
 
 else # EPICSVERSION
 # EPICSVERSION defined 
@@ -299,7 +329,7 @@ ifndef T_A
 # Look for sources etc.
 # Export everything for third run
 
-AUTOSRCS := $(filter-out ~%,$(wildcard *.c) $(wildcard *.cc) $(wildcard *.cpp *.st *.stt *.gt))
+AUTOSRCS := $(filter-out ~%,$(wildcard *.c *.cc *.cpp *.st *.stt *.gt))
 SRCS = $(if ${SOURCES},$(filter-out -none-,${SOURCES}),${AUTOSRCS})
 SRCS += ${SOURCES_${EPICS_BASETYPE}}
 SRCS += ${SOURCES_${EPICSVERSION}}
@@ -467,8 +497,6 @@ export BINS
 
 export CFG
 
-export UIS
-
 else # in O.*
 ## RUN 4
 # in O.* directory
@@ -531,7 +559,6 @@ INSTALL_DB      = ${INSTALL_REV}/db
 INSTALL_CFG     = ${INSTALL_REV}/cfg
 INSTALL_DOC     = ${MODULE_LOCATION}/doc
 INSTALL_SCR     = ${INSTALL_REV}
-INSTALL_UI      = ${MODULE_LOCATION}/ui
 
 #INSTALL_DOCUS = $(addprefix ${INSTALL_DOC}/${PRJ}/,$(notdir ${DOCU}))
 
@@ -749,7 +776,7 @@ EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
 # Setup searchpaths from all used files
 # find all sources whatever suffix
-$(foreach filetype,SRCS TEMPLS SCR UIS,$(foreach ext,$(sort $(suffix ${${filetype}})),\
+$(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),\
     $(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
 
 # Do not treat %.dbd the same way because it creates a circular dependency
@@ -785,7 +812,6 @@ INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
 INSTALL_SCRS = $(addprefix ${INSTALL_SCR}/,$(notdir ${SCR}))
 INSTALL_BINS = $(addprefix ${INSTALL_BIN}/,$(notdir ${BINS}))
 INSTALL_CFGS = $(CFG:%=${INSTALL_CFG}/%)
-INSTALL_UIS  = $(addprefix ${INSTALL_UI}/,$(notdir ${UIS}))
 
 debug::
 	@echo "INSTALL_LIB = $(INSTALL_LIB)"
@@ -803,10 +829,8 @@ debug::
 	@echo "INSTALL_CFGS = $(INSTALL_CFGS)"
 	@echo "INSTALL_BIN = $(INSTALL_BIN)"
 	@echo "INSTALL_BINS = $(INSTALL_BINS)"
-	@echo "INSTALL_UI = $(INSTALL_UI)"
-	@echo "INSTALL_UIS = $(INSTALL_UIS)"
 
-INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_BINS} ${INSTALL_DEPS} ${INSTALL_UIS} 
+INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_BINS} ${INSTALL_DEPS}
 
 ${INSTALLRULE} ${INSTALLS}
 
@@ -832,10 +856,6 @@ ${INSTALL_SCRS}: $(notdir ${SCR})
 
 ${INSTALL_CFGS}: ${CFGS}
 	@echo "Installing configuration files $^ to $(@D)"
-	$(INSTALL) -d -m444 $^ $(@D)
-
-${INSTALL_UIS}: $(notdir ${UIS})
-	@echo "Installing user interfaces $^ to $(@D)"
 	$(INSTALL) -d -m444 $^ $(@D)
 
 ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
