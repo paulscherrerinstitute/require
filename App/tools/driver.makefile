@@ -103,8 +103,6 @@ HEADERS=
 # Don't install anything (different from default EPICS make rules)
 default: build
 
-.PHONY: build clean install uninstall debug help version
-
 IGNOREFILES = .cvsignore .gitignore
 %: ${IGNOREFILES}
 ${IGNOREFILES}:
@@ -217,7 +215,6 @@ build install debug:: ${IGNOREFILES}
 # make 3.13 or make 3.14 instead of make
 
 define VERSIONRULES
-.PHONY: $(1) %.$(1)
 $(1): ${IGNOREFILES}
 	for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
 
@@ -230,7 +227,6 @@ $(foreach v,$(sort $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIO
 # make <action>.<version> instead of make <action> or
 # make <version> instead of make
 # EPICS version must be installed but need not be in EPICS_VERSIONS
-.PHONY: ${INSTALLED_EPICS_VERSIONS} ${INSTALLED_EPICS_VERSIONS:%=build.%} ${INSTALLED_EPICS_VERSIONS:%=install.%} ${INSTALLED_EPICS_VERSIONS:%=debug.%}
 ${INSTALLED_EPICS_VERSIONS}:
 	${MAKEVERSION} EPICSVERSION=$@ build
 
@@ -246,12 +242,9 @@ ${INSTALLED_EPICS_VERSIONS:%=debug.%}:
 
 # Install user interfaces to global location
 
-.PHONY: installui uninstallui
-
 define INSTALL_UI_RULE
 INSTALL_$(1)=$(2)
 $(1)_FILES=$$(wildcard $$(or $${$(1)},$(3)))
-.PHONY: install$(1) uninstall$(1)
 installui: install$(1)
 install$(1):
 #	@echo $(1)=$${$(1)}
