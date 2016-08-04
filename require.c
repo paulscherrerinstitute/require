@@ -195,7 +195,7 @@ int requireDebug;
     
 #else
 
-    #warning unknwn OS
+    #warning unknown OS
     #define PREFIX
     #define INFIX
     #define EXT
