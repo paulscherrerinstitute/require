@@ -180,7 +180,7 @@ help:
 	@echo "  TEMPLATES        (*.template *.db *.subs) [db files]"
 	@echo "  SCRIPTS          (*.cmd) [startup and other scripts]"
 	@echo "  BINS             () [programs to install]"
-	@echo "  UIS              (*.ui) [user interfaces to install]"
+	@echo "  QT               (qt/*) [QT user interfaces to install]"
 	@echo "  EXCLUDE_VERSIONS () [versions not to build, e.g. 3.14]"
 	@echo "  EXCLUDE_ARCHS    () [target architectures not to build]"
 	@echo "  ARCH_FILTER      () [target architectures to build, e.g. SL6%]"
