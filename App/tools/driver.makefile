@@ -166,7 +166,7 @@ help:
 	@for target in '' build '<EPICS version>' \
 	install 'install.<EPICS version>' \
 	uninstall 'uninstall.<EPICS version>' \
-        installqt uninstallqt \
+        installui uninstallui \
 	clean help version; \
 	do echo "  make $$target"; \
 	done
