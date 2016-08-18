@@ -444,7 +444,7 @@ install build:
 %:
 	@true
 
-else ifeq ($(wildcard $(firstword ${CC})),)
+else ifeq ($(shell which $(firstword ${CC})),)
 
 install% build%: build
 install build:
