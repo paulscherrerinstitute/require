@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <macLib.h>
+#include <initHooks.h>
 #include <epicsVersion.h>
 
 #ifdef vxWorks
@@ -356,16 +357,89 @@ end:
     return status;
 }
 
+struct cmditem
+{
+    struct cmditem* next;
+    char cmd[1];
+} *cmdlist, **cmdlast=&cmdlist;
+
+void afterInitHook(initHookState state)
+{
+    struct cmditem *item;
+
+    if (state != 
+#ifdef INCinitHooksh
+        /* old: without iocPause etc */
+        initHookAfterInterruptAccept
+#else
+        /* new: with iocPause etc */
+        initHookAfterIocRunning
+#endif
+        ) return;
+    for (item = cmdlist; item != NULL; item = item->next)
+    {
+#ifdef _WRS_VXWORKS_MAJOR
+        SHELL_EVAL_VALUE result;
+        shellInterpEvaluate(line_exp, "C", &result);
+#elif defined(vxWorks)
+        execute(item->cmd);
+#else
+        iocshCmd(item->cmd);
+#endif
+    }
+}
+
+int afterInit(const char* command)
+{
+    struct cmditem *item;
+    static int first_time = 1;
+    
+    if (!command)
+    {
+        fprintf(stderr, "usage: afterInit \"command line\"\n");
+        return -1;
+    }
+    
+    if (first_time)
+    {
+        first_time = 0;
+        initHookRegister(afterInitHook);
+    }
+    item = malloc(sizeof(struct cmditem) + strlen(command));
+    if (item == NULL)
+    {
+        perror("afterInit");
+        return -1;
+    }
+    item->next = 0;
+    strcpy(item -> cmd, command);
+    *cmdlast = item;
+    cmdlast = &item->next;
+    return 0;
+}
+
 #ifndef EPICS_3_13
 epicsExportAddress(int, runScriptDebug);
 
-static const iocshArg runScriptArg0 = { "filename", iocshArgString };
-static const iocshArg runScriptArg1 = { "substitutions", iocshArgString };
-static const iocshArg * const runScriptArgs[2] = { &runScriptArg0, &runScriptArg1 };
-static const iocshFuncDef runScriptDef = { "runScript", 2, runScriptArgs };
+static const iocshFuncDef runScriptDef = {
+    "runScript", 2, (const iocshArg *[]) {
+        &(iocshArg) { "filename", iocshArgString },
+        &(iocshArg) { "substitutions", iocshArgString },
+}};
+    
 static void runScriptFunc (const iocshArgBuf *args)
 {
     runScript(args[0].sval, args[1].sval);
+}
+
+static const iocshFuncDef afterInitDef = {
+    "afterInit", 1, (const iocshArg *[]) {
+        &(iocshArg) { "commandline", iocshArgString },
+}};
+    
+static void afterInitFunc (const iocshArgBuf *args)
+{
+    afterInit(args[0].sval);
 }
 
 static void runScriptRegister(void)
@@ -374,6 +448,7 @@ static void runScriptRegister(void)
     if (firstTime) {
         firstTime = 0;
         iocshRegister (&runScriptDef, runScriptFunc);
+        iocshRegister (&afterInitDef, afterInitFunc);
     }
 }
 epicsExportRegistrar(runScriptRegister);
