@@ -780,7 +780,7 @@ int libversionShow(const char* outfile)
     if (outfile)
     {
         out = fopen(outfile, "w");
-        if (out < 0)
+        if (out == NULL)
         {
             fprintf(stderr, "can't open %s: %s\n",
                 outfile, strerror(errno));
@@ -795,7 +795,12 @@ int libversionShow(const char* outfile)
             (int)maxModuleNameLength, m->content,
             m->content+lm, m->content+lm+lv);
     }
-    fflush(out);
+    if (fflush(out) < 0 && outfile)
+    {
+        fprintf(stderr, "can't write to %s: %s\n",
+            outfile, strerror(errno));
+        return -1;
+    }
     if (outfile)
         fclose(out);
     return 0;
