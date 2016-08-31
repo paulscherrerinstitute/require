@@ -359,6 +359,9 @@ end:
     return status;
 }
 
+#ifndef EPICS_3_13
+/* initHooks is not included in iocCore in 3.13 */
+
 struct cmditem
 {
     struct cmditem* next;
@@ -384,14 +387,12 @@ void afterInitHook(initHookState state)
         ) return;
     for (item = cmdlist; item != NULL; item = item->next)
     {
-#ifndef EPICS_3_13
         if (item->type == 1)
         {
             printf("%s\n", item->x.cmd);
             iocshCmd(item->x.cmd);
         }
         else
-#endif
         ((void (*)())item->x.a[0])(item->x.a[1], item->x.a[2], item->x.a[3], item->x.a[4], item->x.a[5],
             item->x.a[6], item->x.a[7], item->x.a[8], item->x.a[9], item->x.a[10], item->x.a[11]);
     }
@@ -453,7 +454,6 @@ int afterInit(char* cmd, char* a1, char* a2, char* a3, char* a4, char* a5, char*
     return 0;
 }
 
-#ifndef EPICS_3_13
 epicsExportAddress(int, runScriptDebug);
 
 static const iocshFuncDef runScriptDef = {
