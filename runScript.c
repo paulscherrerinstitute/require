@@ -10,6 +10,7 @@
 #include <epicsVersion.h>
 
 #ifdef vxWorks
+#include "asprintf.h"
 #include <sysSymTbl.h>
 #ifdef _WRS_VXWORKS_MAJOR
 /* vxWorks 6+ */
@@ -22,10 +23,15 @@
 #include <symLib.h>
 #endif
 
+#define IS_ABS_PATH(filename) (filename[0] == '/')  /* may be different for other OS */
+
 #ifdef BASE_VERSION
 #define EPICS_3_13
 extern char** ppGlobalEnviron;
+#define OSI_PATH_SEPARATOR "/"
+#define OSI_PATH_LIST_SEPARATOR ":"
 #else
+#include <osiFileName.h>
 #include <iocsh.h>
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #include <epicsExport.h>
@@ -210,7 +216,37 @@ int runScript(const char* filename, const char* args)
         free(pairs);
     }
 
-    if ((file = fopen(filename, "r")) == NULL) { perror(filename); return errno; }
+    if (IS_ABS_PATH(filename))
+    {
+        file = fopen(filename, "r");
+    }
+    else
+    {
+        const char* dirname;
+        const char* end;
+        char* fullname;
+        const char* path = getenv("SCRIPT_PATH");
+        int dirlen;
+        
+        for (dirname = path; dirname != NULL; dirname = end)
+        {
+            end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
+            if (end && end[1] == OSI_PATH_SEPARATOR[0] && end[2] == OSI_PATH_SEPARATOR[0])   /* "http://..." and friends */
+                end = strchr(end+2, OSI_PATH_LIST_SEPARATOR[0]);
+            if (end) dirlen = (int)(end++ - dirname);
+            else dirlen = (int)strlen(dirname);
+            if (dirlen == 0) continue; /* ignore empty path elements */
+            asprintf(&fullname, "%.*s" OSI_PATH_SEPARATOR "%s", 
+                dirlen, dirname, filename);
+            if (runScriptDebug)
+                printf("runScript: trying %s\n", fullname);
+            file = fopen(fullname, "r");
+            if (!file && errno != ENOENT) perror(fullname);
+            free(fullname);
+            if (file) break;
+        }
+    }
+    if (file == NULL) { perror(filename); return errno; }
 
     /*  line by line after expanding macros with arguments or environment */
     while (fgets(line_raw, line_raw_size, file))

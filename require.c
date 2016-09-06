@@ -372,12 +372,49 @@ int putenvprintf(const char* format, ...)
     return status;
 }
 
-static int setupDbPath(const char* module, const char* dbdir)
+static void insertDirIntoPath(const char* varname, const char* dirname)
 {
     char* old_path;           
-    char* p;
-    size_t len;
 
+    /* add directory to front */
+    old_path = getenv(varname);
+    if (old_path == NULL)
+        putenvprintf("%s=." OSI_PATH_LIST_SEPARATOR "%s", varname, dirname);
+    else
+    {
+        size_t len = strlen(dirname);
+        char* p;
+
+        /* skip over "." at the beginning */
+        if (old_path[0] == '.' && old_path[1] == OSI_PATH_LIST_SEPARATOR[0])
+            old_path += 2;
+
+        /* If directory is already in path, move it to front */
+        p = old_path;
+        while ((p = strstr(p, dirname)) != NULL)
+        {
+            if ((p == old_path || *(p-1) == OSI_PATH_LIST_SEPARATOR[0]) &&
+                (p[len] == 0 || p[len] == OSI_PATH_LIST_SEPARATOR[0]))
+            {
+                if (p == old_path) break; /* already at front, nothing to do */
+                memmove(old_path+len+1, old_path, p-old_path-1);
+                strcpy(old_path, dirname);
+                old_path[len] = OSI_PATH_LIST_SEPARATOR[0];
+                if (requireDebug)
+                    printf("require: modified %s=%s\n", varname, old_path);
+                break;
+            }
+            p += len;
+        }
+        if (p == NULL)
+            /* add new directory to the front (after "." )*/
+            putenvprintf("%s=." OSI_PATH_LIST_SEPARATOR "%s" OSI_PATH_LIST_SEPARATOR "%s",
+                 varname, dirname, old_path);
+    }
+}
+
+static int setupDbPath(const char* module, const char* dbdir)
+{
     char* absdir = realpath(dbdir, NULL); /* so we can change directory later safely */
     if (absdir == NULL)
     {
@@ -385,7 +422,6 @@ static int setupDbPath(const char* module, const char* dbdir)
             printf("require: cannot resolve %s\n", dbdir);
         return -1;
     }
-    len = strlen(absdir);
 
     if (requireDebug)
         printf("require: found template directory %s\n", absdir);
@@ -400,39 +436,7 @@ static int setupDbPath(const char* module, const char* dbdir)
     putenvprintf("%s_DB=%s", module, absdir);
     putenvprintf("%s_TEMPLATES=%s", module, absdir);
     putenvprintf("TEMPLATES=%s", absdir);
-
-    /* add directory to front of EPICS_DB_INCLUDE_PATH */
-    old_path = getenv("EPICS_DB_INCLUDE_PATH");
-    if (old_path == NULL)
-        putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s", absdir);
-    else
-    {
-        /* skip over "." at the beginning */
-        if (old_path[0] == '.' && old_path[1] == OSI_PATH_LIST_SEPARATOR[0])
-            old_path += 2;
-
-        /* If directory is already in path, move it to front */
-        p = old_path;
-        while ((p = strstr(p, absdir)) != NULL)
-        {
-            if ((p == old_path || *(p-1) == OSI_PATH_LIST_SEPARATOR[0]) &&
-                (p[len] == 0 || p[len] == OSI_PATH_LIST_SEPARATOR[0]))
-            {
-                if (p == old_path) break; /* already at front, nothing to do */
-                memmove(old_path+len+1, old_path, p-old_path-1);
-                strcpy(old_path, absdir);
-                old_path[len] = OSI_PATH_LIST_SEPARATOR[0];
-                if (requireDebug)
-                    printf("require: modified EPICS_DB_INCLUDE_PATH=%s\n", old_path);
-                break;
-            }
-            p += len;
-        }
-        if (p == NULL)
-            /* add new directory to the front (after "." )*/
-            putenvprintf("EPICS_DB_INCLUDE_PATH=." OSI_PATH_LIST_SEPARATOR "%s" OSI_PATH_LIST_SEPARATOR "%s",
-                 absdir, old_path);
-    }
+    insertDirIntoPath("EPICS_DB_INCLUDE_PATH", absdir);
     free(absdir);
     return 0;
 }
@@ -739,6 +743,21 @@ static void registerExternalModules()
 }
 #endif
 
+size_t foreachLoadedLib(size_t (*func)(const char* name, const char* version, const char* path, void* arg), void* arg)
+{
+    moduleitem* m;
+    int result;
+
+    for (m = loadedModules; m; m=m->next)
+    {
+        const char* name = m->content;
+        const char* version = name + strlen(name)+1;
+        const char* path = version + strlen(version)+1;
+        result = func(name, version, path, arg);
+        if (result) return result;
+    }
+    return 0;
+}
 
 const char* getLibVersion(const char* libname)
 {
@@ -1532,6 +1551,8 @@ loadlib:
     }
 
     status = 0;       
+
+    insertDirIntoPath("SCRIPT_PATH", filename);
 
     if (requireDebug)
         printf("require: looking for template directory\n");
