@@ -236,12 +236,13 @@ int runScript(const char* filename, const char* args)
             if (end) dirlen = (int)(end++ - dirname);
             else dirlen = (int)strlen(dirname);
             if (dirlen == 0) continue; /* ignore empty path elements */
+            if (dirname[dirlen-1] == OSI_PATH_SEPARATOR[0]) dirlen--;
             asprintf(&fullname, "%.*s" OSI_PATH_SEPARATOR "%s", 
                 dirlen, dirname, filename);
             if (runScriptDebug)
                 printf("runScript: trying %s\n", fullname);
             file = fopen(fullname, "r");
-            if (!file && errno != ENOENT) perror(fullname);
+            if (!file && (errno & 0xffff) != ENOENT) perror(fullname);
             free(fullname);
             if (file) break;
         }
