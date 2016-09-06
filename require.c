@@ -599,7 +599,11 @@ void registerModule(const char* module, const char* version, const char* locatio
 
     putenvprintf("MODULE=%s", module);
     putenvprintf("%s_VERSION=%s", module, version);
-    if (location) putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
+    if (location)
+    {
+        putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
+        insertDirIntoPath("SCRIPT_PATH", m->content+lm+lv);
+    }
     
     /* only do registration register stuff at init */
     if (interruptAccept) return;
@@ -1551,8 +1555,6 @@ loadlib:
     }
 
     status = 0;       
-
-    insertDirIntoPath("SCRIPT_PATH", filename);
 
     if (requireDebug)
         printf("require: looking for template directory\n");
