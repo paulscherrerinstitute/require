@@ -599,11 +599,7 @@ void registerModule(const char* module, const char* version, const char* locatio
 
     putenvprintf("MODULE=%s", module);
     putenvprintf("%s_VERSION=%s", module, version);
-    if (location)
-    {
-        putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
-        insertDirIntoPath("SCRIPT_PATH", m->content+lm+lv);
-    }
+    if (location) putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
     
     /* only do registration register stuff at init */
     if (interruptAccept) return;
@@ -685,7 +681,10 @@ static int findLibRelease (
         *p=0; symname++;                                    /* get "<module>" from "_<module>LibRelease" */
         if ((p = strstr(name, "/" LIBDIR)) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
         if (getLibVersion(symname) == NULL)
+        {
             registerModule(symname, version, location);
+            insertDirIntoPath("SCRIPT_PATH", location);
+        }
     }
     dlclose(handle);
     return 0;
@@ -734,7 +733,10 @@ static void registerExternalModules()
             *p=0; symname++;                                     /* get "<module>" from "_<module>LibRelease" */
             if ((p = strstr(name, "\\" LIBDIR)) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
             if (getLibVersion(symname) == NULL)
+            {
                 registerModule(symname, version, location);
+                insertDirIntoPath("SCRIPT_PATH", location);
+            }
         }
     }
 }
@@ -1553,6 +1555,7 @@ loadlib:
         filename[releasediroffs] = 0;
         registerModule(module, found, filename);
     }
+    insertDirIntoPath("SCRIPT_PATH", filename);
 
     status = 0;       
 
