@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <macLib.h>
+#include <dbAccess.h>
 #include <initHooks.h>
 #include <epicsVersion.h>
 
@@ -23,6 +24,11 @@
 #include <symLib.h>
 #endif
 
+#if defined (_WIN32)
+#include "asprintf.h"
+
+#endif
+
 #define IS_ABS_PATH(filename) (filename[0] == '/')  /* may be different for other OS */
 
 #ifdef BASE_VERSION
@@ -30,6 +36,8 @@
 extern char** ppGlobalEnviron;
 #define OSI_PATH_SEPARATOR "/"
 #define OSI_PATH_LIST_SEPARATOR ":"
+extern volatile int interruptAccept;
+
 #else
 #include <osiFileName.h>
 #include <iocsh.h>
@@ -435,7 +443,6 @@ void afterInitHook(initHookState state)
     }
 }
 
-extern volatile int interruptAccept;
 
 static int first_time = 1;
 
