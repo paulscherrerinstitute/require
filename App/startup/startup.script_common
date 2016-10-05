@@ -9,7 +9,7 @@
 EPICS_MODULES = "/ioc/modules"
 
 # find a better way later to know current require version
-REQUIRE_VERSION="2.3.6"
+REQUIRE_VERSION="2.4.3"
 
 #set EPICS_HOST_ARCH according to vxWorks version and cpu type
 VX6=(*runtimeVersion>>24)&255-'5'
@@ -63,7 +63,7 @@ sprintf LIB, "%s/iocBoot/%s/%s", INSTBASE, EPICS, EPICS_HOST_ARCH
 DBD=malloc(80)
 sprintf DBD, "dbd:%s/iocBoot/%s/dbd", INSTBASE, EPICS
 
-sprintf STRINGBUFFER, "EPICS_DRIVER_PATH=.:bin:snl:%s:%s", EPICS_MODULES, LIB
+sprintf STRINGBUFFER, "EPICS_DRIVER_PATH=.:bin/%s_%s:bin:snl:%s:%s", EPICS, EPICS_HOST_ARCH, EPICS_MODULES, LIB
 putenv STRINGBUFFER
 
 TEMPLATES=malloc(80)
@@ -77,7 +77,7 @@ EXTENDED_MEMORY=0
 #EXTENDED_MEMORY=sysPhysMemTop()-sysMemTop()
 
 # load EPICS system core (different names for 3.13 and 3.14)
-sprintf STRINGBUFFER, "%s/iocCore%s", LIB, strncmp(EPICS,"R3.13",5) ? "Library.munch" : ""
+sprintf STRINGBUFFER, "%s/iocCore%s", LIB, strncmp(EPICS,"R3.13.",6) ? "Library.munch" : ""
 ld 0, 0, STRINGBUFFER
 
 # TIMEZONE must be set after loading iocCoreLibrary.munch and before iocInit
@@ -106,7 +106,7 @@ require "utilities", getenv("utilities_VERSION")
 require "misc", getenv("misc_VERSION")
 require "iocmon", getenv("iocmon_VERSION")
 require "genTime", getenv("genTime_VERSION") ? getenv("genTime_VERSION") : "ifexists"
-require "seq", "ifexists"
+require "seq", getenv("seq_VERSION") ? getenv("seq_VERSION") : "ifexists"
 
 # run EPICS only on 1st network port
 putenv "EPICS_CA_AUTO_ADDR_LIST=NO"
