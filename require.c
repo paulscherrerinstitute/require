@@ -612,7 +612,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     mylocation = getenv("require_DIR");
     if (mylocation == NULL) return;
     if (asprintf(&abslocation, "%s/db/moduleversion.template", mylocation) < 0) return;
-    if (asprintf(&argstring, "IOC=%s, MODULE=%s, VERSION=%s, MODULE_COUNT=%lu, BUFFER_SIZE=%lu",
+    if (asprintf(&argstring, "IOC=%.30s, MODULE=%.24s, VERSION=%.39s, MODULE_COUNT=%lu, BUFFER_SIZE=%lu",
         getenv("IOC"), module, version, moduleCount,
         moduleListBufferSize+maxModuleNameLength*moduleCount) < 0) return;
     printf("Loading module info records for %s\n", module);
