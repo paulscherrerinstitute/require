@@ -26,10 +26,7 @@
 
 #if defined (_WIN32)
 #include "asprintf.h"
-
 #endif
-
-#define IS_ABS_PATH(filename) (filename[0] == '/')  /* may be different for other OS */
 
 #ifdef BASE_VERSION
 #define EPICS_3_13
@@ -44,6 +41,8 @@ extern volatile int interruptAccept;
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #include <epicsExport.h>
 #endif
+
+#define IS_ABS_PATH(filename) (filename[0] == OSI_PATH_SEPARATOR[0])  /* may be different for other OS ? */
 
 #include "require.h"
 
@@ -167,9 +166,7 @@ int runScript(const char* filename, const char* args)
         return -1;
     }
     
-    pairs = (char*[]){ "", "environ", NULL, NULL };
-
-    if (macCreateHandle(&mac, pairs) != 0) goto error;
+    if (macCreateHandle(&mac,(char*[]){ "", "environ", NULL, NULL }) != 0) goto error;
     macSuppressWarning(mac, 1);
 #ifdef EPICS_3_13
     /* Have no environment macro substitution, thus load envionment explicitly */
