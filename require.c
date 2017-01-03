@@ -839,6 +839,9 @@ static int compareVersions(const char* found, const char* request)
 {
     int found_major, found_minor=0, found_patch=0, found_parts = 0;
     int req_major, req_minor, req_patch, req_parts;
+    const char* found_extra;
+    const char* req_extra;
+    int n;
     
     if (requireDebug)
         printf("require: compareVersions(found=%s, request=%s)\n", found, request);
@@ -858,11 +861,12 @@ static int compareVersions(const char* found, const char* request)
             return MISMATCH;
         }
     }
-    
-    found_parts = sscanf(found, "%d.%d.%d", &found_major, &found_minor, &found_patch);
+    n = 0;
+    found_parts = sscanf(found, "%d%n.%d%n.%d%n", &found_major, &n, &found_minor, &n, &found_patch, &n);
+    found_extra = found + n;
     if (request == NULL || request[0] == 0)            /* no particular version request: match anything */
     {
-        if (found_parts == 0)
+        if (found_parts == 0 || found_extra[0] != 0)
         {
             if (requireDebug)
                 printf("require: compareVersions: TESTVERS nothing requested, test version found\n");
@@ -887,18 +891,20 @@ static int compareVersions(const char* found, const char* request)
        Numerical requests must have exact match in major and
        backward-compatible number in minor and patch
     */
-    req_parts = sscanf(request, "%d.%d.%d", &req_major, &req_minor, &req_patch);
-    if (req_parts == 0)
+    n = 0;
+    req_parts = sscanf(request, "%d%n.%d%n.%d%n", &req_major, &n, &req_minor, &n, &req_patch, &n);
+    req_extra = request + n;
+    if (req_parts == 0 || (req_extra[0] != 0 && strcmp(req_extra, "+") != 0))
     {
         if (requireDebug)
             printf("require: compareVersions: MISMATCH test version requested, different version found\n");
         return MISMATCH;
     }
-    if (found_parts == 0)
+    if (found_parts == 0 || (found_extra[0] != 0 && strcmp(found_extra, "+") != 0))
     {
         if (requireDebug)
-            printf("require: compareVersions: TESTVERS numeric requested, test version found\n");
-        if(request[strlen(request)-1] == '+')
+            printf("require: compareVersions: TESTVERS numeric requested, test version found");
+        if (req_extra[0] == '+')
             return TESTVERS;
         else
             return MISMATCH;
@@ -929,7 +935,7 @@ static int compareVersions(const char* found, const char* request)
     }
     if (found_minor > req_minor)                        /* minor larger than required */
     {
-        if(request[strlen(request)-1] == '+')
+        if (req_extra[0] == '+')
         {
             if (requireDebug)
                 printf("require: compareVersions: MATCH minor number higher than requested with +\n");
@@ -957,10 +963,10 @@ static int compareVersions(const char* found, const char* request)
     if (found_patch == req_patch)
     {
         if (requireDebug)
-            printf("require: compareVersions: MATCH patch level matches exactly requested with +\n");
+            printf("require: compareVersions: MATCH patch level matches exactly requested\n");
         return MATCH;
     }
-    if(request[strlen(request)-1] == '+')
+    if (req_extra[0] == '+')
     {
         if (requireDebug)
             printf("require: compareVersions: MATCH patch level higher than requested with +\n");
