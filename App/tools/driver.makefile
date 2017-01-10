@@ -108,6 +108,12 @@ IGNOREFILES = .cvsignore .gitignore
 ${IGNOREFILES}:
 	@echo -e "O.*\n.cvsignore\n.gitignore" > $@
         
+define uniq
+  $(eval seen :=)
+  $(foreach _,$1,$(if $(filter $_,${seen}),,$(eval seen += $_)))
+  ${seen}
+endef
+
 ifndef EPICSVERSION
 ## RUN 1
 # in source directory
@@ -324,8 +330,8 @@ ifndef T_A
 
 AUTOSRCS := $(filter-out ~%,$(wildcard *.c *.cc *.cpp *.st *.stt *.gt))
 SRCS = $(if ${SOURCES},$(filter-out -none-,${SOURCES}),${AUTOSRCS})
-SRCS += ${SOURCES_${EPICS_BASETYPE}}
-SRCS += ${SOURCES_${EPICSVERSION}}
+#SRCS += ${SOURCES_${EPICS_BASETYPE}} # added later by VAR_EXTENSIONS
+#SRCS += ${SOURCES_${EPICSVERSION}}
 export SRCS
 
 DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard menu*.dbd *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
@@ -357,8 +363,8 @@ TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
 
 SCR = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd))
-SCR += ${SCRIPTS_${EPICS_BASETYPE}}
-SCR += ${SCRIPTS_${EPICSVERSION}}
+#SCR += ${SCRIPTS_${EPICS_BASETYPE}} # added later by VAR_EXTENSIONS
+#SCR += ${SCRIPTS_${EPICSVERSION}}
 export SCR
 
 DOCUDIR = .
@@ -672,7 +678,7 @@ DBD_PATH = $(sort $(dir ${DBDFILES}))
 DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${EPICS_BASE}/dbd)
 USR_DBDFLAGS += $(DBDEXPANDPATH)
 
-SRC_INCLUDES = $(addprefix -I, $(sort $(dir ${SRCS:%=../%} ${HDRS:%=../%})))
+SRC_INCLUDES = $(addprefix -I, $(strip $(call uniq, $(dir ${SRCS:%=../%} ${HDRS:%=../%}))))
 
 # different macro name for 3.14.8
 GENERIC_SRC_INCLUDES = $(SRC_INCLUDES)
@@ -767,10 +773,8 @@ RELEASE_INCLUDES += -I${EPICS_BASE}/include/os/${OS_CLASS}
 #for 3.13:
 EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
-# Setup searchpaths from all used files
-# find all sources whatever suffix
-$(foreach filetype,SRCS TEMPLS SCR,$(foreach ext,$(sort $(suffix ${${filetype}})),\
-    $(eval vpath %${ext} $(sort $(dir $(filter %${ext},${${filetype}:%=../%}))))))
+# Find all sources
+$(foreach file, ${SRCS} ${TEMPLS} ${SCR}, $(eval vpath $(notdir ${file}) ../$(dir ${file})))
 
 # Do not treat %.dbd the same way because it creates a circular dependency
 # if a source dbd has the same name as the project dbd. Have to clear %.dbd.
