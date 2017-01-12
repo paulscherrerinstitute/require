@@ -109,8 +109,8 @@ ${IGNOREFILES}:
 	@echo -e "O.*\n.cvsignore\n.gitignore" > $@
         
 define uniq
-  $(eval seen :=)
-  $(foreach _,$1,$(if $(filter $_,${seen}),,$(eval seen += $_)))
+  $(eval seen :=) \
+  $(foreach _,$1,$(if $(filter $_,${seen}),,$(eval seen += $_))) \
   ${seen}
 endef
 
@@ -678,7 +678,8 @@ DBD_PATH = $(sort $(dir ${DBDFILES}))
 DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${EPICS_BASE}/dbd)
 USR_DBDFLAGS += $(DBDEXPANDPATH)
 
-SRC_INCLUDES = $(addprefix -I, $(strip $(call uniq, $(dir ${SRCS:%=../%} ${HDRS:%=../%}))))
+# search all directories where sources or headers come from, plus existing os dependend subdirectories
+SRC_INCLUDES = $(addprefix -I, $(wildcard $(foreach d,$(call uniq, $(filter-out /%,$(dir ${SRCS:%=../%} ${HDRS:%=../%}))), $d $d/os/${OS_CLASS} $d/os/default)))
 
 # different macro name for 3.14.8
 GENERIC_SRC_INCLUDES = $(SRC_INCLUDES)
