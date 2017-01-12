@@ -363,8 +363,8 @@ TEMPLS += ${TEMPLATES_${EPICSVERSION}}
 export TEMPLS
 
 SCR = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd))
-#SCR += ${SCRIPTS_${EPICS_BASETYPE}} # added later by VAR_EXTENSIONS
-#SCR += ${SCRIPTS_${EPICSVERSION}}
+SCR += ${SCRIPTS_${EPICS_BASETYPE}}
+SCR += ${SCRIPTS_${EPICSVERSION}}
 export SCR
 
 DOCUDIR = .
