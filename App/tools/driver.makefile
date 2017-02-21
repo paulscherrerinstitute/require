@@ -137,7 +137,7 @@ VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 MODULE=
 PROJECT=
 PRJDIR:=$(subst -,_,$(subst .,_,$(notdir $(patsubst %Lib,%,$(patsubst %/snl,%,$(patsubst %/src,%,${PWD}))))))
-PRJ = $(or ${MODULE},${PROJECT},${PRJDIR})
+PRJ = $(strip $(or ${MODULE},${PROJECT},${PRJDIR}))
 export PRJ
 
 OS_CLASS_LIST = $(BUILDCLASSES)
