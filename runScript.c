@@ -267,7 +267,7 @@ int runScript(const char* filename, const char* args)
             if ((line_raw = realloc(line_raw, line_raw_size *= 2)) == NULL) goto error;
             if (fgets(line_raw + len, line_raw_size - len, file) == NULL) break;
         }
-        if (line_raw[len-1] == '\n') line_raw[--len] = 0; /* get rid of '\n' */
+        while (len > 0 && isspace((unsigned char)line_raw[len-1])) line_raw[--len] = 0; /* get rid of '\n' and friends */
         if (runScriptDebug)
                 printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
