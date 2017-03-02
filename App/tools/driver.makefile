@@ -252,16 +252,15 @@ define INSTALL_UI_RULE
 INSTALL_$(1)=$(2)
 $(1)_FILES=$$(wildcard $$(or $${$(1)},$(3)))
 installui: install$(1)
-install$(1):
+install$(1): uninstall$(1)
 #	@echo $(1)=$${$(1)}
 	@$$(if $${$(1)_FILES},echo "Installing $(1) user interfaces";$$(MKDIR) $${INSTALL_$(1)})
-	$$(if $$(wildcard $${INSTALL_$(1)}/.$${PRJ}-*.txt),$$(RM) $$(addprefix $${INSTALL_$(1)}/,$$(filter-out $$(notdir $${$(1)_FILES}),$$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt))
 	$$(if $${$(1)_FILES},install -C -m444 $${$(1)_FILES} -t $${INSTALL_$(1)})
 	@$$(if $${$(1)_FILES},echo $$(notdir $${$(1)_FILES}) > $${INSTALL_$(1)}/.$${PRJ}-$$(LIBVERSION).txt)
 
 uninstallui: uninstall$(1)
 uninstall$(1):
-	@echo "Removing $(1) user interfaces"
+	@echo "Removing old $(1) user interfaces"
 	$$(RM) $$(addprefix $${INSTALL_$(1)}/,$$(sort $$(notdir $${$(1)_FILES}) $$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt)
 endef
 
