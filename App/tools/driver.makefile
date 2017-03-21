@@ -777,10 +777,10 @@ EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 $(foreach file, ${SRCS} ${TEMPLS} ${SCR}, $(eval vpath $(notdir ${file}) ../$(dir ${file})))
 
 # Do not treat %.dbd the same way because it creates a circular dependency
-# if a source dbd has the same name as the project dbd. Have to clear %.dbd.
+# if a source dbd has the same name as the project dbd. Have to clear %.dbd snd not use ../ path.
 # But the %Record.h and menu%.h rules need to find their dbd files (example: asyn)
 vpath %.dbd
-vpath %Record.dbd ${DBD_PATH}
+vpath %Record.dbd $(filter-out ../,${DBD_PATH})
 vpath menu%.dbd ${DBD_PATH}
 
 # find header files to install
