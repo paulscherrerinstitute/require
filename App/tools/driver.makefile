@@ -78,6 +78,9 @@ DOCUEXT += template db dbt subs subst substitutions script
 #override config here
 -include ${MAKEHOME}/config
 
+# use fancy glob to find latest versions
+SHELL = /bin/bash -O extglob
+
 # Some shell commands
 LN = ln -s
 EXISTS = test -e
@@ -255,13 +258,13 @@ installui: install$(1)
 install$(1): uninstall$(1)
 #	@echo $(1)=$${$(1)}
 	@$$(if $${$(1)_FILES},echo "Installing $(1) user interfaces";$$(MKDIR) $${INSTALL_$(1)})
-	$$(if $${$(1)_FILES},install -C -m444 $${$(1)_FILES} -t $${INSTALL_$(1)})
-	@$$(if $${$(1)_FILES},echo $$(notdir $${$(1)_FILES}) > $${INSTALL_$(1)}/.$${PRJ}-$$(LIBVERSION).txt)
+	@$$(if $${$(1)_FILES},install -v -t $${INSTALL_$(1)} -C -m444 $${$(1)_FILES:%='%'})
+	@$$(if $${$(1)_FILES},echo "$$(patsubst %,'%',$$(notdir $${$(1)_FILES}))" > $${INSTALL_$(1)}/.$${PRJ}-$$(LIBVERSION).txt)
 
 uninstallui: uninstall$(1)
 uninstall$(1):
 	@echo "Removing old $(1) user interfaces"
-	$$(RM) $$(addprefix $${INSTALL_$(1)}/,$$(sort $$(notdir $${$(1)_FILES}) $$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt)
+	$$(RM) $$(addprefix $${INSTALL_$(1)}/,$$(sort $$(patsubst %,'%',$$(notdir $${$(1)_FILES})) $$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt)
 endef
 
 #$(eval $(call INSTALL_UI_RULE,VARIABLE,installdir,sourcedefaultlocation))
@@ -520,7 +523,7 @@ EPICS_INCLUDES =
 # The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!)
 # Only really existing directories are added to the search path
 define ADD_FOREIGN_INCLUDES
-$(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,%,$(lastword $(shell ls -dv ${EPICS_MODULES}/$(1)/*.*.*/R${EPICSVERSION}/include 2>/dev/null))))
+$(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/include 2>/dev/null))))
 INSTALL_INCLUDES += $$(patsubst %,-I${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,$$($(1)_VERSION))
 endef
 # The tricky part is to sort versions numerically. Make can't but ls -v can. Only accept numerical versions.
@@ -534,7 +537,7 @@ endif
 
 # manually required modules
 define ADD_MANUAL_DEPENDENCIES
-$(eval $(1)_VERSION := $(or $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(lastword $(shell ls -dv ${EPICS_MODULES}/$(1)/*.*.*/R${EPICSVERSION} 2>/dev/null))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
+$(eval $(1)_VERSION := $(or $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION} 2>/dev/null))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
 endef
 $(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,$m)))
 
@@ -716,7 +719,7 @@ DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 #DBDFILES += $(if $(shell cat ${SUBFUNCFILE}),${SUBFUNCFILE})
 
 # snc location in 3.14: from latest version module seq or fall back to globally installed
-SNC=$(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/$(or $(seq_VERSION),*.*.*)/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
+SNC=$(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/$(or $(seq_VERSION),+([0-9]).+([0-9]).+([0-9]))/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
 
 endif # 3.14
 
