@@ -157,10 +157,11 @@ then
     echo "No 64 bit EPICS installation found. Defaulting to 32 bit"
     EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
 fi
+export EPICS_HOST_ARCH
 
 # setup search path for require
 ODIR=O.${BASE}_$EPICS_HOST_ARCH
-EPICS_DRIVER_PATH=.:bin:snl:../snl:$ODIR:src/$ODIR:snl/$ODIR:../snl/$ODIR:${EPICS_DRIVER_PATH#:}
+EPICS_DRIVER_PATH=.:bin/$EPICS_HOST_ARCH:bin:snl:../snl:$ODIR:src/$ODIR:snl/$ODIR:../snl/$ODIR:${EPICS_DRIVER_PATH#:}
 
 #Special PSI: find installation base for libs from working directory
 D=$(rp $PWD)
@@ -168,10 +169,10 @@ I=${D%/iocBoot/*}
 if [ $I != $D ]
 then
     INSTBASE=$I
-    export INSTBASE
 fi
 
 EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH%:}:${EPICS_MODULES:=/ioc/modules}:${INSTBASE:=/work}/iocBoot/R$BASE/$EPICS_HOST_ARCH
+export INSTBASE
 
 # convert for win32-x86 arch
 if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
@@ -183,7 +184,6 @@ if [ ${EPICS_HOST_ARCH#cygwin-} != $EPICS_HOST_ARCH ]
 then 
     DBD=$(cygpath -wp $DBD)
 fi
-
 export EPICS_DRIVER_PATH
 
 subst () {
