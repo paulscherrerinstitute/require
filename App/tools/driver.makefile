@@ -258,13 +258,14 @@ installui: install$(1)
 install$(1): uninstall$(1)
 #	@echo $(1)=$${$(1)}
 	@$$(if $${$(1)_FILES},echo "Installing $(1) user interfaces";$$(MKDIR) $${INSTALL_$(1)})
-	@$$(if $${$(1)_FILES},install -v -t $${INSTALL_$(1)} -C -m444 $${$(1)_FILES:%='%'})
+#	@$$(if $${$(1)_FILES},install -v -t $${INSTALL_$(1)} -C -m777 $${$(1)_FILES:%='%'})
+	@$$(if $${$(1)_FILES},$(CP) -v -t $${INSTALL_$(1)} $${$(1)_FILES:%='%'})
 	@$$(if $${$(1)_FILES},echo "$$(patsubst %,'%',$$(notdir $${$(1)_FILES}))" > $${INSTALL_$(1)}/.$${PRJ}-$$(LIBVERSION).txt)
 
 uninstallui: uninstall$(1)
 uninstall$(1):
 	@echo "Removing old $(1) user interfaces"
-	$$(RM) $$(addprefix $${INSTALL_$(1)}/,$$(sort $$(patsubst %,'%',$$(notdir $${$(1)_FILES})) $$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt)
+	@$$(RM) -v $$(addprefix $${INSTALL_$(1)}/,$$(sort $$(patsubst %,'%',$$(notdir $${$(1)_FILES})) $$(shell cat $${INSTALL_$(1)}/.$${PRJ}-*.txt 2>/dev/null)) .$${PRJ}-*.txt)
 endef
 
 #$(eval $(call INSTALL_UI_RULE,VARIABLE,installdir,sourcedefaultlocation))
