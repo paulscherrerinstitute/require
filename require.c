@@ -234,8 +234,8 @@ int requireDebug;
  
 #define TOSTR(s) TOSTR2(s)
 #define TOSTR2(s) #s
-#define EPICS_RELEASE TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION)"."TOSTR(EPICS_MODIFICATION)
-const char epicsRelease[] = EPICS_RELEASE;
+const char epicsRelease[] = TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION)"."TOSTR(EPICS_MODIFICATION);
+const char epicsBasetype[] = TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION);
 
 #ifndef T_A
 #error T_A not defined: Compile with USR_CFLAGS += -DT_A=${T_A}
@@ -545,12 +545,12 @@ void registerModule(const char* module, const char* version, const char* locatio
     char* argstring = NULL;
     int addSlash=0;
     const char *mylocation;
-    static int firstRun = 1;
+    static int firstTime = 1;
     
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
         
-    if (firstRun)
+    if (firstTime)
     {
 #ifdef EPICS_3_13
         int (*initHookRegister)() = NULL;
@@ -559,11 +559,11 @@ void registerModule(const char* module, const char* version, const char* locatio
         if (initHookRegister)
 #endif
         {
-            firstRun = 0;
             initHookRegister(fillModuleListRecord);
             if (requireDebug)
                 printf("require: initHookRegister\n");
         }
+        firstTime = 0;
     }
     
     if (!version) version="";
@@ -995,12 +995,15 @@ int require(const char* module, const char* version, const char* args)
 {
     int status;
     char* versionstr;
+    static int firstTime = 1;
 
-    if (getenv("T_A") == NULL)
+    if (firstTime)
+    {
+        firstTime = 0;
         putenvprintf("T_A=%s", targetArch);
-
-    if (getenv("EPICS_RELEASE") == NULL)
+        putenvprintf("EPICS_HOST_ARCH=%s", targetArch);
         putenvprintf("EPICS_RELEASE=%s", epicsRelease);
+    }
 
     if (module == NULL)
     {
@@ -1582,11 +1585,23 @@ loadlib:
     if (requireDebug)
         printf("require: looking for startup script\n");
     /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]db" */
-    if (TRY_FILE(releasediroffs, "%s.cmd", targetArch) ||
-        TRY_FILE(releasediroffs, "%s.cmd", osClass) ||
-        TRY_FILE(releasediroffs, "startup.cmd") ||
+    if (TRY_FILE(releasediroffs, "%s-%s.cmd", targetArch, epicsRelease) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", targetArch, epicsRelease) ||
+        TRY_FILE(releasediroffs, "%s-%s.cmd", targetArch, epicsBasetype) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", targetArch, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "%s-%s.cmd", osClass, epicsRelease) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", osClass, epicsRelease) ||
+        TRY_FILE(releasediroffs, "%s-%s.cmd", osClass, epicsBasetype) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", osClass, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "startup-%s.cmd", epicsRelease) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.cmd", epicsRelease) ||
+        TRY_FILE(releasediroffs, "startup-%s.cmd", epicsBasetype) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.cmd", epicsBasetype) ||
+        TRY_FILE(releasediroffs, "%s.cmd", targetArch) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", targetArch) ||
+        TRY_FILE(releasediroffs, "%s.cmd", osClass) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", osClass) ||
+        TRY_FILE(releasediroffs, "startup.cmd") ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup.cmd")
         )
     {
