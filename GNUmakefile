@@ -7,6 +7,11 @@ DBDS    += require.dbd
 SOURCES += runScript.c
 DBDS    += runScript.dbd
 
+SOURCES += dbLoadTemplate.y
+DBDS    += dbLoadTemplate.dbd
+
+dbLoadTemplate.c: dbLoadTemplate_lex.c ../dbLoadTemplate.h
+
 #HEADERS += require.h
 
 SOURCES_T2 += strdup.c
