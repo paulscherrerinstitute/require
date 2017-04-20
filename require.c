@@ -26,8 +26,6 @@
 #include <errno.h>
 #include <recSup.h>
 #include <initHooks.h>
-#include <dbAccess.h>
-#include <dbAccess.h>
 #include <osiFileName.h>
 #include <epicsVersion.h>
 
@@ -36,10 +34,9 @@
 
 #define epicsGetStdout() stdout
 extern int dbLoadDatabase(const char *filename, const char *path, const char *substitutions);
-extern int dbLoadTemplate(const char *filename);
 int dbLoadRecords(const char *filename, const char *substitutions)
 {
-    /* This implementation respects EPICS_DB_INCLUDE_PATH */
+    /* This implementation uses EPICS_DB_INCLUDE_PATH */
     return dbLoadDatabase(filename, NULL, substitutions);
 }
 extern volatile int interruptAccept;
@@ -48,10 +45,10 @@ extern volatile int interruptAccept;
 
 #include <iocsh.h>
 #include <dbAccess.h>
+/* This prototype is missing in older EPICS versions */
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #include <epicsExit.h>
 #include <epicsStdio.h>
-#include <dbLoadTemplate.h>
 #include <osiFileName.h>
 #include <epicsExport.h>
 
@@ -68,12 +65,8 @@ int requireDebug;
 
     #include <symLib.h>
     #include <sysSymTbl.h>
-    #include <sysLib.h>
-    #include <symLib.h>
     #include <loadLib.h>
     #include <shellLib.h>
-    #include <usrLib.h>
-    #include <taskLib.h>
     #include <ioLib.h>
     #include <envLib.h>
     #include <epicsAssert.h>
