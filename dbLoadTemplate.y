@@ -17,8 +17,8 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
-#include "osiUnistd.h"
 #include "macLib.h"
 #include "dbmf.h"
 
