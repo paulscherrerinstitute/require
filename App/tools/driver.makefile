@@ -471,7 +471,7 @@ else
 install:: build
 	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
         (echo -e "Warning: Re-installing ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A}"; \
-         rm -rf ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A})
+        $(RMDIR) ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A})
 endif
 
 install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
