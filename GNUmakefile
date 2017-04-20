@@ -1,3 +1,7 @@
+ifeq ($(wildcard /ioc/tools/driver.makefile),)
+$(warning It seems you do not have the PSI build environment. Remove GNUmakefile.)
+include Makefile
+else
 include /ioc/tools/driver.makefile
 
 BUILDCLASSES += Linux
@@ -10,10 +14,6 @@ DBDS    += runScript.dbd
 SOURCES += dbLoadTemplate.y
 DBDS    += dbLoadTemplate.dbd
 
-dbLoadTemplate.c: dbLoadTemplate_lex.c ../dbLoadTemplate.h
-
-#HEADERS += require.h
-
 SOURCES_T2 += strdup.c
 SOURCES_vxWorks   += asprintf.c
 HEADERS += strdup.h asprintf.h
@@ -24,3 +24,10 @@ USR_INCLUDES_Linux=-idirafter ${EPICS_BASE}/include
 
 # Pass T_A to the code
 USR_CFLAGS += -DT_A=${T_A}
+
+# This should really go into some global WIN32 config file
+USR_CFLAGS_WIN32 += /D_WIN32_WINNT=0x501
+
+dbLoadTemplate.c: dbLoadTemplate_lex.c ../dbLoadTemplate.h
+
+endif
