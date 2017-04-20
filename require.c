@@ -27,12 +27,12 @@
 #include <recSup.h>
 #include <initHooks.h>
 #include <dbAccess.h>
+#include <dbAccess.h>
+#include <osiFileName.h>
 #include <epicsVersion.h>
 
 #ifdef BASE_VERSION
 #define EPICS_3_13
-
-#include <epicsDynLink.h>
 
 #define epicsGetStdout() stdout
 extern int dbLoadDatabase(const char *filename, const char *path, const char *substitutions);
@@ -43,8 +43,6 @@ int dbLoadRecords(const char *filename, const char *substitutions)
     return dbLoadDatabase(filename, NULL, substitutions);
 }
 extern volatile int interruptAccept;
-#define OSI_PATH_SEPARATOR "/"
-#define OSI_PATH_LIST_SEPARATOR ":"
 
 #else /* 3.14+ */
 
@@ -372,9 +370,16 @@ int putenvprintf(const char* format, ...)
     return status;
 }
 
-static void insertDirIntoPath(const char* varname, const char* dirname)
+void pathAdd(const char* varname, const char* dirname)
 {
     char* old_path;           
+
+    if (!varname || !dirname) {
+        fprintf(stderr, "usage: pathAdd \"ENVIRONMENT_VARIABLE\",\"directory\"\n");
+        fprintf(stderr, "       Adds or moves the directory to the front of the ENVIRONMENT_VARIABLE\n");
+        fprintf(stderr, "       but after a leading \".\".\n");
+        return;
+    }
 
     /* add directory to front */
     old_path = getenv(varname);
@@ -436,7 +441,7 @@ static int setupDbPath(const char* module, const char* dbdir)
     putenvprintf("%s_DB=%s", module, absdir);
     putenvprintf("%s_TEMPLATES=%s", module, absdir);
     putenvprintf("TEMPLATES=%s", absdir);
-    insertDirIntoPath("EPICS_DB_INCLUDE_PATH", absdir);
+    pathAdd("EPICS_DB_INCLUDE_PATH", absdir);
     free(absdir);
     return 0;
 }
@@ -555,7 +560,7 @@ void registerModule(const char* module, const char* version, const char* locatio
 #ifdef EPICS_3_13
         int (*initHookRegister)() = NULL;
         SYM_TYPE type;
-        symFindByNameEPICS(sysSymTbl, "initHookRegister", (void *) &initHookRegister, &type);
+        symFindByName(sysSymTbl, "initHookRegister", (char**)&initHookRegister, &type);
         if (initHookRegister)
 #endif
         {
@@ -602,7 +607,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     if (location)
     {
         putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
-        insertDirIntoPath("SCRIPT_PATH", m->content+lm+lv);
+        pathAdd("SCRIPT_PATH", m->content+lm+lv);
     }
     
     /* only do registration register stuff at init */
@@ -1277,7 +1282,7 @@ static int require_priv(const char* module, const char* version, const char* arg
             printf("require: library found in %s\n", dirname);
         snprintf(filename, sizeof(filename), "%s%n", dirname, &releasediroffs);
         putenvprintf("MODULE=%s", module);
-        insertDirIntoPath("SCRIPT_PATH", dirname);
+        pathAdd("SCRIPT_PATH", dirname);
     }
     else
     {
@@ -1623,30 +1628,47 @@ loadlib:
 }
 
 #ifndef EPICS_3_13
-static const iocshArg requireArg0 = { "module", iocshArgString };
-static const iocshArg requireArg1 = { "[version]", iocshArgString };
-static const iocshArg requireArg2 = { "[substitutions]", iocshArgString };
-static const iocshArg * const requireArgs[] = { &requireArg0, &requireArg1, &requireArg2 };
-static const iocshFuncDef requireDef = { "require", 3, requireArgs };
+static const iocshFuncDef requireDef = {
+    "require", 3, (const iocshArg *[]) {
+        &(iocshArg) { "module", iocshArgString },
+        &(iocshArg) { "[version]", iocshArgString },
+        &(iocshArg) { "[substitutions]", iocshArgString },
+}};
+    
 static void requireFunc (const iocshArgBuf *args)
 {
     require(args[0].sval, args[1].sval, args[2].sval);
 }
 
-static const iocshArg libversionShowArg0 = { "outputfile", iocshArgString };
-static const iocshArg * const libversionArgs[] = { &libversionShowArg0 };
-static const iocshFuncDef libversionShowDef = { "libversionShow", 1, libversionArgs };
+static const iocshFuncDef libversionShowDef = {
+    "libversionShow", 1, (const iocshArg *[]) {
+        &(iocshArg) { "outputfile", iocshArgString },
+}};
+
 static void libversionShowFunc (const iocshArgBuf *args)
 {
     libversionShow(args[0].sval);
 }
 
-static const iocshArg ldArg0 = { "library", iocshArgString };
-static const iocshArg * const ldArgs[] = { &ldArg0 };
-static const iocshFuncDef ldDef = { "ld", 1, ldArgs };
+static const iocshFuncDef ldDef = {
+    "ld", 1, (const iocshArg *[]) {
+        &(iocshArg) { "library", iocshArgString },
+}};
+
 static void ldFunc (const iocshArgBuf *args)
 {
     loadlib(args[0].sval);
+}
+
+static const iocshFuncDef pathAddDef = {
+    "pathAdd", 2, (const iocshArg *[]) {
+        &(iocshArg) { "ENV_VARIABLE", iocshArgString },
+        &(iocshArg) { "directory", iocshArgString },
+}};
+
+static void pathAddFunc (const iocshArgBuf *args)
+{
+    pathAdd(args[0].sval, args[1].sval);
 }
 
 static void requireRegister(void)
@@ -1654,9 +1676,10 @@ static void requireRegister(void)
     static int firstTime = 1;
     if (firstTime) {
         firstTime = 0;
-        iocshRegister (&ldDef, ldFunc);
-        iocshRegister (&libversionShowDef, libversionShowFunc);
         iocshRegister (&requireDef, requireFunc);
+        iocshRegister (&libversionShowDef, libversionShowFunc);
+        iocshRegister (&ldDef, ldFunc);
+        iocshRegister (&pathAddDef, pathAddFunc);
         registerExternalModules();
     }
 }
