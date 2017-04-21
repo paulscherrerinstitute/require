@@ -316,31 +316,24 @@ do
     echo "# $var=\"${!var}\""
 done
 
+LIBPREFIX=lib
+LIBPOSTFIX=.so
+
+if [ -d $EPICS_MODULES/${REQUIRE:=require} ]
+then # new module pool model
+    REQUIRE_LIB=$(ls -1rv $EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:-*.*.*}/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX | head -n 1)
+    REQUIRE_DBD=${REQUIRE_LIB%/lib/*}/dbd/$REQUIRE.dbd
+else # old driver pool model
+    REQUIRE=misc${REQUIRE_VERSION:+-}$REQUIRE_VERSION
+    REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
+    REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
+fi
+
 if [ $BASEMINOR -ge 15 -o $BASEPATCH -ge 12 ]
 then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
     ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
-    # load "require" command
-    LIBPREFIX=lib
-    LIBPOSTFIX=.so
-    if [ -d $EPICS_MODULES/${REQUIRE:=require} ]
-    then # new module pool model
-        REQUIRE_LIB=$(ls -1rv $EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:-*.*.*}/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX | head -n 1)
-        REQUIRE_DBD=${REQUIRE_LIB%/lib/*}/dbd/$REQUIRE.dbd
-    else # old driver pool model
-        REQUIRE=misc${REQUIRE_VERSION:+-}$REQUIRE_VERSION
-        REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
-        REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
-    fi
-    if [ ! -f "$REQUIRE_LIB" ]
-    then
-        echo "Library $REQUIRE_LIB not found." >&2
-        echo "Command 'require' is not available." >&2
-    else
-        echo "dlload $REQUIRE_LIB"
-        echo "dbLoadDatabase $REQUIRE_DBD"
-        echo "${REQUIRE%-*}_registerRecordDeviceDriver"
-    fi
+    LDCMD="dlload"
 else
     # get rid of the compiled-in rpath because at PSI that is a link pointing to current EPICS version.
     LOADER=/lib/ld-linux.so.2
@@ -348,10 +341,22 @@ else
     APP=ioc
     EXE=$EPICS_EXTENSIONS/bin/$EPICS_HOST_ARCH/$APP
     DBD=$EPICS_EXTENSIONS/dbd
+    LDCMD="ld"
     echo "dbLoadDatabase \"$APP.dbd\",\"$DBD\""
     echo "${APP}_registerRecordDeviceDriver(pdbbase)"
 fi
-echo "require misc $MISC_VERSION"
+
+if [ ! -f "$REQUIRE_LIB" ]
+then
+    echo "Library $REQUIRE_LIB not found." >&2
+    echo "Command 'require' is not available." >&2
+else
+    echo "$LDCMD $REQUIRE_LIB"
+    echo "dbLoadDatabase $REQUIRE_DBD"
+    echo "${REQUIRE%-*}_registerRecordDeviceDriver"
+    echo "require misc $MISC_VERSION"
+fi
+
 loadFiles "$@"
 if [ "$init" != NO ]
 then
