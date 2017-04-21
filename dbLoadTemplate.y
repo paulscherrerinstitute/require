@@ -461,13 +461,14 @@ static const iocshFuncDef dbLoadTemplateDef = {
 }};
 
 #ifdef __GNUC__
-/* Without this I somehow always get the original dbLoadTemplate linked instead of my version */
-int __dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *path) __attribute__ ((weak, alias ("dbLoadTemplate")));
+/* Without this I always get the original dbLoadTemplate linked instead of my version */
+int __dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *path) __attribute__ ((alias ("dbLoadTemplate")));
+#define dbLoadTemplate __dbLoadTemplate
 #endif
 
 static void dbLoadTemplateFunc(const iocshArgBuf *args)
 {
-    __dbLoadTemplate(args[0].sval, args[1].sval, args[2].sval);
+    dbLoadTemplate(args[0].sval, args[1].sval, args[2].sval);
 }
 
 typedef struct iocshCommand {
