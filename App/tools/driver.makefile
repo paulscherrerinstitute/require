@@ -784,7 +784,7 @@ $(foreach file, ${SRCS} ${TEMPLS} ${SCR}, $(eval vpath $(notdir ${file}) ../$(di
 # if a source dbd has the same name as the project dbd. Have to clear %.dbd and not use ../ path.
 # But the %Record.h and menu%.h rules need to find their dbd files (example: asyn).
 vpath %.dbd
-vpath %Record.dbd $(filter-out ../,${DBD_PATH})
+vpath %Record.dbd ${DBD_PATH}
 vpath menu%.dbd ${DBD_PATH}
 
 # Find header files to install.
