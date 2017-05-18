@@ -17,8 +17,9 @@ sstringchar [^'\n\\]
 /*
 This breaks backward compatibility to 3.14.8:
 bareword    [a-zA-Z0-9_\-+:./\\\[\]<>;]
+Re-enable unquoted chars except #
 */
-bareword    [a-zA-Z0-9_\-+:./\\\[\]<>;^~*#%!|&$()@?]
+bareword    [a-zA-Z0-9_\-+:./\\\[\]<>;^~*%!|&$()@?]
 
 %%
 
