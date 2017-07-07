@@ -442,6 +442,7 @@ static int setupDbPath(const char* module, const char* dbdir)
 static int getRecordHandle(const char* namepart, short type, long minsize, DBADDR* paddr)
 {
     char recordname[PVNAME_STRINGSZ];
+    long dummy, offset;
 
     sprintf(recordname, "%.*s%s", (int)(PVNAME_STRINGSZ-strlen(namepart)-1), getenv("IOC"), namepart);
     if (dbNameToAddr(recordname, paddr) != 0)
@@ -468,6 +469,8 @@ static int getRecordHandle(const char* namepart, short type, long minsize, DBADD
             recordname);
         return -1;
     }
+    /* update array information */
+    dbGetRset(paddr)->get_array_info(paddr, &dummy, &offset);
     return 0;
 }
 
@@ -665,7 +668,9 @@ static int findLibRelease (
     char* version;
     char* symname;
     char name[NAME_MAX + 11];                               /* get space for library path + "LibRelease" */
-
+    
+    (void)data;                                             /* unused */
+    if (size < sizeof(struct dl_phdr_info)) return 0;       /* wrong version of struct dl_phdr_info */
     /* find a symbol with a name like "_<module>LibRelease"
        where <module> is from the library name "<location>/lib<module>.so" */
     if (info->dlpi_name == NULL || info->dlpi_name[0] == 0) return 0;  /* no library name */
@@ -1171,7 +1176,7 @@ static int handleDependencies(const char* module, char* depfilename)
             while (*end && !isspace((unsigned char)*end)) end++;
 
             /* add + to numerial versions if not yet there */
-            if (*(end-1) != '+' && strspn(rversion, "0123456789.") == end-rversion) *end++ = '+';
+            if (*(end-1) != '+' && strspn(rversion, "0123456789.") == (size_t)(end-rversion)) *end++ = '+';
 
             /* terminate version */
             *end = 0;

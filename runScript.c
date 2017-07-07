@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -9,6 +11,8 @@
 #include <dbAccess.h>
 #include <initHooks.h>
 #include <epicsVersion.h>
+
+#define EPICSVER EPICS_VERSION*10000+EPICS_REVISION*100+EPICS_MODIFICATION
 
 #ifdef vxWorks
 #include "asprintf.h"
@@ -28,8 +32,7 @@
 #include "asprintf.h"
 #endif
 
-#ifdef BASE_VERSION
-#define EPICS_3_13
+#if (EPICSVER<31400)
 extern char** ppGlobalEnviron;
 #define OSI_PATH_SEPARATOR "/"
 #define OSI_PATH_LIST_SEPARATOR ":"
@@ -124,7 +127,7 @@ const char* getFormat(const char** pp)
 {
     static char format [20];
     const char* p = *pp;
-    int i = 1;
+    unsigned int i = 1;
     if (runScriptDebug > 1) printf ("getFormat %s\n", p);
     if ((format[0] = *p++) == '%')
     {
@@ -166,9 +169,13 @@ int runScript(const char* filename, const char* args)
         return -1;
     }
     
-    if (macCreateHandle(&mac,(char*[]){ "", "environ", NULL, NULL }) != 0) goto error;
+    if (macCreateHandle(&mac,(
+#if (EPICSVER>=31501)
+        const
+#endif
+        char*[]){ "", "environ", NULL, NULL }) != 0) goto error;
     macSuppressWarning(mac, 1);
-#ifdef EPICS_3_13
+#if (EPICSVER<31400)
     /* Have no environment macro substitution, thus load envionment explicitly */
     /* Actually, environmant macro substitution was introduced in 3.14.3 */
     for (pairs = ppGlobalEnviron; *pairs; pairs++)
@@ -194,7 +201,7 @@ int runScript(const char* filename, const char* args)
 
 #ifdef vxWorks
     /* expand macros (environment variables) in file name because vxWorks shell can't do it */
-#ifdef EPICS_3_13
+#if (EPICSVER<31400)
     /* 3.13 version of macExpandString is broken and may write more than allowed */
     while ((len = labs(macExpandString(mac, (char*)filename, line_exp, 
             line_exp_size/2))) >= line_exp_size/2)
@@ -272,7 +279,7 @@ int runScript(const char* filename, const char* args)
                 printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
         while ((len = labs(macExpandString(mac, line_raw, line_exp, 
-#ifdef EPICS_3_13
+#if (EPICSVER<31400)
         /* 3.13 version of macExpandString is broken and may write more than allowed */
                 line_exp_size/2))) >= line_exp_size/2)
 #else       
@@ -401,7 +408,7 @@ end:
     return status;
 }
 
-#ifndef EPICS_3_13
+#if (EPICSVER>=31400)
 /* initHooks is not included in iocCore in 3.13 */
 
 struct cmditem

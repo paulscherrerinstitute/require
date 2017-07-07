@@ -15,7 +15,7 @@ const char* getLibVersion(const char* libname);
 const char* getLibLocation(const char* libname);
 int libversionShow(const char* outfile);
 int runScript(const char* filename, const char* args);
-int putenvprintf(const char* format, ...) __attribute__((format(printf,1,2)));
+int putenvprintf(const char* format, ...) __attribute__((__format__(__printf__,1,2)));
 void pathAdd(const char* varname, const char* dirname);
 
 #ifdef __cplusplus

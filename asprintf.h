@@ -8,8 +8,8 @@ extern "C" {
 #define __attribute__(arg)
 #endif
 
-int asprintf(char** pbuffer, const char* format, ...) __attribute__((format(printf,2,3)));
-int vasprintf(char** pbuffer, const char* format, va_list ap) __attribute__((format(printf,2,0)));
+int asprintf(char** pbuffer, const char* format, ...) __attribute__((__format__(__printf__,2,3)));
+int vasprintf(char** pbuffer, const char* format, va_list ap) __attribute__((__format__(__printf__,2,0)));
 #ifdef __cplusplus
 }
 #endif

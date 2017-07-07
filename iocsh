@@ -128,9 +128,9 @@ else
 BASE=$(basename $(rp $EPICS_BASE))
 BASE=${BASE#*base-}
 fi
-if [ "${BASE#3.14.}" = "$BASE" -a "${BASE#3.15.}" = "$BASE" ]
+if [ "${BASE#3.}" = "$BASE" ]
 then
-    echo "Cannot find any EPICS 3.14 or 3.15 version" >&2
+    echo "Cannot find any EPICS base version" >&2
     echo "Try setting EPICS_BASE environment variable to full path" >&2
     exit 1
 fi
