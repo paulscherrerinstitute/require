@@ -889,6 +889,7 @@ ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
 
 CPPSNCFLAGS1  = $(filter -D%, ${OP_SYS_CFLAGS})
 CPPSNCFLAGS1 += $(filter-out ${OP_SYS_INCLUDE_CPPFLAGS} ,${CPPFLAGS}) ${CPPSNCFLAGS}
+CPPSNCFLAGS1 += -I $(dir $(SNC))../../include
 SNCFLAGS += -r
 
 %$(OBJ) %_snl.dbd: %.st
