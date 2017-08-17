@@ -668,11 +668,10 @@ endif # MINOR
 LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
 
 # Create and include dependency files.
-# 3.14.12+ already uses -MMD
-ifndef $(HDEPENDS_METHOD)
-HDEPENDS =
-CPPFLAGS += -MMD
-endif
+CPPFLAGS += -MD
+# 3.14.12 already defines -MMD here (does not catch #include <...>):
+HDEPENDSCFLAGS =
+HDEPENDS_CMD = 
 -include *.d
 
 # Need to find source dbd files relative to one dir up but generated dbd files in this dir.
