@@ -284,9 +284,9 @@ EPICS_BASETYPE=3.14
 ifneq ($(filter %_64,$(EPICS_HOST_ARCH)),)
 ifeq ($(wildcard $(EPICS_BASE)/lib/$(EPICS_HOST_ARCH)),)
 EPICS_HOST_ARCH:=$(patsubst %_64,%,$(EPICS_HOST_ARCH))
-export USR_CFLAGS_$(EPICS_HOST_ARCH) += -m32
-export USR_CXXFLAGS_$(EPICS_HOST_ARCH) += -m32
-export USR_LDFLAGS_$(EPICS_HOST_ARCH) += -m32
+USR_CFLAGS_$(EPICS_HOST_ARCH) += -m32
+USR_CXXFLAGS_$(EPICS_HOST_ARCH) += -m32
+USR_LDFLAGS_$(EPICS_HOST_ARCH) += -m32
 endif
 endif
 
@@ -668,10 +668,14 @@ endif # MINOR
 LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
 
 # Create and include dependency files.
+# 3.14.8 uses HDEPENDS to select depends mode
+# 3.14.12 uses 'HDEPENDSCFLAGS -MMD' (does not catch #include <...>)
+# 3.15 uses 'HDEPENDS_COMPFLAGS = -MM -MF $@' (does not catch #include <...>)
+HDEPENDS = 
+HDEPENDS_METHOD = COMP
+HDEPENDS_COMPFLAGS = -c
+MKMF = DO_NOT_USE_MKMF
 CPPFLAGS += -MD
-# 3.14.12 already defines -MMD here (does not catch #include <...>):
-HDEPENDSCFLAGS =
-HDEPENDS_CMD = 
 -include *.d
 
 # Need to find source dbd files relative to one dir up but generated dbd files in this dir.
