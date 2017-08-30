@@ -4,7 +4,7 @@ package require Tclx
 
 set global_context [scancontext create]
 
-set epicsversion 3.13
+set epicsversion 3.14
 set quiet 0
 set recordtypes 0
 set seachpath {}
@@ -12,7 +12,7 @@ set filesDone {}
 
 while {[llength $argv]} {
     switch -glob -- [lindex $argv 0] {
-        "-3.14" { set epicsversion 3.14 }
+        "-3*"   { set epicsversion [string range [lindex $argv 0] 1 end]}
         "-q"    { set quiet 1 }
         "-r"    { set recordtypes 1; set quiet 1 }
         "-I"    { lappend seachpath [lindex $argv 1]; set argv [lreplace $argv 0 1]; continue }
@@ -54,11 +54,11 @@ if {$recordtypes} {
 
     scanmatch $global_context {(registrar|variable|function)[ \t]*\([ \t]*"?([a-zA-Z0-9_]+)"?[ \t]*\)} {
         global epicsversion
-        if {$epicsversion == 3.14} {puts $matchInfo(submatch0)($matchInfo(submatch1))}
+        if {$epicsversion > 3.13} {puts $matchInfo(submatch0)($matchInfo(submatch1))}
     }
     scanmatch $global_context {variable[ \t]*\([ \t]*"?([a-zA-Z0-9_]+)"?[ \t]*,[ \t]*"?([a-zA-Z0-9_]+)"?[ \t]*\)} {
         global epicsversion
-        if {$epicsversion == 3.14} {puts variable($matchInfo(submatch0),$matchInfo(submatch1))}
+        if {$epicsversion > 3.13} {puts variable($matchInfo(submatch0),$matchInfo(submatch1))}
     }
 
     scanmatch $global_context {

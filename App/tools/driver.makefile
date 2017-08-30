@@ -277,8 +277,16 @@ else # EPICSVERSION
 
 EPICS_BASE=${EPICS_LOCATION}/base-${EPICSVERSION}
 
-ifneq ($(filter 3.14.% 3.15.% ,$(EPICSVERSION)),)
+ifneq ($(filter 3.13.%,$(EPICSVERSION)),)
+
+EPICS_BASETYPE=3.13
+CONFIG=${EPICS_BASE}/config
+export BUILD_TYPE=Vx
+
+else # 3.14+
+
 EPICS_BASETYPE=3.14
+CONFIG=${EPICS_BASE}/configure
 
 # There is no 64 bit support before 3.14.12 
 ifneq ($(filter %_64,$(EPICS_HOST_ARCH)),)
@@ -290,36 +298,26 @@ USR_LDFLAGS_$(EPICS_HOST_ARCH) += -m32
 endif
 endif
 
-${EPICS_BASE}/configure/CONFIG:
+endif # 3.14+
+
+${CONFIG}/CONFIG:
 	@echo "ERROR: EPICS release ${EPICSVERSION} not installed on this host."
 
 # Some TOP and EPICS_BASE tweeking necessary to work around release check in 3.14.10+.
-CONFIG=${EPICS_BASE}/configure
 EB=${EPICS_BASE}
 TOP:=${EPICS_BASE}
--include ${EPICS_BASE}/configure/CONFIG
+-include ${CONFIG}/CONFIG
 EPICS_BASE:=${EB}
 SHRLIB_VERSION=
 COMMON_DIR = O.${EPICSVERSION}_Common
 # do not link *everything* with readline (and curses)
 COMMANDLINE_LIBRARY =
-endif # 3.14
-
-ifneq ($(filter 3.13.%,$(EPICSVERSION)),)
-
-EPICS_BASETYPE=3.13
-${EPICS_BASE}/config/CONFIG:
-	@echo "ERROR: EPICS release ${EPICSVERSION} not installed on this host."
-
--include ${EPICS_BASE}/config/CONFIG
-# Relax 3.13 cross compilers (default is STRICT) to allow sloppier syntax.
+# Relax (3.13) cross compilers (default is STRICT) to allow sloppier syntax.
 CMPLR=STD
 GCC_STD = $(GCC)
 CXXCMPLR=ANSI
 G++_ANSI = $(G++) -ansi
 OBJ=.o
-export BUILD_TYPE=Vx
-endif # 3.13
 
 ifndef T_A
 ## RUN 2
@@ -328,6 +326,7 @@ ifndef T_A
 # Still in source directory.
 
 # Look for sources etc.
+# Select target architectures to build.
 # Export everything for third run:
 
 AUTOSRCS := $(filter-out ~%,$(wildcard *.c *.cc *.cpp *.st *.stt *.gt))
@@ -376,10 +375,20 @@ export DOCU
 # Loop over all target architectures for third run.
 # Go to O.${T_A} subdirectory because RULES.Vx only work there:
 
-ifeq (${EPICS_BASETYPE},3.14)
-CROSS_COMPILER_TARGET_ARCHS += ${EPICS_HOST_ARCH}
-endif # 3.14
+# Filter architectures to build using EXCLUDE_ARCHS and ARCH_FILTER.
+ifneq (${EPICS_BASETYPE},3.13)
+CROSS_COMPILER_TARGET_ARCHS := ${EPICS_HOST_ARCH} ${CROSS_COMPILER_TARGET_ARCHS}
+endif # !3.13
 CROSS_COMPILER_TARGET_ARCHS := $(filter-out $(addprefix %,${EXCLUDE_ARCHS}),$(filter-out $(addsuffix %,${EXCLUDE_ARCHS}),$(if ${ARCH_FILTER},$(filter ${ARCH_FILTER},${CROSS_COMPILER_TARGET_ARCHS}),${CROSS_COMPILER_TARGET_ARCHS})))
+
+# Create build dirs (and links) if necessary.
+LINK_eldk52-e500v2 = eldk52-rt-e500v2 eldk52-xenomai-e500v2
+define MAKELINKDIRS
+LINKDIRS+=O.${EPICSVERSION}_$1
+O.${EPICSVERSION}_$1:
+	$(LN) O.${EPICSVERSION}_$2 O.${EPICSVERSION}_$1
+endef 
+$(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
 SRCS_Linux = ${SOURCES_Linux}
 SRCS_Linux += ${SOURCES_${EPICS_BASETYPE}_Linux}
@@ -403,23 +412,6 @@ debug::
 	@echo "CROSS_COMPILER_TARGET_ARCHS = ${CROSS_COMPILER_TARGET_ARCHS}"
 	@echo "EXCLUDE_ARCHS = ${EXCLUDE_ARCHS}"
 	@echo "LIBVERSION = ${LIBVERSION}"
-
-# Create build dirs (and links) if necessary.
-
-BUILDDIRS = $(addprefix O.${EPICSVERSION}_, ${CROSS_COMPILER_TARGET_ARCHS})
-ifeq (${EPICS_BASETYPE},3.14)
-    BUILDDIRS += O.${EPICSVERSION}_Common
-endif
-
-define MAKELINKDIRS
-LINKDIRS+=O.${EPICSVERSION}_$1
-O.${EPICSVERSION}_$1:
-	$(LN) O.${EPICSVERSION}_$2 O.${EPICSVERSION}_$1
-endef 
-
-LINK_eldk52-e500v2 = eldk52-rt-e500v2 eldk52-xenomai-e500v2
-
-$(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
 install build::
 # Delete old build if INSTBASE has changed and module depends on other modules.
@@ -700,8 +692,6 @@ USR_INCLUDES += $(SRC_INCLUDES) $(INSTALL_INCLUDES)
 else
 # Only 3.14 from here.
 
-EXPANDARG = -3.14
-
 # Create dbd file for snl code.
 DBDFILES += $(patsubst %.st,%_snl.dbd,$(notdir $(filter %.st,${SRCS})))
 DBDFILES += $(patsubst %.stt,%_snl.dbd,$(notdir $(filter %.stt,${SRCS})))
@@ -805,7 +795,7 @@ MODULEINFOS:
 # because it has too strict checks to be used for a loadable module.
 ${MODULEDBD}: ${DBDFILES}
 	@echo "Expanding $@"
-	${MAKEHOME}/expandDBD.tcl ${EXPANDARG} ${DBDEXPANDPATH} $^ > $@
+	${MAKEHOME}expandDBD.tcl -$(basename ${EPICSVERSION}) ${DBDEXPANDPATH} $^ > $@
 
 # Install everything.
 INSTALL_LIBS = ${MODULELIB:%=${INSTALL_LIB}/%}
@@ -996,7 +986,7 @@ END {for (name in func_missing) if (!func_found[name]) { \
 endef
  
 CORELIB = ${CORELIB_${OS_CLASS}}
-CORELIB_vxWorks = ${EPICS_BASE}/bin/${T_A}/$(if $(filter 3.15.% ,$(EPICSVERSION)),softIoc.munch,iocCoreLibrary.munch)
+CORELIB_vxWorks = $(firstword $(wildcard ${EPICS_BASE}/bin/${T_A}/softIoc.munch ${EPICS_BASE}/bin/${T_A}/iocCoreLibrary.munch))
  
 ifeq (${OS_CLASS},vxWorks)
 SHARED_LIBRARIES=NO
