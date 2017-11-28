@@ -2,30 +2,29 @@
 
 help () {
     {
-    echo "usage: iocsh [options] [files]"
+    echo "usage: iocsh [options] [files] [macro=value] ..."
     echo "Start an EPICS iocsh and load files"
-    echo "Recognized filetypes: *.db *.dbt *.template *.subs *.subst *.dbd *.so"
     echo
     echo "Possible options:"
-    echo " -3.xx.yy: Set EPICS base version."
-    echo " -32: Force 32 bit version (on 64 bit systems)."
-    echo " -? or -h or --help: Show this page and exit."
-    echo " -v or --version: Show version and exit."
-    echo " -c: The next string is executed as a command by the EPICS shell."
-    echo " -s: The next string is a sequencer program (and arguments), run with 'seq'."
+    echo " -? or -h or --help: Show this page and exit"
+    echo " -v or --version: Show version and exit"
+    echo " -32: Force 32 bit host architecture (on 64 bit systems)"
+    echo " -x.z.y: (Up to 3 numbers) Use specific EPICS base version"
+    echo " -c: The next string is executed as a command by the EPICS shell"
+    echo " -s: The next string is a sequencer program (and arguments), run with 'seq'"
     echo "     This forces an 'iocInit' before running the program."
-    echo " -r: The next string is a module (and version), loaded via 'require'."
-    echo " -n: The next string is the IOC name (used for prompt)."
-    echo "     Default: dirname if parent dir is \"ioc\" otherwise hostname."
+    echo " -r: The next string is a module (and version), loaded via 'require'"
+    echo " -n: The next string is the IOC name (used for prompt)"
+    echo "     Default: dirname if parent dir is \"ioc\" otherwise hostname"
     echo
     echo "Supported filetypes:"
-    echo "*.db, *.dbt and *.template are loaded via 'dbLoadRecords'."
-    echo "  After the filename, you can specify substitutions like MACRO=value."
-    echo "*.subs and *.subst are loaded via 'dbLoadTemplate'."
-    echo "*.dbd is loaded via 'dbLoadDatabase'."
-    echo "*.so is loaded via 'ld' or 'dlload' (3.14.12 or higer)."
-    echo "If an argument is @file, more arguments are read from that file."
-    echo "All other files are executed as startup scripts by the EPICS shell."
+    echo "*.db, *.dbt and *.template are loaded via 'dbLoadRecords'"
+    echo "*.subs and *.subst are loaded via 'dbLoadTemplate'"
+    echo "*.dbd is loaded via 'dbLoadDatabase'"
+    echo "After the above files, you can specify macro substitutions like m1=v1 m2=v1"
+    echo "*.so is loaded via 'dlload' (or 'ld' before 3.14.12)"
+    echo "If an argument is @file, more arguments are read from that file"
+    echo "All other files are executed as startup scripts by the EPICS shell"
     } >&2
     exit
 }
@@ -37,20 +36,6 @@ version () {
     exit
 }
 
-case $1 in
-    ( -h | "-?" | -help | --help )
-        help
-        ;;
-    ( -v | -ver | --ver | -version | --version )
-        version
-        ;;
-    ( -3.* )
-        unset EPICS_BASE
-        BASE=${1#-}
-        shift
-    ;;
-esac
-
 # realpath and readlink are not available on all systems, let's try what works...
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || (cd -P $1 && echo $PWD) || (x=$(\ls -ld $1) && echo ${x##* }) || echo $1 ) 2>/dev/null
@@ -59,23 +44,31 @@ rp() {
 # if EPICS_HOST_ARCH is not set guess it
 if [ -z "$EPICS_HOST_ARCH" ]
 then
-    echo "EPICS_HOST_ARCH is not set"
     EPICS_HOST_ARCH=$(basename $(dirname $(rp $(which caRepeater))))
     if [ -n "$EPICS_HOST_ARCH" ]
     then
-        echo "Guessing EPICS_HOST_ARCH=$EPICS_HOST_ARCH"
+        echo "Guessing EPICS_HOST_ARCH=$EPICS_HOST_ARCH" >&2
     else
+        echo "EPICS_HOST_ARCH is not set" >&2
         exit 1
     fi
 fi
 
-# check if user requested 32 bit version on a 64 bit system
-case $1 in
-    ( -32 )
-        EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
-        shift
-    ;;
-esac
+while true
+do
+    case $1 in
+        ( -32 )
+            EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
+        ;;
+        ( -[1-9]* )
+            unset EPICS_BASE
+            BASE=${1#-}
+        ;;
+        ( * ) break
+        ;;
+    esac
+    shift
+done
 
 # Either EPICS or EPICS_BASE should be set to the install directory
 if [ -z "$EPICS_BASE" ]
@@ -87,25 +80,44 @@ then
         do
             if [ -d $EPICS ]
             then
-                break 2
+                break
             fi
-            echo "Cannot find any EPICS installation directory." >&2
-            echo "Try setting EPICS_BASE environment variable to full path" >&2
-            exit 1
         done
+        if [ ! -d "$EPICS" ]
+        then
+            EPICS=$(dirname $(dirname $(dirname $(dirname $(ldd $(which caRepeater) | awk '/libca/ {print $3}')))))
+            echo "Guessing EPICS=$EPICS"
+        fi
+        if [ ! -d "$EPICS" ]
+        then
+            echo "Cannot find EPICS installation directory." >&2
+            echo "Try setting EPICS environment variable." >&2
+            exit 1
+        fi
     fi
-    # find highest (requested) EPICS version that supports our architecture (or its 32 bit version)
-    EPICS_BASE=$(\ls -1vrd $EPICS/base*$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
+    if [ -z "$BASE" ]
+    then
+        EPICS_BASE=$(\ls -1vrd $EPICS/base/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
+    else
+        # find highest (requested) EPICS version that supports our architecture (or its 32 bit version)
+        EPICS_BASE=$(\ls -1vrd $EPICS/base-$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
+    fi
     if [ -z $EPICS_BASE ]
     then
-        echo Cannot find any $BASE EPICS version for $EPICS_HOST_ARCH. >&2
+        if [ -z "$(\ls -1vrd $EPICS/base-$BASE*/ 2>/dev/null)" ]
+        then
+            echo "No EPICS $BASE installed." >&2
+            exit 1
+        fi
+        echo EPICS $BASE not available for EPICS_HOST_ARCH=$EPICS_HOST_ARCH. >&2
         exit 1
     fi
     # maybe we need to change from 64 bit to 32 bit
     if [ $EPICS_HOST_ARCH != ${EPICS_BASE#*/bin/} ]
     then
         EPICS_HOST_ARCH=${EPICS_BASE#*/bin/}
-        echo "No 64 bit version in ${EPICS_BASE%bin*}. Switch to 32 bit version $EPICS_HOST_ARCH"
+        echo "No 64 bit version in ${EPICS_BASE%bin*}." >&2
+        echo "Switching to 32 bit version $EPICS_HOST_ARCH." >&2
     fi
     EPICS_BASE=$(rp ${EPICS_BASE%bin*})
 fi
@@ -116,28 +128,13 @@ then
     exit 1
 fi
 
-# Check revision
-if [ -r $EPICS_BASE/configure/CONFIG_BASE_VERSION ]
-then
-BASE=$(awk -F '[ \t]*=[ \t]*' '
+# Get actual EPICS revision
+eval $(awk -F '[ \t]*=[ \t]*' '
     /^[ \t]*EPICS_VERSION[ \t]*=/ {v=$2}
     /^[ \t]*EPICS_REVISION[ \t]*=/ {r=$2}
-    /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2}
-    END {print v"."r"."m}' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
-else
-BASE=$(basename $(rp $EPICS_BASE))
-BASE=${BASE#*base-}
-fi
-if [ "${BASE#3.}" = "$BASE" ]
-then
-    echo "Cannot find any EPICS base version" >&2
-    echo "Try setting EPICS_BASE environment variable to full path" >&2
-    exit 1
-fi
-export BASE
-BASEMINOR=${BASE#3.}
-BASEPATCH=${BASEMINOR#*.}
-BASEMINOR=${BASEMINOR%.*}
+    /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2+0}
+    END {print "BASE="v"."r"."m";BASECODE="v*10000+r*100+m}
+' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
 
 # IOC name derives from hostname
 # (trailing possible '\r' under cygwin)
@@ -154,7 +151,7 @@ export IOC
 # Check for 64 bit versions, default to 32 bit
 if [ ! -d $EPICS_BASE/lib/${EPICS_HOST_ARCH} -a -d $EPICS_BASE/lib/${EPICS_HOST_ARCH%_64} ]
 then
-    echo "No 64 bit EPICS installation found. Defaulting to 32 bit"
+    echo "No 64 bit EPICS installation found. Defaulting to 32 bit" >&2
     EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
 fi
 export EPICS_HOST_ARCH
@@ -207,6 +204,14 @@ while [ "$#" -gt 0 ]
 do
   file=$1
   case $file in
+    ( -32 )
+        echo "-32 option must be set earlier" >&2
+        exit 1
+        ;;
+    ( -[1-9]* )
+        echo "EPICS version $file option must be set earlier" >&2
+        exit 1
+        ;;
     ( -h | "-?" | -help | --help )
         help
         ;;
@@ -216,7 +221,7 @@ do
     ( @* )              
         loadFiles $(cat ${file#@})
         ;;
-    ( *.db | *.template)
+    ( *.db | *.template | *.subs | *.subst | *.dbd )
         subst=""
         while [ "$#" -gt 1 ]
         do
@@ -229,17 +234,19 @@ do
                     ;;
             esac
         done
+        ;;&
+    ( *.db | *.template)
         echo "dbLoadRecords \"$file\",\"${subst#,}\""
         ;;
     ( *.subs | *.subst )
-        echo "dbLoadTemplate \"$file\""
+        echo "dbLoadTemplate \"$file\",\"${subst#,}\""
         ;;
     ( *.dbd )
         # some dbd files must be loaded before main to take effect
-        echo "dbLoadDatabase \"$file\",\"$DBD\""
+        echo "dbLoadDatabase \"$file\",\"$DBD\",\"${subst#,}\""
         ;;
     ( *.so )             
-        if [ $BASEMINOR -ge 15 -o $BASEPATCH -ge 12 ]
+        if [ $BASECODE -ge 31412 ]
         then
             echo "dlload \"$file\""
         else
@@ -279,19 +286,9 @@ do
         shift
         IOC="$1"
         ;;
-    ( -3.* )
-        echo "Version $file must be first argument" >&2
-        exit 1
-        ;;
-    ( -32 )
-        echo "-32 option must come before all others (except -3.xx.yy)" >&2
-        exit 1
-        ;;
     ( -* )
-        {
-        echo "unknown option $1"
-        echo "try: $(basename $0) --help"
-        } >&2
+        echo "Unknown option $1" >&2
+        echo "Try: $(basename $0) --help" >&2
         exit 1
        ;;
     ( * )                
@@ -311,7 +308,7 @@ trap "kill -s SIGTERM 0; stty sane; echo; rm -f $startup; " EXIT
 {
 echo "# date=\"$(date)\""
 echo "# user=\"${USER:-$(whoami)}\""
-for var in PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER_PATH
+for var in IOC PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER_PATH
 do
     echo "# $var=\"${!var}\""
 done
@@ -329,7 +326,7 @@ else # old driver pool model
     REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
 fi
 
-if [ $BASEMINOR -ge 15 -o $BASEPATCH -ge 12 ]
+if [ $BASECODE -ge 31412 ]
 then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
     ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
@@ -344,6 +341,12 @@ else
     LDCMD="ld"
     echo "dbLoadDatabase \"$APP.dbd\",\"$DBD\""
     echo "${APP}_registerRecordDeviceDriver(pdbbase)"
+fi
+
+if [ ! -x $EXE ]
+then
+    echo "$EXE not found or not executable." >&2
+    exit 1
 fi
 
 if [ ! -f "$REQUIRE_LIB" ]
@@ -388,5 +391,6 @@ then
 fi
 
 echo $EXE $ARGS $startup
+#enable core dumps
 ulimit -c unlimited
 eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
