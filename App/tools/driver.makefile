@@ -307,9 +307,13 @@ ${CONFIG}/CONFIG:
 EB=${EPICS_BASE}
 TOP:=${EPICS_BASE}
 -include ${CONFIG}/CONFIG
+BASE_CPPFLAGS=
 EPICS_BASE:=${EB}
-SHRLIB_VERSION=
 COMMON_DIR = O.${EPICSVERSION}_Common
+ifndef LEGACY_RSET
+USR_CPPFLAGS+=-DUSE_TYPED_RSET
+endif
+SHRLIB_VERSION=
 # do not link *everything* with readline (and curses)
 COMMANDLINE_LIBRARY =
 # Relax (3.13) cross compilers (default is STRICT) to allow sloppier syntax.
