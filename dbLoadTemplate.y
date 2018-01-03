@@ -18,7 +18,7 @@
 #include <string.h>
 #include <errno.h>
 
-#if not defined (_WIN32)
+#if !defined (_WIN32)
 #include <unistd.h>
 #endif
 
