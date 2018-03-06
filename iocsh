@@ -2,29 +2,41 @@
 
 help () {
     {
-    echo "usage: iocsh [options] [files] [macro=value] ..."
+    echo "Usage: iocsh [options] [files] [macro=value] ..."
     echo "Start an EPICS iocsh and load files"
     echo
-    echo "Possible options:"
-    echo " -? or -h or --help: Show this page and exit"
-    echo " -v or --version: Show version and exit"
-    echo " -32: Force 32 bit host architecture (on 64 bit systems)"
-    echo " -x.z.y: (Up to 3 numbers) Use specific EPICS base version"
-    echo " -c: The next string is executed as a command by the EPICS shell"
-    echo " -s: The next string is a sequencer program (and arguments), run with 'seq'"
-    echo "     This forces an 'iocInit' before running the program."
-    echo " -r: The next string is a module (and version), loaded via 'require'"
-    echo " -n: The next string is the IOC name (used for prompt)"
-    echo "     Default: dirname if parent dir is \"ioc\" otherwise hostname"
+    echo "Options:"
+    echo " -?, -h, --help  Show this page and exit."
+    echo " -v, --version   Show version and exit."
+    echo " -32             Force 32 bit version (on 64 bit systems)."
+    echo " -x.z.y          Use EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7)."
+    echo " -d, --debug     Run IOC with gdb."
+    echo " -dv             Run IOC with valgrind."
+    echo " -dp             Run IOC with perf record."
+    echo " -c              The next string is executed as a command by the EPICS shell."
+    echo " -s              The next string is a sequencer program (and arguments), run with 'seq'."
+    echo "                 This forces an 'iocInit' before running the program."
+    echo " -r              The next string is a module (and version), loaded via 'require'."
+    echo " -n              The next string is the IOC name (used for prompt)."
+    echo "                 Default: dirname if parent dir is \"ioc\" otherwise hostname"
     echo
     echo "Supported filetypes:"
-    echo "*.db, *.dbt and *.template are loaded via 'dbLoadRecords'"
-    echo "*.subs and *.subst are loaded via 'dbLoadTemplate'"
-    echo "*.dbd is loaded via 'dbLoadDatabase'"
+    echo " *.db, *.dbt, *.template  loaded via 'dbLoadRecords'"
+    echo " *.subs, *.subst          loaded via 'dbLoadTemplate'"
+    echo " *.dbd                    loaded via 'dbLoadDatabase'"
     echo "After the above files, you can specify macro substitutions like m1=v1 m2=v1"
-    echo "*.so is loaded via 'dlload' (or 'ld' before 3.14.12)"
-    echo "If an argument is @file, more arguments are read from that file"
+    echo " *.so                     loaded via 'dlload' (or 'ld' before 3.14.12)"
+    echo
+    echo "If a file is preceeded with an at sign (@file), more arguments are"
+    echo "read from that file."
     echo "All other files are executed as startup scripts by the EPICS shell"
+    echo
+    echo "Examples:"
+    echo "  iocsh st.cmd"
+    echo "  iocsh my_database.template P=XY M=3"
+    echo "  iocsh -r my_module,version -c 'initModule()'"
+    echo "  iocsh -3.15.4 -dp st.cmd"
+    echo "  iocsh -c 'var requireDebug 1' st.cmd"
     } >&2
     exit
 }
@@ -221,6 +233,15 @@ do
     ( @* )              
         loadFiles $(cat ${file#@})
         ;;
+    ( -d | -dg | --debug )
+        LOADER="gdb --eval-command run --args $LOADER"
+        ;;
+    ( -dv )
+        LOADER="valgrind --leak-check=full $LOADER"
+        ;;
+    ( -dp )
+        LOADER="perf record $LOADER"
+        ;;
     ( *.db | *.template | *.subs | *.subst | *.dbd )
         subst=""
         while [ "$#" -gt 1 ]
@@ -303,7 +324,7 @@ done
 startup=/tmp/iocsh.startup.$$
 
 # clean up and kill the softIoc when killed by any signal
-trap "kill -s SIGTERM 0; stty sane; echo; rm -f $startup; " EXIT
+trap "kill -s SIGTERM 0; (stty sane && echo) 2>/dev/null; rm -f $startup; " EXIT
 
 {
 echo "# date=\"$(date)\""
@@ -333,7 +354,7 @@ then
     LDCMD="dlload"
 else
     # get rid of the compiled-in rpath because at PSI that is a link pointing to current EPICS version.
-    LOADER=/lib/ld-linux.so.2
+    LOADER="$LOADER /lib/ld-linux.so.2"
     LOADERARGS="--library-path $EPICS_BASE/lib/$EPICS_HOST_ARCH --inhibit-rpath ''"
     APP=ioc
     EXE=$EPICS_EXTENSIONS/bin/$EPICS_HOST_ARCH/$APP
