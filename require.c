@@ -229,9 +229,9 @@ const char epicsRelease[] = TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION)"."TOSTR
 const char epicsBasetype[] = TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION);
 
 #ifndef T_A
-#error T_A not defined: Compile with USR_CFLAGS += -DT_A=${T_A}
+#error T_A not defined: Compile with USR_CFLAGS += -DT_A='"${T_A}"'
 #endif
-const char targetArch[] = TOSTR(T_A);
+const char targetArch[] = T_A;
 
 #ifndef OS_CLASS
 #error OS_CLASS not defined: Try to compile with USR_CFLAGS += -DOS_CLASS='"${OS_CLASS}"'
