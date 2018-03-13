@@ -68,6 +68,7 @@ int requireDebug;
     #include <loadLib.h>
     #include <shellLib.h>
     #include <ioLib.h>
+    #include <fioLib.h>
     #include <envLib.h>
     #include <epicsAssert.h>
     #include "strdup.h"
@@ -81,19 +82,54 @@ int requireDebug;
     #define getAddress(module, name) __extension__ \
         ({SYM_TYPE t; char* a = NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
 
-    /* vxWorks has no snprintf() */
-    #define snprintf(s, maxchars, f, args...) __extension__ \
-        ({int printed=sprintf(s, f, ## args); assert(printed < maxchars); printed;})
+#ifndef _WRS_VXWORKS_MAJOR
+    /* vxWorks 5 has no snprintf() */
+    struct outStr_s {
+        char *str;
+        int free;
+    };
+
+    static STATUS outRoutine(char *buffer, int nchars, int outarg) {
+        struct outStr_s *poutStr = (struct outStr_s *) outarg;
+        int free = poutStr->free;
+
+        if (free < 1) { /*let fioFormatV continue to count length*/
+            return OK;
+        } else if (free > 1) {
+            if (nchars >= free) nchars = free-1;
+            strncpy(poutStr->str, buffer, nchars);
+            poutStr->str += nchars;
+            poutStr->free -= nchars;
+        }
+        /*make sure final string is null terminated*/
+        *poutStr->str = 0;
+        return OK;
+    }
+
+    static int snprintf(char *str, size_t size, const char *format, ...)
+    {
+        struct outStr_s outStr;
+        int nchars;
+        va_list ap;
+
+        outStr.str = str;
+        outStr.free = size;
+        va_start(ap, format);
+        nchars = fioFormatV(format, ap, outRoutine, (int)&outStr);
+        va_end(ap);
+        return nchars;
+    }
+#endif
 
     /* vxWorks has no realpath() -- at least make directory absolute */
     static char* realpath(const char* path, char* buf)
     {
         size_t len = 0;
-        if (!buf) buf = malloc(MAX_FILENAME_LENGTH);
+        if (!buf) buf = malloc(PATH_MAX+1);
         if (!buf) return NULL;
         if (path[0] != OSI_PATH_SEPARATOR[0])
         {
-            getcwd(buf, MAX_FILENAME_LENGTH);
+            getcwd(buf, PATH_MAX);
             len = strlen(buf);
             if (len && buf[len-1] != OSI_PATH_SEPARATOR[0])
                 buf[len++] = OSI_PATH_SEPARATOR[0];
@@ -162,7 +198,7 @@ int requireDebug;
     #include "asprintf.h"
     #define snprintf _snprintf
     #define setenv(name,value,overwrite) _putenv_s(name,value)
-    #define NAME_MAX MAX_PATH
+    #define PATH_MAX MAX_PATH
 
     #define PREFIX
     #define INFIX
@@ -667,7 +703,7 @@ static int findLibRelease (
     char* p;
     char* version;
     char* symname;
-    char name[NAME_MAX + 11];                               /* get space for library path + "LibRelease" */
+    char name[PATH_MAX + 11];                               /* get space for library path + "LibRelease" */
     
     (void)data;                                             /* unused */
     if (size < sizeof(struct dl_phdr_info)) return 0;       /* wrong version of struct dl_phdr_info */
@@ -741,7 +777,6 @@ static void registerExternalModules()
         }
     }
 }
-
 
 #else
 static void registerExternalModules()
@@ -1209,7 +1244,7 @@ static int require_priv(const char* module, const char* version, const char* arg
     int extoffs;
     char* founddir = NULL;
     char* symbolname;
-    char filename[NAME_MAX];
+    char filename[PATH_MAX];
     
     int someVersionFound = 0;
     int someArchFound = 0;
