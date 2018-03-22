@@ -9,27 +9,25 @@ help () {
     echo " -?, -h, --help  Show this page and exit."
     echo " -v, --version   Show version and exit."
     echo " -32             Force 32 bit version (on 64 bit systems)."
-    echo " -x.z.y          Use EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7)."
+    echo " -x[.z[.y]]      Select EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7)."
     echo " -d, --debug     Run IOC with gdb."
     echo " -dv             Run IOC with valgrind."
     echo " -dp             Run IOC with perf record."
-    echo " -c              The next string is executed as a command by the EPICS shell."
-    echo " -s              The next string is a sequencer program (and arguments), run with 'seq'."
+    echo " -c 'cmd args'   Ioc shell command."
+    echo " -s 'prog m=v'   Sequencer program (and arguments), run with 'seq'."
     echo "                 This forces an 'iocInit' before running the program."
-    echo " -r              The next string is a module (and version), loaded via 'require'."
-    echo " -n              The next string is the IOC name (used for prompt)."
-    echo "                 Default: dirname if parent dir is \"ioc\" otherwise hostname"
+    echo " -r module[,ver] Modue (optionally with version) loaded via 'require'."
+    echo " -n name         Name of the IOC, used for prompt and \${IOC} variable."
+    echo "                 Default: dirname if parent dir is \"ioc\" otherwise hostname."
+    echo " @file           More arguments are read from file."
     echo
     echo "Supported filetypes:"
     echo " *.db, *.dbt, *.template  loaded via 'dbLoadRecords'"
     echo " *.subs, *.subst          loaded via 'dbLoadTemplate'"
     echo " *.dbd                    loaded via 'dbLoadDatabase'"
-    echo "After the above files, you can specify macro substitutions like m1=v1 m2=v1"
     echo " *.so                     loaded via 'dlload' (or 'ld' before 3.14.12)"
-    echo
-    echo "If a file is preceeded with an at sign (@file), more arguments are"
-    echo "read from that file."
-    echo "All other files are executed as startup scripts by the EPICS shell"
+    echo "All other files are executed as startup scripts by the EPICS shell."
+    echo "After a file you can specify substitutions like m1=v1 m2=v1 for that file."
     echo
     echo "Examples:"
     echo "  iocsh st.cmd"
@@ -195,22 +193,6 @@ then
 fi
 export EPICS_DRIVER_PATH
 
-subst () {
-    subst=""
-    while [ "$#" -gt 1 ]
-    do
-        case $2 in 
-            ( *=* )
-                subst="$subst,$2"; shift
-                ;;
-            ( * )
-                break
-                ;;
-        esac
-    done
-    echo ${subst#,}
-}
-
 loadFiles () {
 while [ "$#" -gt 0 ]
 do
@@ -241,38 +223,6 @@ do
         ;;
     ( -dp )
         LOADER="perf record $LOADER"
-        ;;
-    ( *.db | *.template | *.subs | *.subst | *.dbd )
-        subst=""
-        while [ "$#" -gt 1 ]
-        do
-            case $2 in 
-                ( *=* )
-                    subst="$subst,$2"; shift
-                    ;;
-                ( * )
-                    break
-                    ;;
-            esac
-        done
-        ;;&
-    ( *.db | *.template)
-        echo "dbLoadRecords \"$file\",\"${subst#,}\""
-        ;;
-    ( *.subs | *.subst )
-        echo "dbLoadTemplate \"$file\",\"${subst#,}\""
-        ;;
-    ( *.dbd )
-        # some dbd files must be loaded before main to take effect
-        echo "dbLoadDatabase \"$file\",\"$DBD\",\"${subst#,}\""
-        ;;
-    ( *.so )             
-        if [ $BASECODE -ge 31412 ]
-        then
-            echo "dlload \"$file\""
-        else
-            echo "ld \"$file\""
-        fi
         ;;
     ( -c )               
         shift
@@ -312,9 +262,53 @@ do
         echo "Try: $(basename $0) --help" >&2
         exit 1
        ;;
-    ( * )                
-        echo "< \"$file\""
-        if grep -q iocInit $file; then init=NO; fi
+    ( *.so )
+        if [ $BASECODE -ge 31412 ]
+        then
+            echo "dlload \"$file\""
+        else
+            echo "ld \"$file\""
+        fi
+        ;;
+    ( *=* )
+        echo -n $file | awk -F '=' '{printf "epicsEnvSet %s '\''%s'\''\n", $1, $2}'
+        ;;
+    ( * )
+        subst=""
+        while [ "$#" -gt 1 ]
+        do
+            case $2 in
+                ( *=* )
+                    subst="$subst,$2"; shift
+                    ;;
+                ( * )
+                    break
+                    ;;
+            esac
+        done
+        subst=${subst#,}
+        case $file in
+            ( *.db | *.template)
+                echo "dbLoadRecords '$file','$subst'"
+                ;;
+            ( *.subs | *.subst )
+                echo "dbLoadTemplate '$file','$subst'"
+                ;;
+            ( *.dbd )
+                # some dbd files must be loaded before main to take effect
+                echo "dbLoadDatabase '$file','$DBD','$subst'"
+                ;;
+            ( * )
+                if [ $BASECODE -ge 31500 ]
+                then
+                    echo "iocshLoad '$file','$subst'"
+                else
+                    echo -n $subst | awk -F '=' -v 'RS=,' '{printf "epicsEnvSet %s '\''%s'\''\n", $1, $2}'
+                    echo "< '$file'"
+                fi
+                if grep -q iocInit $file; then init=NO; fi
+                ;;
+        esac
         ;;
   esac
   shift
