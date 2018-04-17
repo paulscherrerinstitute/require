@@ -59,6 +59,11 @@ static int parseValue(const char** pp, int* v)
     const char *p = *pp;
     int neg = 0;
 
+    /* A value is optionally prefixed with a sign + -.
+     * It is either a number (decimal, octal or hex)
+     * or an expression in ().
+     * Allowed chars after a number: operators, closing parenthesis, whitespace, quotes, end of string
+     */ 
     while (isspace((unsigned char)*p)) p++;
     if (*p == '+' || *p == '-') neg = *p++ == '-';
     while (isspace((unsigned char)*p)) p++;
@@ -66,13 +71,20 @@ static int parseValue(const char** pp, int* v)
     {
         p++;
         if (!parseExpr(&p, &val)) return 0;
+        while (isspace((unsigned char)*p)) p++;
         if (*p++ != ')') return 0;
     }
     else
     {
         char* e;
         val = strtol(p, &e, 0);
-        if (e == p) return 0;
+        if (e == p) return 0; /* no number */
+        if (*e && !isspace((unsigned char)*e) && !strchr("+-*/%?)'\"",*e))
+        {
+            /* followed by rubbish */
+            if (runScriptDebug > 1) printf("parseValue: bail out from %s at %s\n", *pp, e);
+            return 0; 
+        }
         p = e;
     }
     if (neg) val = -val;
@@ -97,9 +109,15 @@ static int parseExpr(const char** pp, int* v)
     int status = 0;
 
     *v = 0;
+    /* An expression is a value optionally followed by an operator and another value.
+     * Outer loop: low priority operators + -
+     * Inner loop: high priority operators * / %
+     * A value is a number or an expression in ().
+     * Allowed chars after a expression: quotes, end of string
+     */
     do {
         if (!parseValue(&p, &val)) return status;
-        if (runScriptDebug > 1) printf("parseExp val=%d rest=%s\n", val, p);
+        if (runScriptDebug > 1) printf("parseExpr: val=%d rest=%s\n", val, p);
         q = p;
         while (isspace((unsigned char)*q)) q++;
         o = *q;
@@ -108,7 +126,7 @@ static int parseExpr(const char** pp, int* v)
             q++;
             if (!parseValue(&q, &val2)) break;
             if (o == '*') val *= val2;
-            else if (val2 == 0) val = 0;
+            else if (val2 == 0) val = 0; /* define devision by zero as 0 */
             else if (o == '/') val /= val2;
             else val %= val2;
             p = q;
@@ -117,9 +135,9 @@ static int parseExpr(const char** pp, int* v)
         }
         status = 1;
         *v += val;
-        *pp = p;
         if (runScriptDebug > 1) printf("parseExpr: sum %d rest=\"%s\"\n", *v, p);
     } while (o == '+' || o == '-');
+    *pp = p;
     return 1;
 }
 
@@ -175,7 +193,7 @@ int runScript(const char* filename, const char* args)
 #endif
         char*[]){ "", "environ", NULL, NULL }) != 0) goto error;
     macSuppressWarning(mac, 1);
-#if (EPICSVER<31400)
+#if (EPICSVER<31403)
     /* Have no environment macro substitution, thus load envionment explicitly */
     /* Actually, environmant macro substitution was introduced in 3.14.3 */
     for (pairs = ppGlobalEnviron; *pairs; pairs++)
@@ -299,9 +317,10 @@ int runScript(const char* filename, const char* args)
         if (*p == 0 || *p == '#') continue;
         
         /* find local variable assignments */
-        if ((x = strpbrk(p, "=(, \t\n")) != NULL && *x=='=')
+        if ((x = strpbrk(p, "=(, \t\n\r")) != NULL && *x=='=')
         {
             const char* r;
+            const char* s;
             char* w;
             int val;
 
@@ -310,58 +329,56 @@ int runScript(const char* filename, const char* args)
             w = line_raw;
             while (*r)
             {
-                if (runScriptDebug > 1) printf ("expr %s\n", r);
+                /* Resolve any integer expression that is not embedded in a
+                 * string. A string is anything in single or double quotes or
+                 * a word that is not an integer expression. An expression
+                 * consists of an optional format specifier (such as %x),
+                 * numbers (including 0x prefixed hex numbers), arithmetic
+                 * operators (at the moment +-*%/) and and parentheses ().
+                 */
+                while (isspace((unsigned char)*r)) *w++ = *r++;
+                if (!*r) break;
+                s = w;
+
+                if (*r == '"' || *r == '\'')
+                {
+                    /* quoted strings */
+                    char c = *w++ = *r++;
+                    while (*r && *r != c) {
+                        if (*r == '\\' && !(*w++ = *r++)) break;
+                        *w++ = *r++;
+                    }
+                    if (*r) *w++ = *r++;
+                    *w = 0;
+                    if (runScriptDebug > 1) printf ("quoted string %s\n", s);
+                    continue;
+                }
                 if (*r == '%')
                 {
+                    /* formatted expression */
                     const char* r2 = r;
                     const char* f;
                     if ((f = getFormat(&r2)) && parseExpr(&r2, &val))
                     {
                         w += sprintf(w, f , val);
                         r = r2;
+                        if (runScriptDebug > 1) printf ("formatted expression %s\n", s);
+                        continue;
                     }
-                    else
-                    {
-                        if (runScriptDebug > 1) printf ("skip %c\n", *r);
-                        *w++ = *r++;
-                    }
-                    continue;
                 }
                 if (parseExpr(&r, &val))
                 {
-                    if (runScriptDebug > 1) printf ("val=%d, rest=%s\n", val, r);
+                    /* unformatted expression */
                     w += sprintf(w, "%d", val);
-                    if (runScriptDebug > 1) printf ("rest=%s\n", r);
-                }
-                else if (*r == '(' || *r == '+')
-                {
-                    if (runScriptDebug > 1) printf ("skip %c\n", *r);
-                    *w++ = *r++;
+                    if (runScriptDebug > 1) printf ("simple expression %s\n", s);
                     continue;
                 }
-                while (1)
-                {
-                    if ((*r >= '0' && *r <= '9') || *r == '(' || *r == '%') break;
-                    if (*r == '"' || *r == '\'')
-                    {
-                        char c = *r++;
-                        if (runScriptDebug > 1) printf ("string %c\n", c);
-                        while (*r && *r != c) {
-                            *w++ = *r++;
-                        }
-                        *w = 0;
-                        if (*r) r++;
-                        if (*r == '+')
-                        {
-                            if (runScriptDebug > 1) printf ("skip %c\n", *r);
-                            *w++ = *r++;
-                        }
-                        break;
-                    }
-                    if (runScriptDebug > 1) printf ("copy %c\n", *r);
-                    if (!(*w++ = *r)) break;
-                    r++;
-                };
+                /* unquoted string (i.e plain word) */
+                do {
+                    *w++ = *r++;
+                } while (*r && !strchr("(\"' \t\n",*r));
+                *w = 0;
+                if (runScriptDebug > 1) printf ("plain word %s\n", s);
             }
             if (runScriptDebug)
                 printf("runScript: assign %s=%s\n", p, line_raw);
