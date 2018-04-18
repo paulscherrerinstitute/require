@@ -109,33 +109,31 @@ static int parseExpr(const char** pp, int* v)
     const char *p = *pp;
     const char *q;
     int sum = 0, val, val2;
-    int status = 0;
     char o;
 
     /* An expression is a value optionally followed by an operator and another value.
      * Outer loop: low priority operators + -
      * Inner loop: high priority operators * / %
      * A value is a number or an expression in ().
-     * Allowed chars after a expression: quotes, end of string
+     * Allowed chars after a expression: quotes, space, end of string
      */
     do {
-        if (!parseValue(&p, &val)) return status;
+        if (!parseValue(&p, &val)) return 0;
         q = p;
         while (isspace((unsigned char)*q)) q++;
         o = *q;
         while (o == '*' || o == '/' || o == '%')
         {
             q++;
-            if (!parseValue(&q, &val2)) return status;
+            if (!parseValue(&q, &val2)) return 0;
             if (o == '*') val *= val2;
-            else if (val2 == 0) val = 0; /* define devision by zero as 0 */
+            else if (val2 == 0) val = 0; /* define division by zero as 0 */
             else if (o == '/') val /= val2;
             else val %= val2;
             p = q;
             while (isspace((unsigned char)*p)) p++;
             o = *p;
         }
-        status = 1;
         sum += val;
     } while (o == '+' || o == '-');
     if (*p == '?')
