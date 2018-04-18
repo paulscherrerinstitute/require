@@ -57,18 +57,29 @@ static int parseValue(const char** pp, int* v)
 {
     int val;
     const char *p = *pp;
-    int neg = 0;
+    char o;
 
-    /* A value is optionally prefixed with a sign + -.
+    /* A value is optionally prefixed with an unary operator + - ! ~.
      * It is either a number (decimal, octal or hex)
      * or an expression in ().
      * Allowed chars after a number: operators, closing parenthesis, whitespace, quotes, end of string
-     */ 
-    while (isspace((unsigned char)*p)) p++;
-    if (*p == '+' || *p == '-') neg = *p++ == '-';
-    while (isspace((unsigned char)*p)) p++;
-    if (*p == '(')
+     */
+
+    do {
+        while (isspace((unsigned char)*p)) p++;
+    } while (*p == '+' && p++);
+    o = *p;
+    if (strchr("-~!", o))
     {
+        p++;
+        if (!parseValue(&p, &val)) return 0;
+        if (o == '-') val=-val;
+        else if (o == '~') val=~val;
+        else if (o == '!') val=!val;
+    }
+    else if (o == '(')
+    {
+        if (runScriptDebug > 1) printf("parseValue: subexpression '%s'\n", p);
         p++;
         if (!parseExpr(&p, &val)) return 0;
         while (isspace((unsigned char)*p)) p++;
@@ -82,20 +93,14 @@ static int parseValue(const char** pp, int* v)
         if (*e && !isspace((unsigned char)*e) && !strchr("+-*/%?)'\"",*e))
         {
             /* followed by rubbish */
-            if (runScriptDebug > 1) printf("parseValue: bail out from %s at %s\n", *pp, e);
+            if (runScriptDebug > 1) printf("parseValue: bail out from '%s' at '%s'\n", *pp, e);
             return 0; 
         }
         p = e;
     }
-    if (neg) val = -val;
-    if (*p == '?')
-    {
-        p++;
-        val = (val != 0);
-    }
+    if (runScriptDebug > 1) printf("parseValue: '%.*s' = %d rest '%s'\n", (int)(p-*pp), *pp, val, p);
     *pp = p;
     *v = val;
-    if (runScriptDebug > 1) printf("parseValue: %d rest=\"%s\"\n", *v, p);
     return 1;
 }
 
@@ -103,12 +108,10 @@ static int parseExpr(const char** pp, int* v)
 {
     const char *p = *pp;
     const char *q;
-    int o;
-    int val;
-    int val2;
+    int sum = 0, val, val2;
     int status = 0;
+    char o;
 
-    *v = 0;
     /* An expression is a value optionally followed by an operator and another value.
      * Outer loop: low priority operators + -
      * Inner loop: high priority operators * / %
@@ -117,14 +120,13 @@ static int parseExpr(const char** pp, int* v)
      */
     do {
         if (!parseValue(&p, &val)) return status;
-        if (runScriptDebug > 1) printf("parseExpr: val=%d rest=%s\n", val, p);
         q = p;
         while (isspace((unsigned char)*q)) q++;
         o = *q;
         while (o == '*' || o == '/' || o == '%')
         {
             q++;
-            if (!parseValue(&q, &val2)) break;
+            if (!parseValue(&q, &val2)) return status;
             if (o == '*') val *= val2;
             else if (val2 == 0) val = 0; /* define devision by zero as 0 */
             else if (o == '/') val /= val2;
@@ -134,10 +136,16 @@ static int parseExpr(const char** pp, int* v)
             o = *p;
         }
         status = 1;
-        *v += val;
-        if (runScriptDebug > 1) printf("parseExpr: sum %d rest=\"%s\"\n", *v, p);
+        sum += val;
     } while (o == '+' || o == '-');
+    if (*p == '?')
+    {
+        p++;
+        sum = (sum != 0);
+    }
+    if (runScriptDebug > 1) printf("parseExpr: '%.*s' = %d\n", (int)(p-*pp), *pp, sum);
     *pp = p;
+    *v = sum;
     return 1;
 }
 
@@ -149,13 +157,10 @@ const char* getFormat(const char** pp)
     if (runScriptDebug > 1) printf ("getFormat %s\n", p);
     if ((format[0] = *p++) == '%')
     {
-        if (runScriptDebug > 1) printf ("getFormat0 %s\n", p);
         while (i < sizeof(format) && strchr(" #-+0", *p))
             format[i++] = *p++;
-        if (runScriptDebug > 1) printf ("getFormat1 %s\n", p);
         while (i < sizeof(format) && strchr("0123456789", *p))
             format[i++] = *p++;
-        if (runScriptDebug > 1) printf ("getFormat2 %s\n", p);
         if (i < sizeof(format) && strchr("diouxXc", *p))
         {
             format[i++] = *p++;
@@ -293,6 +298,7 @@ int runScript(const char* filename, const char* args)
             if (fgets(line_raw + len, line_raw_size - len, file) == NULL) break;
         }
         while (len > 0 && isspace((unsigned char)line_raw[len-1])) line_raw[--len] = 0; /* get rid of '\n' and friends */
+        if (len == 0) continue;
         if (runScriptDebug)
                 printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
@@ -320,7 +326,7 @@ int runScript(const char* filename, const char* args)
         if ((x = strpbrk(p, "=(, \t\n\r")) != NULL && *x=='=')
         {
             const char* r;
-            const char* s;
+            char* s;
             char* w;
             int val;
 
@@ -329,17 +335,15 @@ int runScript(const char* filename, const char* args)
             w = line_raw;
             while (*r)
             {
-                /* Resolve any integer expression that is not embedded in a
-                 * string. A string is anything in single or double quotes or
-                 * a word that is not an integer expression. An expression
-                 * consists of an optional format specifier (such as %x),
-                 * numbers (including 0x prefixed hex numbers), arithmetic
-                 * operators (at the moment +-*%/) and and parentheses ().
+                /* Resolve integer expressions:
+                 * Any free standing expression.
+                 * Any expression in parentheses () embedded in an unquoted word.
+                 * Do not resolve expressions in single or double quoted strings.
+                 * An expression optionally starts with a format such as %x.
+                 * It consists of integer numbers (including 0x prefixed hex numbers),
+                 * unary (+-!~) and binary (+-*%/) oprators and parentheses ().
                  */
-                while (isspace((unsigned char)*r)) *w++ = *r++;
-                if (!*r) break;
                 s = w;
-
                 if (*r == '"' || *r == '\'')
                 {
                     /* quoted strings */
@@ -358,10 +362,16 @@ int runScript(const char* filename, const char* args)
                     /* formatted expression */
                     const char* r2 = r;
                     const char* f;
+                    if (runScriptDebug > 1) printf ("formatted expression after '%s'\n", s);
                     if ((f = getFormat(&r2)) && parseExpr(&r2, &val))
                     {
-                        w += sprintf(w, f , val);
                         r = r2;
+                        if (*s == '(' && *r2++ == ')')
+                        {
+                            w = s;
+                            r = r2;
+                        }
+                        w += sprintf(w, f , val);
                         if (runScriptDebug > 1) printf ("formatted expression %s\n", s);
                         continue;
                     }
@@ -376,9 +386,10 @@ int runScript(const char* filename, const char* args)
                 /* unquoted string (i.e plain word) */
                 do {
                     *w++ = *r++;
-                } while (*r && !strchr("(\"' \t\n",*r));
+                } while (*r && !strchr("%(\"', \t\n",*r));
+                while (isspace((unsigned char)*r)) *w++ = *r++;
                 *w = 0;
-                if (runScriptDebug > 1) printf ("plain word %s\n", s);
+                if (runScriptDebug > 1) printf ("plain word '%s'\n", s);
             }
             if (runScriptDebug)
                 printf("runScript: assign %s=%s\n", p, line_raw);
