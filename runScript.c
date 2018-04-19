@@ -69,7 +69,7 @@ static int parseValue(const char** pp, int* v)
         while (isspace((unsigned char)*p)) p++;
     } while (*p == '+' && p++);
     o = *p;
-    if (strchr("-~!", o))
+    if (memchr("-~!", o, 3))
     {
         p++;
         if (!parseValue(&p, &val)) return 0;
@@ -90,7 +90,7 @@ static int parseValue(const char** pp, int* v)
         char* e;
         val = strtol(p, &e, 0);
         if (e == p) return 0; /* no number */
-        if (*e && !isspace((unsigned char)*e) && !strchr("+-*/%?)'\"",*e))
+        if (*e && !isspace((unsigned char)*e) && !strchr("+-*/%?)'\",", *e))
         {
             /* followed by rubbish */
             if (runScriptDebug > 1) printf("parseValue: bail out from '%s' at '%s'\n", *pp, e);
@@ -122,7 +122,7 @@ static int parseExpr(const char** pp, int* v)
         q = p;
         while (isspace((unsigned char)*q)) q++;
         o = *q;
-        while (o == '*' || o == '/' || o == '%')
+        while (memchr("*/%", o, 3))
         {
             q++;
             if (!parseValue(&q, &val2)) return 0;
@@ -155,11 +155,11 @@ const char* getFormat(const char** pp)
     if (runScriptDebug > 1) printf ("getFormat %s\n", p);
     if ((format[0] = *p++) == '%')
     {
-        while (i < sizeof(format) && strchr(" #-+0", *p))
+        while (i < sizeof(format) && memchr(" #-+0", *p, 5))
             format[i++] = *p++;
-        while (i < sizeof(format) && strchr("0123456789", *p))
+        while (i < sizeof(format) && *p >= '0' && *p <= '9')
             format[i++] = *p++;
-        if (i < sizeof(format) && strchr("diouxXc", *p))
+        if (i < sizeof(format) && memchr("diouxXc", *p, 7))
         {
             format[i++] = *p++;
             format[i] = 0;
@@ -353,9 +353,8 @@ int runScript(const char* filename, const char* args)
                     if (*r) *w++ = *r++;
                     *w = 0;
                     if (runScriptDebug > 1) printf ("quoted string %s\n", s);
-                    continue;
                 }
-                if (*r == '%')
+                else if (*r == '%')
                 {
                     /* formatted expression */
                     const char* r2 = r;
@@ -371,23 +370,32 @@ int runScript(const char* filename, const char* args)
                         }
                         w += sprintf(w, f , val);
                         if (runScriptDebug > 1) printf ("formatted expression %s\n", s);
-                        continue;
                     }
                 }
-                if (parseExpr(&r, &val))
+                else if (parseExpr(&r, &val))
                 {
                     /* unformatted expression */
                     w += sprintf(w, "%d", val);
+                    *w = 0;
                     if (runScriptDebug > 1) printf ("simple expression %s\n", s);
-                    continue;
                 }
-                /* unquoted string (i.e plain word) */
-                do {
+                else if (*r == ',')
+                {
+                    /* single comma */
                     *w++ = *r++;
-                } while (*r && !strchr("%(\"', \t\n",*r));
+                }
+                else {
+                    /* unquoted string (i.e plain word) */
+                    do {
+                        *w++ = *r++;
+                    } while (*r && !strchr("%(\"', \t\n", *r));
+                    *w = 0;
+                    if (runScriptDebug > 1) printf ("plain word '%s'\n", s);
+                }
+                /* copy space */
                 while (isspace((unsigned char)*r)) *w++ = *r++;
+                /* terminate */
                 *w = 0;
-                if (runScriptDebug > 1) printf ("plain word '%s'\n", s);
             }
             if (runScriptDebug)
                 printf("runScript: assign %s=%s\n", p, line_raw);
