@@ -90,7 +90,7 @@ static int parseValue(const char** pp, int* v)
         char* e;
         val = strtol(p, &e, 0);
         if (e == p) return 0; /* no number */
-        if (*e && !isspace((unsigned char)*e) && !strchr("+-*/%?)'\",", *e))
+        if (*e && !isspace((unsigned char)*e) && !strchr("+-*/%|&^?)'\",", *e))
         {
             /* followed by rubbish */
             if (runScriptDebug > 1) printf("parseValue: bail out from '%s' at '%s'\n", *pp, e);
@@ -122,16 +122,18 @@ static int parseExpr(const char** pp, int* v)
         q = p;
         while (isspace((unsigned char)*q)) q++;
         o = *q;
-        while (memchr("*/%", o, 3))
+        while (memchr("*/%&|^", o, 6))
         {
             q++;
             if (!parseValue(&q, &val2)) return 0;
             if (o == '*') val *= val2;
+            else if (o == '&') val &= val2;
+            else if (o == '|') val |= val2;
+            else if (o == '^') val ^= val2;
             else if (val2 == 0) val = 0; /* define division by zero as 0 */
             else if (o == '/') val /= val2;
             else val %= val2;
             p = q;
-            while (isspace((unsigned char)*p)) p++;
             o = *p;
         }
         sum += val;
@@ -296,7 +298,6 @@ int runScript(const char* filename, const char* args)
             if (fgets(line_raw + len, line_raw_size - len, file) == NULL) break;
         }
         while (len > 0 && isspace((unsigned char)line_raw[len-1])) line_raw[--len] = 0; /* get rid of '\n' and friends */
-        if (len == 0) continue;
         if (runScriptDebug)
                 printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
