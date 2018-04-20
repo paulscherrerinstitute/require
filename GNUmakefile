@@ -10,6 +10,8 @@ SOURCES += require.c
 DBDS    += require.dbd
 SOURCES += runScript.c
 DBDS    += runScript.dbd
+SOURCES += expr.c
+#DBDS    += expr.dbd
 
 SOURCES += dbLoadTemplate.y
 DBDS    += dbLoadTemplate.dbd

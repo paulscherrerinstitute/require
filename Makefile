@@ -13,6 +13,9 @@ requireSup_DBD += require.dbd
 LIB_SRCS += runScript.c
 requireSup_DBD += runScript.dbd
 
+LIB_SRCS += expr.c
+#requireSup_DBD += expr.dbd
+
 LIB_SRCS += dbLoadTemplate.y
 requireSup_DBD += dbLoadTemplate.dbd
 
