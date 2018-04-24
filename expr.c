@@ -242,9 +242,9 @@ size_t replaceExpressions(const char* r, char* buffer, size_t buffersize)
             if ((f = getFormat(&r2)) && parseExpr(&r2, &val) == 0)
             {
                 r = r2;
-                if (*s == '(' && *r2++ == ')')
+                if (w > buffer && w[-1] == '(' && *r2++ == ')')
                 {
-                    w = s;
+                    w--;
                     r = r2;
                 }
                 w += sprintf(w, f , val);
