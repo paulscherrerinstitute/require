@@ -7,7 +7,8 @@
 
 int exprDebug;
 
-static int parseExpr(const char** pp, long* v, int op);
+static int parseSubExpr(const char** pp, long* v, int pr, int op);
+#define parseExpr(pp,v) parseSubExpr(pp, v, 0, 0)
 
 static int parseValue(const char** pp, long* v)
 {
@@ -37,7 +38,7 @@ static int parseValue(const char** pp, long* v)
     {
         /*  handle sub-expression */
         p++;
-        if (parseExpr(&p, &val, 0) < 0) return 0; /* no valid expression */
+        if (parseExpr(&p, &val) < 0) return 0; /* no valid expression */
         while (isspace((unsigned char)*p)) p++;
         if (*p++ != ')') return 0; /* missing ) */
     }
@@ -71,7 +72,7 @@ static long ipow(long base, long exp)
 }
 
 struct {char str[4]; int pr;} ops[] = {
-    {"<-",0},
+    {"",0},
     {"**",11},
     {"*", 10},{"/",10},{"%",10},
     {"+",9},{"-",9},
@@ -79,7 +80,8 @@ struct {char str[4]; int pr;} ops[] = {
     {"<=>",7},{"<=",7},{">=",7},{"<",7},{">",7},
     {"==",6},{"!=",6},
     {"&&",5},{"||",5},
-    {"&",4},{"^",3},{"|",2},{"?",1}
+    {"&",4},{"^",3},{"|",2},
+    {"?:",1},{"?",1},{":",0}
 };
 
 static int startsWith(const char* p, const char* s)
@@ -110,27 +112,34 @@ static int parseOp(const char** pp)
     return 0;
 }
 
-static int parseExpr(const char** pp, long* v, int o)
+static int parseSubExpr(const char** pp, long* v, int pr, int o)
 {
     const char *p = *pp;
-    long val = *v;
+    long val = o ? *v : 0;
     long val2;
     int o2 = o;
-    int pr = ops[o].pr;
 
-    if (exprDebug) printf("parseExpr(%s %d): start %ld %s %s\n", ops[o].str, pr, val, ops[o].str, p);
+    if (exprDebug) printf("parseExpr(%d): start %ld %s %s\n", pr, val, ops[o].str, p);
     do {
-        if (!parseValue(&p, &val2)) return -1;
+        if (!parseValue(&p, &val2))
+        {
+            if (exprDebug) printf("parseExpr(%d): no value after %ld %s\n", pr, val, ops[o].str);
+            return -1;
+        }
         if ((o2 = parseOp(&p)))
         {
             if (exprDebug) printf("parseExpr(%d): %ld %s %ld %s %s\n", pr, val, ops[o].str, val2, ops[o2].str, p);
             if (o && ops[o2].pr > ops[o].pr)
             {
-                if ((o2 = parseExpr(&p, &val2, o2)) < 0) return -1;
+                if ((o2 = parseSubExpr(&p, &val2, ops[o].pr, o2)) < 0)
+                {
+                    if (exprDebug) printf("parseExpr(%d): parse failed after %ld %s %ld\n", pr, val, ops[o].str, val2);
+                    return -1;
+                }
             }
         }
         if (exprDebug) printf("parseExpr(%d): %ld %s %ld", pr, val, ops[o].str, val2);
-        switch(o)
+        switch (o)
         {
             case  0: val = val2; break;
             case  1: val = ipow(val, val2); break;
@@ -154,12 +163,23 @@ static int parseExpr(const char** pp, long* v, int o)
             case 19: val &= val2; break;
             case 20: val ^= val2; break;
             case 21: val |= val2; break;
-            case 22: val = (val != 0); break;
+            case 22: if (!val) val = val2; break;
         }
         if (exprDebug) printf(" = %ld\n", val);
+        if (o2 == 23) /* ? ... : ... */
+        {
+            long val3 = 0;
+            val2 = 1;
+            if (exprDebug) printf("parseExpr(%d) if %ld ...\n", pr, val);
+            if ((o2 = parseSubExpr(&p, &val2, 1, 0)) == 24)
+                o2 = parseSubExpr(&p, &val3, 1, 0);
+            else o2 = 0;
+            if (exprDebug) printf("parseExpr(%d) if %ld then %ld else %ld\n", pr, val, val2, val3);
+            val = val ? val2 : val3;
+        }
         o = o2;
-    } while (o && pr <= ops[o].pr);
-    if (exprDebug) printf("parseExpr(%d): result %ld\n", pr, val);
+    } while (ops[o].pr && pr <= ops[o].pr);
+    if (exprDebug) printf("parseExpr(%d): value = %ld return %d %s\n", pr, val, o, ops[o].str);
     *pp = p;
     *v = val;
     return o;
@@ -219,7 +239,7 @@ size_t replaceExpressions(const char* r, char* buffer, size_t buffersize)
             const char* r2 = r;
             const char* f;
             if (exprDebug) printf("formatted expression after '%s'\n", s);
-            if ((f = getFormat(&r2)) && parseExpr(&r2, &val, 0) == 0)
+            if ((f = getFormat(&r2)) && parseExpr(&r2, &val) == 0)
             {
                 r = r2;
                 if (*s == '(' && *r2++ == ')')
@@ -231,7 +251,7 @@ size_t replaceExpressions(const char* r, char* buffer, size_t buffersize)
                 if (exprDebug) printf("formatted expression %s\n", s);
             }
         }
-        else if (parseExpr(&r, &val, 0) == 0)
+        else if (parseExpr(&r, &val) == 0)
         {
             /* unformatted expression */
             w += sprintf(w, "%ld", val);
