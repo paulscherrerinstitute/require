@@ -101,6 +101,8 @@ TEMPLATES=
 SOURCES=
 DBDS=
 HEADERS=
+BASH_ENV=
+ENV=
 
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules).
