@@ -218,6 +218,7 @@ size_t replaceExpressions(const char* r, char* buffer, size_t buffersize)
     char* w = buffer;
     char* s;
 
+    *w = 0;
     while (*r)
     {
         s = w;
