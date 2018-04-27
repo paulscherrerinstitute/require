@@ -78,5 +78,12 @@ x=0?; 1?; 2?; -4?
 x=a030b a(030)b a( 030 )b "a"030"b" a(%x 030)b
 # $(x) should be: a030b a24b a24b a24b a18b
 
+x=030b (030)b ( 030 )b 030"b" %x 030'b'
+# $(x) should be: 030b 24b 24b 24b 18b
+
+x=-0bla -0.1
+# $(x) should be: -0bla -0.1
+
 x=-2**2 0-2**2 0+-2**2 0--2**2
 # $(x) should be: 4 -4 4 -4
+

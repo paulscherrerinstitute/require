@@ -49,7 +49,7 @@ static int parseValue(const char** pp, long* v)
         val = strtol(p, &e, 0);
         if (e == p) return 0; /* no number */
         
-        if (isalpha((unsigned char)*p))
+        if (isalpha((unsigned char)*e)||*e=='.')
         {
             /* followed by rubbish */
             return 0; 
