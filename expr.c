@@ -8,8 +8,8 @@
 int exprDebug;
 
 static int parseSubExpr(const char **pp, long *v, int pr, int op);
+static long parseString(const char **pp, const char **pstart);
 #define parseExpr(pp,v) parseSubExpr(pp, v, 0, 0)
-
 #define skipSpace(p) while (isspace((unsigned char)*p)) p++
 
 static int parseValue(const char **pp, long *v)
@@ -32,13 +32,14 @@ static int parseValue(const char **pp, long *v)
         /* handle unary operators */
         p++;
         if (!parseValue(&p, &val)) return 0; /* no valid value */
+        if (exprDebug) printf("parseValue: %c %ld\n", o, val);
         if (o == '-') val=-val;
         else if (o == '~') val=~val;
         else if (o == '!') val=!val;
     }
     else if (o == '(')
     {
-        /*  handle sub-expression */
+        /* handle sub-expression */
         p++;
         if (parseExpr(&p, &val) < 0) return 0; /* no valid expression */
         skipSpace(p);
@@ -84,16 +85,31 @@ static char parseSep(const char **pp, const char *seps)
 }
 
 struct {char str[4]; int pr;} ops[] = {
-    {"",0},
-    {"**",11},
-    {"*", 10},{"/",10},{"%",10},
-    {"+",9},{"-",9},
-    {"<<",8},{">>>",8},{">>",8},
-    {"<=>",7},{"<=",7},{">=",7},{"<",7},{">",7},
-    {"==",6},{"!=",6},
-    {"&&",5},{"||",5},
-    {"&",4},{"^",3},{"|",2},
+    {":=",0},
+    {"**",14},
+    {"*", 13},{"/",13},{"%",13},
+    {"+",12},{"-",12},
+    {"<<",11},{">>>",11},{">>",11},
+    {"<=>",9},
+    {"<=",8},{">=",8},{"<",8},{">",8},
+    {"==",7},{"!=",7},
+    {"&&",3},{"||",2},
+    {"&",6},{"^",5},{"|",4},
     {"?:",1},{"?",1}
+};
+
+enum op {
+    op_none,
+    op_pow, 
+    op_mul,op_div,op_mod,
+    op_plus,op_minus,
+    op_lshift,op_urshift,op_rshift,
+    op_cmp,
+    op_lteq,op_gteq,op_lt,op_gt,
+    op_eq,op_neq,
+    op_logicand,op_logicor,
+    op_bitand,op_bitxor,op_bitor,
+    op_alt,op_if
 };
 
 static int startsWith(const char *p, const char *s)
@@ -131,20 +147,17 @@ static int parseSubExpr(const char **pp, long *v, int pr, int o)
     long val2;
     int o2 = o;
 
-    if (exprDebug) printf("parseExpr(%d): start %ld %s %s\n", pr, val, ops[o].str, p);
+    if (exprDebug) printf("parseExpr(%d): start %ld %s \"%s\"\n", pr, val, ops[o].str, p);
     do {
         if (!parseValue(&p, &val2))
         {
-            if (exprDebug)
-            {
-                if (o) printf("parseExpr(%d): no value after %ld %s\n", pr, val, ops[o].str);
-                else printf("parseExpr(%d): no value\n", pr);
-            }
+            if (exprDebug) printf("parseExpr(%d): no value after %ld %s\n", pr, val, ops[o].str);
             return -1;
         }
+nextop:
         if ((o2 = parseOp(&p)))
         {
-            if (exprDebug) printf("parseExpr(%d): %ld %s %ld %s %s\n", pr, val, ops[o].str, val2, ops[o2].str, p);
+            if (exprDebug) printf("parseExpr(%d): %ld %s %ld %s \"%s\"\n", pr, val, ops[o].str, val2, ops[o2].str, p);
             if (o && ops[o2].pr > ops[o].pr)
             {
                 if ((o2 = parseSubExpr(&p, &val2, ops[o].pr, o2)) < 0)
@@ -154,50 +167,54 @@ static int parseSubExpr(const char **pp, long *v, int pr, int o)
                 }
             }
         }
-        if (exprDebug) printf("parseExpr(%d): %ld %s %ld", pr, val, ops[o].str, val2);
+        if (exprDebug) printf("parseExpr(%d): calc %ld %s %ld\n", pr, val, ops[o].str, val2);
         switch (o)
         {
-            case  0: val = val2; break;
-            case  1: val = ipow(val, val2); break;
-            case  2: val *= val2; break;
-            case  3: val /= val2; break;
-            case  4: val %= val2; break;
-            case  5: val += val2; break;
-            case  6: val -= val2; break;
-            case  7: val <<= val2; break;
-            case  8: val = (unsigned long)val >> val2; break;
-            case  9: val >>= val2; break;
-            case 10: val = val < val2 ? -1 : val == val2 ? 0 : 1; break;
-            case 11: val = val <= val2; break;
-            case 12: val = val >= val2; break;
-            case 13: val = val < val2; break;
-            case 14: val = val > val2; break;
-            case 15: val = val == val2; break;
-            case 16: val = val != val2; break;
-            case 17: val = val && val2; break;
-            case 18: val = val || val2; break;
-            case 19: val &= val2; break;
-            case 20: val ^= val2; break;
-            case 21: val |= val2; break;
-            case 22: if (!val) val = val2; break;
+            case op_none:     val = val2; break;
+            case op_pow:      val = ipow(val, val2); break;
+            case op_mul:      val *= val2; break;
+            case op_div:      val /= val2; break;
+            case op_mod:      val %= val2; break;
+            case op_plus:     val += val2; break;
+            case op_minus:    val -= val2; break;
+            case op_lshift:   val <<= val2; break;
+            case op_urshift:  val = (unsigned long)val >> val2; break;
+            case op_rshift:   val >>= val2; break;
+            case op_min:      if (val2 < val) val = val2; break;
+            case op_max:      if (val2 > val) val = val2; break;
+            case op_cmp:      val = val < val2 ? -1 : val == val2 ? 0 : 1; break;
+            case op_lteq:     val = val <= val2; break;
+            case op_gteq:     val = val >= val2; break;
+            case op_lt:       val = val < val2; break;
+            case op_gt:       val = val > val2; break;
+            case op_eq:       val = val == val2; break;
+            case op_neq:      val = val != val2; break;
+            case op_logicand: val = val && val2; break;
+            case op_logicor:  val = val || val2; break;
+            case op_bitand:   val &= val2; break;
+            case op_bitxor:   val ^= val2; break;
+            case op_bitor:    val |= val2; break;
+            case op_alt:      if (!val) val = val2; break;
         }
-        if (exprDebug) printf(" = %ld\n", val);
-        if (o2 == 23) /* ? ... : ... */
+        if (exprDebug) printf("parseExpr(%d): result %ld\n", pr, val);
+        if (o2 == op_if)
         {
             long val3 = 0;
             val2 = 1;
-            if (exprDebug) printf("parseExpr(%d) if %ld ...\n", pr, val);
+            if (exprDebug) printf("parseExpr(%d) if %ld\n", pr, val);
             if ((o2 = parseExpr(&p, &val2)) >= 0)
             {
+                if (exprDebug) printf("parseExpr(%d) then %ld\n", pr, val2);
                 if (parseSep(&p, ":"))
                 {
-                    if (exprDebug) printf("parseExpr(%d) : found\n", pr);
                     parseExpr(&p, &val3);
+                    if (exprDebug) printf("parseExpr(%d) else %ld\n", pr, val3);
                 }
             }
             if (exprDebug) printf("parseExpr(%d) if %ld then %ld else %ld\n", pr, val, val2, val3);
             val = val ? val2 : val3;
-            break;
+            if (exprDebug) printf("parseExpr(%d): result %ld, o2=%d, rest \"%s\" \n", pr, val, o2, p);
+            if (o2 == -1) goto nextop;
         }
         o = o2;
     } while (ops[o].pr && pr <= ops[o].pr);
@@ -207,7 +224,7 @@ static int parseSubExpr(const char **pp, long *v, int pr, int o)
     return o;
 }
 
-const char *getFormat(const char **pp)
+static const char *getFormat(const char **pp)
 {
     static char format [20];
     const char *p = *pp;
@@ -234,7 +251,7 @@ const char *getFormat(const char **pp)
     return NULL;
 }
 
-int parseSlice(const char **pp, long* pstart, long* plength)
+static int parseSlice(const char **pp, long* pstart, long* plength)
 {
     const char *p = *pp;
     long slice_start = 0;
@@ -274,7 +291,7 @@ int parseSlice(const char **pp, long* pstart, long* plength)
     return 1;
 }
 
-long parseString(const char **pp, const char **pstart)
+static long parseString(const char **pp, const char **pstart)
 {
     const char *p = *pp;
     const char *string_start = p;
@@ -353,12 +370,7 @@ size_t replaceExpressions(const char *r, char *buffer, size_t buffersize)
             /* unformatted expression */
             w += sprintf(w, "%ld", val);
             *w = 0;
-            if (exprDebug) printf("simple expression %s\n", s);
-        }
-        else if (*r == ',')
-        {
-            /* single comma */
-            *w++ = *r++;
+            if (exprDebug) printf("expression %s\n", s);
         }
         else {
             /* unquoted string (i.e plain word) */
@@ -369,7 +381,7 @@ size_t replaceExpressions(const char *r, char *buffer, size_t buffersize)
             if (exprDebug) printf("plain word '%s'\n", s);
         }
         /* copy space */
-        while (isspace((unsigned char)*r)) *w++ = *r++;
+        while (isspace((unsigned char)*r) || *r == ',') *w++ = *r++;
         /* terminate */
         *w = 0;
     }
