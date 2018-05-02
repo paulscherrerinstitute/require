@@ -336,11 +336,27 @@ static long parseString(const char **pp, const char **pstart)
     return length;
 }
 
+static void writeString(char** pw, const char* r, long length, char q)
+{
+    char* w = *pw;
+    *w++ = q;
+    while (length-- > 0)
+    {
+        if (*r == '\\') *w++ = *r++;
+        *w++ = *r++;
+    }
+    *w++ = q;
+    *w++ = 0;
+    *pw = w;
+}
+
 size_t replaceExpressions(const char *r, char *buffer, size_t buffersize)
 {
-    long val;
+    long val, string_length;
     char *w = buffer;
     char *s;
+    const char *string_start;
+    char q;
 
     *w = 0;
     while (*r)
@@ -349,17 +365,9 @@ size_t replaceExpressions(const char *r, char *buffer, size_t buffersize)
         if (*r == '"' || *r == '\'')
         {
             /* quoted strings */
-            const char *start;
-            char q = *r;
-            long length = parseString(&r, &start);
-            *w++ = q;
-            while (length-- > 0)
-            {
-                if (*start == '\\') *w++ = *start++;
-                *w++ = *start++;
-            }
-            *w++ = q;
-            *w++ = 0;
+            q = *r;
+            string_length = parseString(&r, &string_start);
+            writeString(&w, string_start, string_length, q);
             if (exprDebug) printf("quoted string %s\n", s);
         }
         else if (*r == '%')
@@ -383,8 +391,23 @@ size_t replaceExpressions(const char *r, char *buffer, size_t buffersize)
         else if (parseExpr(&r, &val) >= 0)
         {
             /* unformatted expression */
-            w += sprintf(w, "%ld", val);
-            *w = 0;
+            if (r[-1] == '?' && (q = parseSep(&r, "\"'")))
+            {
+                /* handle expression ? "string1" : "string2" */
+                w = s;
+                r--;
+                string_length = parseString(&r, &string_start);
+                if (val) writeString(&w, string_start, string_length, q);
+                if (parseSep(&r, ":"))
+                {
+                    string_length = parseString(&r, &string_start);
+                    if (!val) writeString(&w, string_start, string_length, q);
+                }
+            }
+            else
+            {
+                w += sprintf(w, "%ld", val);
+            }
             if (exprDebug) printf("expression %s\n", s);
         }
         else {

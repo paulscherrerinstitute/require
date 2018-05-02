@@ -88,4 +88,5 @@ x=#"Hello World"[2:8]
 x=#Hello World
 # $(x) should be: #Hello World
 
-
+x=1 ? "true" : "false"
+# $(x) should be: true
