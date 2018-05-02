@@ -187,7 +187,7 @@ static int parseSubExpr(const char **pp, long *v, int pr, int o)
             long val3 = 0;
             val2 = 1;
             if (exprDebug) printf("parseExpr(%d) if %ld ...\n", pr, val);
-            if (parseExpr(&p, &val2) >= 0)
+            if ((o2 = parseExpr(&p, &val2)) >= 0)
             {
                 if (parseSep(&p, ":"))
                 {
