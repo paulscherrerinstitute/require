@@ -66,12 +66,16 @@ static int parseValue(const char **pp, long *v)
 
 static long ipow(long base, long exp)
 {
-    long v;
-    if (exp < 0) return 0;
+    long val;
+    if (exp == 2) return base*base;
+    if (exp == 3) return base*base*base;   
+    if (exp == 1) return base;
     if (exp == 0) return 1;
-    v = base;
-    while (--exp) v *= base; /* optimize this! */
-    return v;
+    if (exp < 0) return 0;
+    val = ipow(base,exp>>1);
+    val *= val;
+    if (exp&1) val *= base;
+    return val;
 }
 
 static char parseSep(const char **pp, const char *seps)
