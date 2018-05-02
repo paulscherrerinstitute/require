@@ -78,3 +78,14 @@ x="Hello World"[7,-1]
 
 x='\"\\x'[2]
 # $(x) should be: x
+
+x=#"Hello World"
+# $(x) should be: 11
+
+x=#"Hello World"[2:8]
+# $(x) should be: 6
+
+x=#Hello World
+# $(x) should be: #Hello World
+
+

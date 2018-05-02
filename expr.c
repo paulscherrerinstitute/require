@@ -29,7 +29,7 @@ static int parseValue(const char **pp, long *v)
     o = *p;
     if (memchr("+-~!", o, 4))
     {
-        /* handle unary operators */
+        /* unary operators */
         p++;
         if (!parseValue(&p, &val)) return 0; /* no valid value */
         if (exprDebug) printf("parseValue: %c %ld\n", o, val);
@@ -39,15 +39,24 @@ static int parseValue(const char **pp, long *v)
     }
     else if (o == '(')
     {
-        /* handle sub-expression */
+        /* sub-expression */
         p++;
         if (parseExpr(&p, &val) < 0) return 0; /* no valid expression */
         skipSpace(p);
         if (*p++ != ')') return 0; /* missing ) */
     }
+    else if (o == '#')
+    {
+        /* string length operator */
+        p++;
+        if (exprDebug) printf("parseValue: string length of %s\n", p);
+        if (*p == '"' || *p == '\'')
+            val = parseString(&p, NULL);
+        else return 0;
+    }
     else
     {
-        /* get number */
+        /* number */
         char *e;
         val = strtol(p, &e, 0);
         if (e == p) return 0; /* no number */
