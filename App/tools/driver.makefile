@@ -198,6 +198,7 @@ help:
 	@echo "  ARCH_FILTER      () [target architectures to build, e.g. SL6%]"
 	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"
 	@echo "  <module>_VERSION () [build against specific version of other module]"
+	@echo "  IGNORE_MODULES   () [do not use header files from these modules]"
 
 # "make version" shows the module version and why it is what it is.       
 version: ${IGNOREFILES}
@@ -494,6 +495,8 @@ export BINS
 
 export CFG
 
+export IGNORE_MODULES
+
 else # in O.*
 ## RUN 4
 # In O.* directory.
@@ -525,7 +528,7 @@ define ADD_FOREIGN_INCLUDES
 $(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/include 2>/dev/null))))
 INSTALL_INCLUDES += $$(patsubst %,-I${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,$$($(1)_VERSION))
 endef
-$(eval $(foreach m,$(filter-out $(PRJ),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_FOREIGN_INCLUDES,$m)))
+$(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_FOREIGN_INCLUDES,$m)))
 
 ifneq ($(wildcard ${MAKEHOME}/getPrerequisites.tcl),)
 # Include path for old style modules.
