@@ -139,12 +139,22 @@ then
 fi
 
 # Get actual EPICS revision
-eval $(awk -F '[ \t]*=[ \t]*' '
-    /^[ \t]*EPICS_VERSION[ \t]*=/ {v=$2}
-    /^[ \t]*EPICS_REVISION[ \t]*=/ {r=$2}
-    /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2+0}
-    END {print "BASE="v"."r"."m";BASECODE="v*10000+r*100+m}
-' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
+if [ -f $EPICS_BASE/configure/CONFIG_BASE_VERSION ]
+then
+    eval $(awk -F '[ \t]*=[ \t]*' '
+        /^[ \t]*EPICS_VERSION[ \t]*=/ {v=$2}
+        /^[ \t]*EPICS_REVISION[ \t]*=/ {r=$2}
+        /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2+0}
+        END {print "BASE="v"."r"."m";BASECODE="v*10000+r*100+m}
+    ' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
+elif [ -f $EPICS_BASE/lib/$EPICS_HOST_ARCH/libCom.so ]
+then
+    eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/libCom.so | awk -F'[.R-]' '
+        /EPICS R[0-9]/ {print "BASE="$2"."$3"."$4";BASECODE="$2*10000+$3*100+$4 }')
+else
+    echo "Cannot guess EPICS base version." >&2
+    exit 1;
+fi
 
 # IOC name derives from hostname
 # (trailing possible '\r' under cygwin)
@@ -263,7 +273,7 @@ do
         exit 1
        ;;
     ( *.so )
-        if [ $BASECODE -ge 31412 ]
+        if [ "$BASECODE" -ge 31412 ]
         then
             echo "dlload \"$file\""
         else
@@ -299,7 +309,7 @@ do
                 echo "dbLoadDatabase '$file','$DBD','$subst'"
                 ;;
             ( * )
-                if [ $BASECODE -ge 31500 ]
+                if [ "$BASECODE" -ge 31500 ]
                 then
                     echo "iocshLoad '$file','$subst'"
                 else
@@ -341,7 +351,7 @@ else # old driver pool model
     REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
 fi
 
-if [ $BASECODE -ge 31412 ]
+if [ "$BASECODE" -ge 31412 ]
 then
     EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
     ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
