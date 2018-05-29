@@ -434,6 +434,26 @@ install build debug::
 	    umask 002; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
+# Add include directory of other modules to include file search path.
+# Default is to use latest version of any module.
+# The user can overwrite the version by defining <module>_VERSION=<version>.
+# For each other module look for include/ for the EPICS base version in use.
+# The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!).
+# Only really existing directories are added to the search path.
+
+# The tricky part is to sort versions numerically. Make can't but ls -v can.
+# Only accept numerical versions (needs extended glob).
+# This is slow, thus do it only once for each EPICSVERSION.
+define ADD_OTHER_MODULE_INCLUDES
+$(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/include 2>/dev/null))))
+export $(1)_VERSION 
+OTHER_MODULE_INCLUDES += $$(patsubst %,-I${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,$$($(1)_VERSION))
+endef
+$(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
+# Include path for old style modules.
+OTHER_MODULE_INCLUDES += $(addprefix -I,$(wildcard ${INSTBASE}/iocBoot/R${EPICSVERSION}/include))
+export OTHER_MODULE_INCLUDES
+
 else # T_A
 
 ifeq ($(filter O.%,$(notdir ${CURDIR})),)
@@ -512,29 +532,8 @@ COMMON_DIR = ${COMMON_DIR_${EPICS_BASETYPE}}
 
 # Remove include directory for this module from search path.
 # 3.13 and 3.14 use different variables
-INSTALL_INCLUDES =
+INSTALL_INCLUDES = $(strip $(OTHER_MODULE_INCLUDES))
 EPICS_INCLUDES =
-
-# Add include directory of foreign modules to include file search path.
-# Default is to use latest version of any module.
-# The user can overwrite the version by defining <module>_VERSION=<version>.
-# For each foreign module look for include/ for the EPICS base version in use.
-# The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!).
-# Only really existing directories are added to the search path.
-
-# The tricky part is to sort versions numerically. Make can't but ls -v can.
-# Only accept numerical versions (needs extended glob).
-define ADD_FOREIGN_INCLUDES
-$(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/include 2>/dev/null))))
-INSTALL_INCLUDES += $$(patsubst %,-I${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,$$($(1)_VERSION))
-endef
-$(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_FOREIGN_INCLUDES,$m)))
-
-ifneq ($(wildcard ${MAKEHOME}/getPrerequisites.tcl),)
-# Include path for old style modules.
-OLD_INCLUDE = $(wildcard ${INSTBASE}/iocBoot/R${EPICSVERSION}/include)
-INSTALL_INCLUDES += $(addprefix -I,${OLD_INCLUDE})
-endif
 
 # Manually required modules.
 define ADD_MANUAL_DEPENDENCIES
