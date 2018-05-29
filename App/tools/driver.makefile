@@ -763,6 +763,9 @@ ${BUILDRULE} ${MODULEDBD}
 ${BUILDRULE} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
 ${BUILDRULE} ${DEPFILE}
 
+# In 3.15+ this is required to build %Record.h files
+COMMON_INC = ${HDRS}
+
 # Include default EPICS Makefiles (version dependent).
 # Avoid library installation when doing 'make build'.
 INSTALL_LOADABLE_SHRLIBS=
