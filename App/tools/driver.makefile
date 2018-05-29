@@ -134,7 +134,7 @@ $(foreach v,$(sort $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v
 # Check only version of files needed to build the module. But which are they?
 VERSIONCHECKFILES = $(filter-out /% -none-, $(wildcard *makefile* *Makefile* *.db *.template *.subs *.dbd *.cmd) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v}))
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
-LIBVERSION = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
+LIBVERSION := $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 
 # Default module name is name of current directory.
@@ -350,7 +350,7 @@ export DBD_SRCS
 #record dbd files given in DBDS
 RECORDS1 = $(patsubst %Record.dbd, %, $(filter-out dev%, $(filter %Record.dbd, $(notdir ${DBD_SRCS}))))
 #record dbd files included by files given in DBDS
-RECORDS2 = $(filter-out dev%, $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS})))
+RECORDS2 := $(filter-out dev%, $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS})))
 RECORDS = $(sort ${RECORDS1} ${RECORDS2})
 export RECORDS
 
@@ -658,7 +658,7 @@ MINOR=$(word 2,${MAJOR_MINOR_PATCH})
 PATCH=$(word 3,${MAJOR_MINOR_PATCH})
 ifneq (${MINOR},)
 ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
-PREREQUISITES = $(shell ${MAKEHOME}/getPrerequisites.tcl ${INSTALL_INCLUDE} | grep -vw ${PRJ})
+PREREQUISITES := $(shell ${MAKEHOME}/getPrerequisites.tcl ${INSTALL_INCLUDE} | grep -vw ${PRJ})
 ifeq (${OS_CLASS}, vxWorks)
 PROVIDES = ${ALLMINORS:%=--defsym __${PRJ}Lib_${MAJOR}.%=0}
 endif # vxWorks
@@ -722,7 +722,7 @@ DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 #DBDFILES += $(if $(shell cat ${SUBFUNCFILE}),${SUBFUNCFILE})
 
 # snc location in 3.14: From latest version of module seq or fall back to globally installed snc.
-SNC=$(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/$(or $(seq_VERSION),+([0-9]).+([0-9]).+([0-9]))/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
+SNC := $(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/$(or $(seq_VERSION),+([0-9]).+([0-9]).+([0-9]))/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
 
 endif # 3.14
 
