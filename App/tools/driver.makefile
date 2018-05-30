@@ -667,7 +667,6 @@ MINOR=$(word 2,${MAJOR_MINOR_PATCH})
 PATCH=$(word 3,${MAJOR_MINOR_PATCH})
 ifneq (${MINOR},)
 ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
-PREREQUISITES := $(shell ${MAKEHOME}/getPrerequisites.tcl ${INSTALL_INCLUDE} | grep -vw ${PRJ})
 ifeq (${OS_CLASS}, vxWorks)
 PROVIDES = ${ALLMINORS:%=--defsym __${PRJ}Lib_${MAJOR}.%=0}
 endif # vxWorks
