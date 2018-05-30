@@ -313,9 +313,6 @@ TOP:=${EPICS_BASE}
 BASE_CPPFLAGS=
 EPICS_BASE:=${EB}
 COMMON_DIR = O.${EPICSVERSION}_Common
-ifndef LEGACY_RSET
-USR_CPPFLAGS+=-DUSE_TYPED_RSET
-endif
 SHRLIB_VERSION=
 # do not link *everything* with readline (and curses)
 COMMANDLINE_LIBRARY =
@@ -642,6 +639,19 @@ endif
 # Handle registry stuff automagically if we have a dbd file.
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
 LIBOBJS += $(if $(MODULEDBD), $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
+
+ifdef BASE_3_16
+# Suppress "'rset' is deprecated" warning for old drivers
+# but not on record types where it would cause an error
+ifndef USING_NEW_RSET
+SUPPRESS_RSET_WARNING = -DUSE_TYPED_RSET
+USR_CPPFLAGS += ${SUPPRESS_RSET_WARNING}
+%Record.o: SUPPRESS_RSET_WARNING=
+%Record.i: SUPPRESS_RSET_WARNING=
+%Record.ii: SUPPRESS_RSET_WARNING=
+%Record$(DEP): SUPPRESS_RSET_WARNING=
+endif
+endif
 
 endif # Both, 3.13 and 3.14 from here.
 
