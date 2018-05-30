@@ -345,10 +345,7 @@ DBD_SRCS += ${DBDS_${EPICSVERSION}}
 export DBD_SRCS
 
 #record dbd files given in DBDS
-RECORDS1 = $(patsubst %Record.dbd, %, $(filter-out dev%, $(filter %Record.dbd, $(notdir ${DBD_SRCS}))))
-#record dbd files included by files given in DBDS
-RECORDS2 := $(filter-out dev%, $(shell ${MAKEHOME}/expandDBD.tcl -r $(addprefix -I, $(sort $(dir ${DBD_SRCS}))) $(realpath ${DBDS})))
-RECORDS = $(sort ${RECORDS1} ${RECORDS2})
+RECORDS = $(filter %Record, $(basename $(notdir $(SRCS))))
 export RECORDS
 
 MENUS = $(patsubst %.dbd,%.h,$(wildcard menu*.dbd))
@@ -357,7 +354,7 @@ export MENUS
 BPTS = $(patsubst %.data,%.dbd,$(wildcard bpt*.data))
 export BPTS
 
-HDRS = ${HEADERS} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
+HDRS = ${HEADERS} ${RECORDS:%=${COMMON_DIR}/%.h}
 HDRS += ${HEADERS_${EPICS_BASETYPE}}
 HDRS += ${HEADERS_${EPICSVERSION}}
 export HDRS
@@ -683,7 +680,7 @@ LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
 HDEPENDS = 
 HDEPENDS_METHOD = COMP
 HDEPENDS_COMPFLAGS = -c
-MKMF = DO_NOT_USE_MKMF
+#MKMF = DO_NOT_USE_MKMF
 CPPFLAGS += -MD
 -include *.d
 
@@ -768,11 +765,10 @@ debug::
 
 ${BUILDRULE} MODULEINFOS
 ${BUILDRULE} ${MODULEDBD}
-${BUILDRULE} $(addprefix ${COMMON_DIR}/,$(addsuffix Record.h,${RECORDS}))
 ${BUILDRULE} ${DEPFILE}
 
 # In 3.15+ this is required to build %Record.h files
-COMMON_INC = ${HDRS}
+COMMON_INC = ${RECORDS:%=${COMMON_DIR}/%.h}
 
 # Include default EPICS Makefiles (version dependent).
 # Avoid library installation when doing 'make build'.
