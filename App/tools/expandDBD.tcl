@@ -86,7 +86,7 @@ proc includeFile {context filename} {
     set basename [file tail $filename]
     if {[lsearch $filesDone $basename ] != -1} {
         if {!$quiet} {
-            puts stderr "Warning: skipping duplicate file $basename included from $FileName($matchInfo(handle))"
+            puts stderr "Info: skipping duplicate file $basename included from $FileName($matchInfo(handle))"
         }
         return
     }
@@ -103,7 +103,7 @@ foreach filename $argv {
     set basename [file tail $filename]
     if {[lsearch $filesDone $basename] != -1} {
         if {!$quiet} {
-            puts stderr "Warning: skipping duplicate file $basename from command line"
+            puts stderr "Info: skipping duplicate file $basename from command line"
         }
         continue
     }
