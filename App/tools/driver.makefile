@@ -763,6 +763,8 @@ debug::
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
 
+# In 3.14.8- this is required to build %Record.h files
+${BUILDRULE} ${RECORDS:%=${COMMON_DIR}/%.h}
 ${BUILDRULE} MODULEINFOS
 ${BUILDRULE} ${MODULEDBD}
 ${BUILDRULE} ${DEPFILE}
