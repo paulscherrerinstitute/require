@@ -500,6 +500,9 @@ export VAR_EXTENSIONS
 REQ = ${REQUIRED} $(foreach x, ${VAR_EXTENSIONS}, ${REQUIRED_$x})
 export REQ
 
+HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, ${HEADERS_$x})
+export HDRS 
+
 SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
 USR_LIBOBJS += ${LIBOBJS} $(foreach x,${VAR_EXTENSIONS},${LIBOBJS_$x})
 export USR_LIBOBJS
