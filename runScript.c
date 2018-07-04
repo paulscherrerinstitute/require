@@ -50,6 +50,9 @@ epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #include "expr.h"
 #include "require.h"
 
+#define SAVEENV(var) do { old_##var = getenv(#var); if (old_##var) old_##var=strdup(old_##var); } while(0)
+#define RESTOREENV(var) do { if(old_##var) { putenvprintf("%s=%s", #var, old_##var); free(old_##var); }} while(0)
+
 int runScriptDebug=0;
 
 int runScript(const char* filename, const char* args)
@@ -63,6 +66,8 @@ int runScript(const char* filename, const char* args)
     long len;
     char** pairs;
     int status = 0;
+    char* old_MODULE = NULL;
+    char* old_MODULE_DIR = NULL;
     
     if (!filename)
     {
@@ -161,8 +166,12 @@ int runScript(const char* filename, const char* args)
         }
     }
     if (file == NULL) { perror(filename); return errno; }
+    
+    /* save some environments variables */
+    SAVEENV(MODULE);
+    SAVEENV(MODULE_DIR);
 
-    /*  line by line after expanding macros with arguments or environment */
+    /* execute script line by line after expanding macros with arguments or environment */
     while (fgets(line_raw, line_raw_size, file))
     {
         char* p, *x;
@@ -246,6 +255,11 @@ end:
     free(line_exp);
     if (mac) macDeleteHandle(mac);
     if (file) fclose(file);
+
+    /* restore environment */
+    RESTOREENV(MODULE);
+    RESTOREENV(MODULE_DIR);
+
     return status;
 }
 
