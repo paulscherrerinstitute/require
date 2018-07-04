@@ -638,6 +638,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     putenvprintf("%s_VERSION=%s", module, version);
     if (location)
     {
+        putenvprintf("MODULE_DIR=%s", m->content+lm+lv);
         putenvprintf("%s_DIR=%s", module, m->content+lm+lv);
         pathAdd("SCRIPT_PATH", m->content+lm+lv);
     }
