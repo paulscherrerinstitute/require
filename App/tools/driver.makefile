@@ -221,7 +221,7 @@ debug::
 MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION}
 
 build install debug:: ${IGNOREFILES}
-	for VERSION in ${BUILD_EPICS_VERSIONS}; do ${MAKEVERSION} EPICSVERSION=$$VERSION $@; done
+	@+for VERSION in ${BUILD_EPICS_VERSIONS}; do ${MAKEVERSION} EPICSVERSION=$$VERSION $@; done
 
 # Handle cases where user requests a group of EPICS versions:
 # make <action>.3.13 or make <action>.3.14 instead of make <action> or
@@ -229,10 +229,10 @@ build install debug:: ${IGNOREFILES}
 
 define VERSIONRULES
 $(1): ${IGNOREFILES}
-	for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
+	@+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
 
 %.$(1): ${IGNOREFILES}
-	for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
+	@+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
 endef
 $(foreach v,$(sort $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIONRULES,$v)))
 
@@ -416,7 +416,7 @@ debug::
 
 install build::
 # Delete old build if INSTBASE has changed and module depends on other modules.
-	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
+	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
 	    echo '$(realpath ${EPICS_MODULES})' | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE || \
 	    ( grep -qs "^[^#]" O.${EPICSVERSION}_$$ARCH/*.dep && \
 	     (echo "rebuilding $$ARCH"; $(RMDIR) O.${EPICSVERSION}_$$ARCH) ) || true; \
@@ -424,8 +424,8 @@ install build::
 
 # Loop over all architectures.
 install build debug::
-	@for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-	    umask 002; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
+	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
+	    umask 002; echo MAKING ARCH $$ARCH; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
 # Add include directory of other modules to include file search path.
@@ -499,9 +499,6 @@ export VAR_EXTENSIONS
 
 REQ = ${REQUIRED} $(foreach x, ${VAR_EXTENSIONS}, ${REQUIRED_$x})
 export REQ
-
-HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, ${HEADERS_$x})
-export HDRS 
 
 SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
 USR_LIBOBJS += ${LIBOBJS} $(foreach x,${VAR_EXTENSIONS},${LIBOBJS_$x})
