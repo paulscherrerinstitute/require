@@ -240,18 +240,17 @@ $(foreach v,$(sort $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIO
 # make <action>.<version> instead of make <action> or
 # make <version> instead of make
 # EPICS version must be installed but need not be in EPICS_VERSIONS
-${INSTALLED_EPICS_VERSIONS}:
-	${MAKEVERSION} EPICSVERSION=$@ build
+${INSTALLED_EPICS_VERSIONS}: ${IGNOREFILES}
+	+${MAKEVERSION} EPICSVERSION=$@ build
 
-${INSTALLED_EPICS_VERSIONS:%=build.%}:
-	${MAKEVERSION} EPICSVERSION=${@:build.%=%} build
+${INSTALLED_EPICS_VERSIONS:%=build.%}: ${IGNOREFILES}
+	+${MAKEVERSION} EPICSVERSION=${@:build.%=%} build
 
-${INSTALLED_EPICS_VERSIONS:%=install.%}:
-	${MAKEVERSION} EPICSVERSION=${@:install.%=%} install
+${INSTALLED_EPICS_VERSIONS:%=install.%}: ${IGNOREFILES}
+	+${MAKEVERSION} EPICSVERSION=${@:install.%=%} install
 
 ${INSTALLED_EPICS_VERSIONS:%=debug.%}:
-	${MAKEVERSION} EPICSVERSION=${@:debug.%=%} debug
-
+	+${MAKEVERSION} EPICSVERSION=${@:debug.%=%} debug
 
 # Install user interfaces to global location.
 # Keep a list of installed files in a hidden file for uninstall.
