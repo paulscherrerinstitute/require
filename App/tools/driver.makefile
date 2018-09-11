@@ -129,7 +129,7 @@ INSTALLED_EPICS_VERSIONS := $(patsubst ${EPICS_LOCATION}/base-%,%,$(wildcard ${E
 EPICS_VERSIONS = $(filter-out ${EXCLUDE_VERSIONS:=%},${DEFAULT_EPICS_VERSIONS})
 MISSING_EPICS_VERSIONS = $(filter-out ${BUILD_EPICS_VERSIONS},${EPICS_VERSIONS})
 BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
-$(foreach v,$(sort $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
+$(foreach v,$(sort $(basename $(basename ${BUILD_EPICS_VERSIONS})) $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
 
 # Check only version of files needed to build the module. But which are they?
 VERSIONCHECKFILES = $(filter-out /% -none-, $(wildcard *makefile* *Makefile* *.db *.template *.subs *.dbd *.cmd) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v}))
@@ -211,6 +211,9 @@ debug::
 	@echo "EPICS_VERSIONS_3.13 = ${EPICS_VERSIONS_3.13}"
 	@echo "EPICS_VERSIONS_3.14 = ${EPICS_VERSIONS_3.14}"
 	@echo "EPICS_VERSIONS_3.15 = ${EPICS_VERSIONS_3.15}"
+	@echo "EPICS_VERSIONS_3.16 = ${EPICS_VERSIONS_3.16}"
+	@echo "EPICS_VERSIONS_3 = ${EPICS_VERSIONS_3}"
+	@echo "EPICS_VERSIONS_7 = ${EPICS_VERSIONS_7}"
 	@echo "BUILDCLASSES = ${BUILDCLASSES}"
 	@echo "LIBVERSION = ${LIBVERSION}"
 	@echo "VERSIONCHECKFILES = ${VERSIONCHECKFILES}"
@@ -229,12 +232,12 @@ build install debug:: ${IGNOREFILES}
 
 define VERSIONRULES
 $(1): ${IGNOREFILES}
-	@+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
+	+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
 
 %.$(1): ${IGNOREFILES}
-	@+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
+	+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
 endef
-$(foreach v,$(sort $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIONRULES,$v)))
+$(foreach v,$(sort $(basename $(basename ${INSTALLED_EPICS_VERSIONS})) $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIONRULES,$v)))
 
 # Handle cases where user requests one specific version:
 # make <action>.<version> instead of make <action> or
@@ -249,8 +252,9 @@ ${INSTALLED_EPICS_VERSIONS:%=build.%}: ${IGNOREFILES}
 ${INSTALLED_EPICS_VERSIONS:%=install.%}: ${IGNOREFILES}
 	+${MAKEVERSION} EPICSVERSION=${@:install.%=%} install
 
-${INSTALLED_EPICS_VERSIONS:%=debug.%}:
+${INSTALLED_EPICS_VERSIONS:%=debug.%}: ${IGNOREFILES}
 	+${MAKEVERSION} EPICSVERSION=${@:debug.%=%} debug
+
 
 # Install user interfaces to global location.
 # Keep a list of installed files in a hidden file for uninstall.
