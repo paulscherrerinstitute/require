@@ -680,14 +680,19 @@ endif # MINOR
 LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
 
 # Create and include dependency files.
-# 3.14.8 uses HDEPENDS to select depends mode
-# 3.14.12 uses 'HDEPENDSCFLAGS -MMD' (does not catch #include <...>)
-# 3.15 uses 'HDEPENDS_COMPFLAGS = -MM -MF $@' (does not catch #include <...>)
+# 3.13 does not make those files at all.
+# 3.14.8 uses HDEPENDS to select depends mode.
+# 3.14.12 uses 'HDEPENDSCFLAGS -MMD'
+# 3.15 uses 'HDEPENDS_COMPFLAGS = -MM -MF $@'
+# For newer compilers they are ok and ignore files in system directories.
+# For old vxWorks gcc those rules ignore #include <...>,
+# which may be falsey used for non-system headers.
+ifneq (,$(filter T2-%,$(T_A)))
 HDEPENDS = 
 HDEPENDS_METHOD = COMP
 HDEPENDS_COMPFLAGS = -c
-#MKMF = DO_NOT_USE_MKMF
 CPPFLAGS += -MD
+endif
 -include *.d
 
 # Need to find source dbd files relative to one dir up but generated dbd files in this dir.
