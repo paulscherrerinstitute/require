@@ -355,7 +355,7 @@ size_t replaceExpressions(const char *r, char *buffer, size_t buffersize)
     long val, string_length;
     char *w = buffer;
     char *s;
-    const char *string_start;
+    const char *string_start = r;
     char q;
 
     *w = 0;
