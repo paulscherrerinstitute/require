@@ -46,6 +46,10 @@ extern void dbLoadRecords(const char*, const char*);
 #define dbmfStrdup(s) strcpy(dbmfMalloc(strlen((char*)(s))+1),(char*)(s))
 #endif
 
+#if (EPICS_VERSION*10000+EPICS_REVISION*100+EPICS_MODIFICATION>=31600)
+#define dbmfStrdup(s) dbmfStrdup((char*)s) 
+#endif
+
 static int line_num;
 static int yyerror(char* str);
 
