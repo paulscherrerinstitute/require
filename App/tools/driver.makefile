@@ -132,7 +132,7 @@ BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
 $(foreach v,$(sort $(basename $(basename ${BUILD_EPICS_VERSIONS})) $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
 
 # Check only version of files needed to build the module. But which are they?
-VERSIONCHECKFILES = $(filter-out /% -none-, $(wildcard *makefile* *Makefile* *.db *.template *.subs *.dbd *.cmd) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $(foreach v,3.13 3.14 3.15, ${SOURCES_$v} ${DBDS_$v}))
+VERSIONCHECKFILES = $(filter-out /% -none-, $(wildcard *makefile* *Makefile* *.db *.template *.subs *.dbd *.cmd) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $($(filter SOURCES_% DBDS_%,${.VARIABLES})))
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
 LIBVERSION := $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
@@ -439,19 +439,22 @@ ifeq ($(filter O.%,$(notdir ${CURDIR})),)
 # Still in source directory, third run.
 
 # Add include directory of other modules to include file search path.
-# Default is to use latest version of any module for this EPICSVERSION and T_A.
-# The user can overwrite the version by defining <module>_VERSION=<version>.
-# For each other module look for include/ for the EPICS base version in use.
-# The user can overwrite (or add) by defining <module>_INC=<relative/path> (not recommended!).
-# Only really existing directories are added to the search path.
+# By default use highest version of all other modules installed for
+# current EPICSVERSION and T_A.
+# The user can overwrite by defining <module>_VERSION=<version>.
+# This version can be incomplete (only <major> or <major>.<minor>).
+# In this case the hightest matching full version (<major>.<minor>.<patch>)
+# will be selected.
 
-# The tricky part is to sort versions numerically. Make can't but ls -v can.
+# The tricky part is to sort versions numerically.
+# Make can't but ls -v can.
 # Only accept numerical versions (needs extended glob).
 # This is slow, thus do it only once for each EPICSVERSION.
+
 define ADD_OTHER_MODULE_INCLUDES
 $(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/../../include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/../../include 2>/dev/null))))
-export $(1)_VERSION 
-OTHER_MODULE_INCLUDES += $$(patsubst %,-I${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/include,$$($(1)_VERSION))
+export $(1)_VERSION
+OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$($(1)_VERSION)*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
 endef
 $(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
 # Include path for old style modules.
@@ -517,6 +520,8 @@ export CFG
 
 export IGNORE_MODULES
 
+export API_MAY_CHANGE_BETWEEN_MINOR_VERSIONS
+
 else # in O.*
 ## RUN 4
 # In O.* directory.
@@ -531,8 +536,8 @@ COMMON_DIR_3.13 = .
 COMMON_DIR = ${COMMON_DIR_${EPICS_BASETYPE}}
 
 # Remove include directory for this module from search path.
-# 3.13 and 3.14 use different variables
-INSTALL_INCLUDES = $(strip $(OTHER_MODULE_INCLUDES))
+# 3.13 and 3.14+ use different variables
+INSTALL_INCLUDES := $(strip $(OTHER_MODULE_INCLUDES))
 EPICS_INCLUDES =
 
 # Manually required modules.
@@ -546,11 +551,11 @@ ifeq (${EPICS_BASETYPE},3.13)
 INSTALLRULE=install::
 BUILDRULE=build::
 BASERULES=${EPICS_BASE}/config/RULES.Vx
-else # 3.14
+else # 3.14+
 INSTALLRULE=install:
 BUILDRULE=build:
 BASERULES=${EPICS_BASE}/configure/RULES
-endif # 3.14
+endif # 3.14+
 
 INSTALL_REV     = ${MODULE_LOCATION}/R${EPICSVERSION}
 INSTALL_BIN     = ${INSTALL_REV}/bin/$(T_A)
@@ -585,7 +590,7 @@ INSTALL_SCR     = ${INSTALL_REV}
 #	chmod 444 $@
 #	$(SETLINKS) ${INSTALL_TEMPL} .db $(basename $(notdir $^))
 
-# Different settings required to build library in EPICS 3.13 and 3.14.
+# Different settings required to build library in EPICS 3.13 and 3.14+.
 ifeq (${EPICS_BASETYPE},3.13) # only 3.13 from here
 
 # Convert sources to object code, skip .a and .o here.
@@ -608,7 +613,7 @@ PROD = ${MODULELIB}
 #endif # T1- T_A
 #endif # .cc or .cpp found
 
-else # Only 3.14 from here.
+else # Only 3.14+ from here.
 
 LIBRARY_OBJS = $(strip ${LIBOBJS} $(foreach l,${USR_LIBOBJS},$(addprefix ../,$(filter-out /%,$l))$(filter /%,$l)))
 
@@ -656,7 +661,7 @@ USR_CPPFLAGS += ${SUPPRESS_RSET_WARNING}
 endif
 endif
 
-endif # Both, 3.13 and 3.14 from here.
+endif # Both, 3.13 and 3.14+ from here.
 
 # For backward compatibility:
 # Provide a global symbol for every version with the same
@@ -669,7 +674,11 @@ MAJOR=$(word 1,${MAJOR_MINOR_PATCH})
 MINOR=$(word 2,${MAJOR_MINOR_PATCH})
 PATCH=$(word 3,${MAJOR_MINOR_PATCH})
 ifneq (${MINOR},)
+ifdef API_MAY_CHANGE_BETWEEN_MINOR_VERSIONS
+ALLMINORS = ${MINOR}
+else
 ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
+endif
 ifeq (${OS_CLASS}, vxWorks)
 PROVIDES = ${ALLMINORS:%=--defsym __${PRJ}Lib_${MAJOR}.%=0}
 endif # vxWorks
@@ -715,7 +724,7 @@ ifeq (${EPICS_BASETYPE},3.13)
 USR_INCLUDES += $(SRC_INCLUDES) $(INSTALL_INCLUDES) 
 
 else
-# Only 3.14 from here.
+# Only 3.14+ from here.
 
 # Create dbd file for snl code.
 DBDFILES += $(patsubst %.st,%_snl.dbd,$(notdir $(filter %.st,${SRCS})))
@@ -737,10 +746,10 @@ DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 #$(shell awk '$(maksubfuncfile)' $(addprefix ../,$(filter %.c %.cc %.C %.cpp, $(SRCS))) > ${SUBFUNCFILE})
 #DBDFILES += $(if $(shell cat ${SUBFUNCFILE}),${SUBFUNCFILE})
 
-# snc location in 3.14: From latest version of module seq or fall back to globally installed snc.
+# snc location in 3.14+: From latest version of module seq or fall back to globally installed snc.
 SNC := $(lastword $(dir ${EPICS_BASE})seq/bin/$(EPICS_HOST_ARCH)/snc $(shell ls -dv ${EPICS_MODULES}/seq/$(or $(seq_VERSION),+([0-9]).+([0-9]).+([0-9]))/R${EPICSVERSION}/bin/${EPICS_HOST_ARCH}/snc 2>/dev/null))
 
-endif # 3.14
+endif # 3.14+
 
 ifneq ($(strip ${DBDFILES}),)
 MODULEDBD=${PRJ}.dbd
@@ -854,6 +863,12 @@ debug::
 	@echo "INSTALL_BINS = $(INSTALL_BINS)"
 
 INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_BINS} ${INSTALL_DEPS}
+
+ifdef API_MAY_CHANGE_BETWEEN_MINOR_VERSIONS
+INSTALLS += ${EPICS_MODULES}/${PRJ}/use_exact_minor_version
+%/use_exact_minor_version:
+	touch $@
+endif
 
 ${INSTALLRULE} ${INSTALLS}
 
@@ -973,7 +988,7 @@ MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
 ${VERSIONFILE}:
 	echo "char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
 
-# EPICS R3.14.*:
+# EPICS R3.14+:
 # Create file to fill registry from dbd file.
 ${REGISTRYFILE}: ${MODULEDBD}
 	$(RM) $@ temp.cpp
