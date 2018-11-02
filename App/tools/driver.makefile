@@ -428,7 +428,7 @@ install build::
 # Loop over all architectures.
 install build debug::
 	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-	    umask 002; echo MAKING ARCH $$ARCH; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
+	    umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
 else # T_A
@@ -437,29 +437,6 @@ ifeq ($(filter O.%,$(notdir ${CURDIR})),)
 ## RUN 3
 # Target architecture defined.
 # Still in source directory, third run.
-
-# Add include directory of other modules to include file search path.
-# By default use highest version of all other modules installed for
-# current EPICSVERSION and T_A.
-# The user can overwrite by defining <module>_VERSION=<version>.
-# This version can be incomplete (only <major> or <major>.<minor>).
-# In this case the hightest matching full version (<major>.<minor>.<patch>)
-# will be selected.
-
-# The tricky part is to sort versions numerically.
-# Make can't but ls -v can.
-# Only accept numerical versions (needs extended glob).
-# This is slow, thus do it only once for each EPICSVERSION.
-
-define ADD_OTHER_MODULE_INCLUDES
-$(eval $(1)_VERSION := $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/../../include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/../../include 2>/dev/null))))
-export $(1)_VERSION
-OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$($(1)_VERSION)*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
-endef
-$(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
-# Include path for old style modules.
-OTHER_MODULE_INCLUDES += $(addprefix -I,$(wildcard ${INSTBASE}/iocBoot/R${EPICSVERSION}/include))
-export OTHER_MODULE_INCLUDES
 
 ifeq ($(filter ${OS_CLASS},${OS_CLASS_LIST}),)
 
@@ -478,6 +455,36 @@ install build:
 	@true
 
 else
+
+# Add include directory of other modules to include file search path.
+# By default use highest version of all other modules installed for
+# current EPICSVERSION and T_A.
+# The user can overwrite by defining <module>_VERSION=<version>.
+# This version can be incomplete (only <major> or <major>.<minor>).
+# In this case the hightest matching full version (<major>.<minor>.<patch>)
+# will be selected.
+
+# The tricky part is to sort versions numerically.
+# Make can't but ls -v can.
+# Only accept numerical versions (needs extended glob).
+# This is slow, thus do it only once for each EPICSVERSION.
+
+define ADD_OTHER_MODULE_INCLUDES
+$(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/../../include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/../../include 2>/dev/null))))
+export $(1)_VERSION
+OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$($(1)_VERSION)*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
+endef
+$(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
+# Include path for old style modules.
+OLD_INCLUDE = $(wildcard ${INSTBASE}/iocBoot/R${EPICSVERSION}/include)
+OTHER_MODULE_INCLUDES += $(addprefix -I,$(OLD_INCLUDE))
+export OTHER_MODULE_INCLUDES
+
+# Manually required modules.
+define ADD_MANUAL_DEPENDENCIES
+$(eval $(1)_VERSION = $(or $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION} 2>/dev/null))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
+endef
+$(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,$m)))
 
 O.%:
 	$(MKDIR) $@
@@ -520,7 +527,8 @@ export CFG
 
 export IGNORE_MODULES
 
-export API_MAY_CHANGE_BETWEEN_MINOR_VERSIONS
+export USE_EXACT_VERSION += $(ABI_MAY_CHANGE)
+export USE_EXACT_MINOR_VERSION += $(ABI_MAY_CHANGE_BETWEEN_MINOR_VERSIONS)
 
 else # in O.*
 ## RUN 4
@@ -537,14 +545,8 @@ COMMON_DIR = ${COMMON_DIR_${EPICS_BASETYPE}}
 
 # Remove include directory for this module from search path.
 # 3.13 and 3.14+ use different variables
-INSTALL_INCLUDES := $(strip $(OTHER_MODULE_INCLUDES))
+INSTALL_INCLUDES = $(strip $(OTHER_MODULE_INCLUDES))
 EPICS_INCLUDES =
-
-# Manually required modules.
-define ADD_MANUAL_DEPENDENCIES
-$(eval $(1)_VERSION := $(or $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION} 2>/dev/null))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
-endef
-$(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,$m)))
 
 # EPICS 3.13 uses :: in some rules where 3.14 uses :
 ifeq (${EPICS_BASETYPE},3.13)
@@ -663,6 +665,7 @@ endif
 
 endif # Both, 3.13 and 3.14+ from here.
 
+ifndef USE_EXACT_VERSION
 # For backward compatibility:
 # Provide a global symbol for every version with the same
 # major and equal or smaller minor version number.
@@ -674,7 +677,7 @@ MAJOR=$(word 1,${MAJOR_MINOR_PATCH})
 MINOR=$(word 2,${MAJOR_MINOR_PATCH})
 PATCH=$(word 3,${MAJOR_MINOR_PATCH})
 ifneq (${MINOR},)
-ifdef API_MAY_CHANGE_BETWEEN_MINOR_VERSIONS
+ifdef USE_EXACT_MINOR_VERSION
 ALLMINORS = ${MINOR}
 else
 ALLMINORS := $(shell for ((i=0;i<=${MINOR};i++));do echo $$i;done)
@@ -687,6 +690,7 @@ PROVIDES = ${ALLMINORS:%=-Wl,--defsym,${PRJ}Lib_${MAJOR}.%=0}
 endif # Linux
 endif # MINOR
 LDFLAGS += ${PROVIDES} ${USR_LDFLAGS_${T_A}}
+endif # !USE_EXACT_VERSION
 
 # Create and include dependency files.
 # 3.13 does not make those files at all.
@@ -864,10 +868,16 @@ debug::
 
 INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_BINS} ${INSTALL_DEPS}
 
-ifdef API_MAY_CHANGE_BETWEEN_MINOR_VERSIONS
+ifdef USE_EXACT_VERSION
+INSTALLS += ${EPICS_MODULES}/${PRJ}/use_exact_version
+%/use_exact_version:
+	touch $@
+else
+ifdef USE_EXACT_MINOR_VERSION
 INSTALLS += ${EPICS_MODULES}/${PRJ}/use_exact_minor_version
 %/use_exact_minor_version:
 	touch $@
+endif
 endif
 
 ${INSTALLRULE} ${INSTALLS}
@@ -1048,15 +1058,11 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "Collecting dependencies"
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
-	# Check dependencies on other module headers.
-	cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/\([0-9]*\.[0-9]*\)\.[0-9]*/.*%\1 \2%p;s%$(EPICS_MODULES)/*\([^/]*\)/\([^/]*\)/.*%\1 \2%p'| sort -u >> $@
-ifneq ($(strip ${REQ}),)
-	# Manully added dependencies: ${REQ}
-	@$(foreach m,${REQ},echo "$m $(or ${$m_VERSION},$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numbered version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
-endif
+#       Check dependencies on ${REQ} and other module headers.
+	$(foreach m,$(sort ${REQ} $(shell cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/.*%\1%p' | sort -u)),echo "$m $(or $(if $(wildcard ${EPICS_MODULES}/$m/use_exact_version),${$m_VERSION},$(basename ${$m_VERSION})),$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numbered version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
 ifdef OLD_INCLUDE
 	# Check dependencies on old style driver headers.
-	@${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw -e ${PRJ} -e ^$$ >> $@ && echo "Warning: dependency on old style driver"; true;
+	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw -e ${PRJ} -e ^$$ >> $@ && echo "Warning: dependency on old style driver"; true;
 endif
 
 # Remove MakefileInclude after we are done because it interfers with our way to build.

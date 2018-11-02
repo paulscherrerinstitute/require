@@ -874,7 +874,7 @@ int libversionShow(const char* outfile)
 #define TESTVERS 2
 #define HIGHER 3
 
-static int compareVersions(const char* found, const char* request, int exactMinorNeeded)
+static int compareVersions(const char* found, const char* request, int exactnessLevel)
 {
     int found_major, found_minor=0, found_patch=0, found_parts = 0;
     int req_major, req_minor, req_patch, req_parts;
@@ -883,7 +883,7 @@ static int compareVersions(const char* found, const char* request, int exactMino
     int n;
 
     if (requireDebug)
-        printf("require: compareVersions(found=%s, request=%s, exactMinorNeeded=%d)\n", found, request, exactMinorNeeded);
+        printf("require: compareVersions(found=%s, request=%s, exactnessLevel=%d)\n", found, request, exactnessLevel);
 
     if (found == NULL || found[0] == 0)                /* no version found: any requested? */
     {
@@ -974,7 +974,7 @@ static int compareVersions(const char* found, const char* request, int exactMino
     }
     if (found_minor > req_minor)                        /* minor larger than required */
     {
-        if (req_extra[0] == '+' && !exactMinorNeeded)
+        if (req_extra[0] == '+' && exactnessLevel == 0)
         {
             if (requireDebug)
                 printf("require: compareVersions: MATCH minor number higher than requested with +\n");
@@ -1005,7 +1005,7 @@ static int compareVersions(const char* found, const char* request, int exactMino
             printf("require: compareVersions: MATCH patch level matches exactly requested\n");
         return MATCH;
     }
-    if (req_extra[0] == '+')
+    if (req_extra[0] == '+' && exactnessLevel <= 1)
     {
         if (requireDebug)
             printf("require: compareVersions: MATCH patch level higher than requested with +\n");
@@ -1131,7 +1131,7 @@ static off_t fileSize(const char* filename)
     {
         case S_IFREG:
             if (requireDebug)
-                printf("require: file %s exists, size %lld bytes\n",
+                printf("require: file %s exists, size %llu bytes\n",
                     filename, (unsigned long long)filestat.st_size);
             return filestat.st_size;
         case S_IFDIR:
@@ -1247,7 +1247,7 @@ static int require_priv(const char* module, const char* version, const char* arg
     char* symbolname;
     char filename[PATH_MAX];
 
-    int exactMinorNeeded = 0;
+    int exactnessLevel = 0;
     int someVersionFound = 0;
     int someArchFound = 0;
 
@@ -1301,11 +1301,19 @@ static int require_priv(const char* module, const char* version, const char* arg
         dirname = getLibLocation(module);
         if (requireDebug && dirname[0])
             printf("require: library found in %s\n", dirname);
-        snprintf(filename, sizeof(filename), "%s%n.." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "use_exact_minor_version",
+        snprintf(filename, sizeof(filename), "%s%n.." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "use_exact_version",
             dirname, &releasediroffs);
         if (fileExists(filename))
-            exactMinorNeeded = 1;
-        switch (compareVersions(loaded, version, exactMinorNeeded))
+        {
+            exactnessLevel = 2;
+        }
+        else
+        {
+            snprintf(filename+releasediroffs, sizeof(filename)-releasediroffs, ".." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "use_exact_minor_version");
+            if (fileExists(filename))
+                exactnessLevel = 1;
+        }
+        switch (compareVersions(loaded, version, exactnessLevel))
         {
             case TESTVERS:
                 if (version)
@@ -1320,7 +1328,8 @@ static int require_priv(const char* module, const char* version, const char* arg
                 int i = strlen(version);
                 if (version[i-1] == '+') i--;
                 printf("Conflict between required %s%s version %.*s and already loaded version %s.\n",
-                    exactMinorNeeded ? "exact " : "" , module, i, version, loaded);
+                    exactnessLevel > 1 ? "exact " : exactnessLevel > 0 ? "exact minor " : "" ,
+                    module, i, version, loaded);
                 return -1;
             }
         }
@@ -1347,25 +1356,25 @@ static int require_priv(const char* module, const char* version, const char* arg
                 end = strchr(end+2, OSI_PATH_LIST_SEPARATOR[0]);
             if (end) dirlen = (int)(end++ - dirname);
             else dirlen = (int)strlen(dirname);
-            if (dirlen == 0) continue; /* ignore empty driverpath elements */
 
-            if (requireDebug)
-                printf("require: trying %.*s\n", dirlen, dirname);
+            if (dirlen == 0)
+                continue; /* ignore empty driverpath elements */
 
-            snprintf(filename, sizeof(filename), "%.*s" OSI_PATH_SEPARATOR "%s" OSI_PATH_SEPARATOR "%n" OSI_PATH_SEPARATOR "use_exact_minor_version",
-                dirlen, dirname, module, &modulediroffs);
+            if (!TRY_FILE(0, "%.*s" OSI_PATH_SEPARATOR, dirlen, dirname))
+                continue; /* ignore non-existing driverpath elements */
+
             dirlen += strlen(OSI_PATH_SEPARATOR);
-            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]/use_exact_minor_version" */
-
-            if (fileExists(filename))
-                exactMinorNeeded = 1;
+            /* filename = "<dirname>/[dirlen]" */
+            
+            snprintf(filename+dirlen, sizeof(filename)-dirlen, "%s" OSI_PATH_SEPARATOR "%n", module, &modulediroffs);
+            modulediroffs += dirlen;
+            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
 
             /* Does the module directory exist? */
-            filename[modulediroffs] = 0;
             IF_OPEN_DIR(filename)
             {
-                if (requireDebug)
-                    printf("require: found directory %s\n", filename);
+                if (TRY_FILE(modulediroffs, "use_exact_version")) exactnessLevel = 2;
+                else if (TRY_FILE(modulediroffs, "use_exact_minor_version")) exactnessLevel = 1;
 
                 /* Now look for versions. */
                 START_DIR_LOOP
@@ -1379,10 +1388,10 @@ static int require_priv(const char* module, const char* version, const char* arg
 
                     /* Look for highest matching version. */
                     if (requireDebug)
-                        printf("require: checking version %s against required %s\n",
+                        printf("require: comparing found version %s against required %s\n",
                                 currentFilename, version);
 
-                    switch ((status = compareVersions(currentFilename, version, exactMinorNeeded)))
+                    switch ((status = compareVersions(currentFilename, version, exactnessLevel)))
                     {
                         case EXACT: /* exact match found */
                         case MATCH: /* all given numbers match. */
@@ -1418,10 +1427,10 @@ static int require_priv(const char* module, const char* version, const char* arg
                             }
 
                             /* Is it higher than the one we found before? */
-                            if (found && requireDebug)
+                            if (requireDebug)
                                 printf("require: %s %s support for %s %s found, compare against previously found %s\n",
                                     module, currentFilename, epicsRelease, targetArch, found);
-                            if (!found || compareVersions(currentFilename, found, exactMinorNeeded) == HIGHER)
+                            if (!found || compareVersions(currentFilename, found, exactnessLevel) == HIGHER)
                             {
                                 if (requireDebug)
                                     printf("require: %s %s looks promising\n", module, currentFilename);
@@ -1565,7 +1574,7 @@ loadlib:
             /* check what we got */
             if (requireDebug)
                 printf("require: compare requested version %s with loaded version %s\n", version, found);
-            if (compareVersions(found, version, exactMinorNeeded) == MISMATCH)
+            if (compareVersions(found, version, exactnessLevel) == MISMATCH)
             {
                 fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
                     module, version, found);
