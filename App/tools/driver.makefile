@@ -694,14 +694,16 @@ endif # !USE_EXACT_VERSION
 
 # Create and include dependency files.
 # 3.13 does not make those files at all.
-# 3.14.8 uses HDEPENDS to select depends mode.
+# 3.14.8 uses HDEPENDS=YES to select depends mode.
 # 3.14.12 uses 'HDEPENDSCFLAGS -MMD'
 # 3.15 uses 'HDEPENDS_COMPFLAGS = -MM -MF $@'
 # For newer compilers they are ok and ignore files in system directories.
 # For old vxWorks gcc those rules ignore #include <...>,
 # which may be falsey used for non-system headers.
+ifdef HDEPENDS
+CPPFLAGS += -MMD
+endif
 ifneq (,$(filter T2-%,$(T_A)))
-HDEPENDS = 
 HDEPENDS_METHOD = COMP
 HDEPENDS_COMPFLAGS = -c
 CPPFLAGS += -MD
