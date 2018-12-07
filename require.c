@@ -257,7 +257,7 @@ int requireDebug;
 #endif
 
 #define LIBDIR "lib" OSI_PATH_SEPARATOR
-#define TEMPLATEDIR "db"
+#define TEMPLATEDIR "db" OSI_PATH_SEPARATOR
 
 #define TOSTR(s) TOSTR2(s)
 #define TOSTR2(s) #s
