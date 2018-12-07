@@ -192,6 +192,7 @@ help:
 	@echo "  TEMPLATES        (*.template *.db *.subs) [db files]"
 	@echo "  SCRIPTS          (*.cmd) [startup and other scripts]"
 	@echo "  BINS             () [programs to install]"
+	@echo "  SHRLIBS          () [extra shared libraries to install]"
 	@echo "  QT               (qt/*) [QT user interfaces to install]"
 	@echo "  EXCLUDE_VERSIONS () [versions not to build, e.g. 3.14]"
 	@echo "  EXCLUDE_ARCHS    () [target architectures not to build]"
@@ -523,6 +524,9 @@ export USR_LIBOBJS
 BINS += $(foreach x, ${VAR_EXTENSIONS}, ${BINS_$x})
 export BINS
 
+SHRLIBS += $(foreach x, ${VAR_EXTENSIONS}, ${SHRLIBS_$x})
+export SHRLIBS
+
 export CFG
 
 export IGNORE_MODULES
@@ -815,7 +819,12 @@ RELEASE_INCLUDES += -I${EPICS_BASE}/include/os/${OS_CLASS}
 EPICS_INCLUDES += -I$(EPICS_BASE_INCLUDE) -I$(EPICS_BASE_INCLUDE)/os/$(OS_CLASS)
 
 # Find all sources and set vpath accordingly.
-$(foreach file, ${SRCS} ${TEMPLS} ${SCR}, $(eval vpath $(notdir ${file}) ../$(dir ${file})))
+$(foreach file, $(filter-out /%,${SRCS} ${TEMPLS} ${SCR} ${SHRLIBS}), $(eval vpath $(notdir ${file}) ../$(dir ${file})))
+$(foreach file, $(filter /%,${SRCS} ${TEMPLS} ${SCR} ${SHRLIBS}), $(eval vpath $(notdir ${file}) $(dir ${file})))
+
+ifdef SHRLIBS
+LDFLAGS_Linux+=-Wl,-rpath,$(INSTALL_LIB)
+endif
 
 # Do not treat %.dbd the same way because it creates a circular dependency
 # if a source dbd has the same name as the project dbd. Have to clear %.dbd and not use ../ path.
@@ -842,7 +851,7 @@ ${MODULEDBD}: ${DBDFILES}
 	${MAKEHOME}expandDBD.tcl -$(basename ${EPICSVERSION}) ${DBDEXPANDPATH} $^ > $@
 
 # Install everything.
-INSTALL_LIBS = ${MODULELIB:%=${INSTALL_LIB}/%}
+INSTALL_LIBS = $(addprefix ${INSTALL_LIB}/,${MODULELIB} $(notdir ${SHRLIBS}))
 INSTALL_DEPS = ${DEPFILE:%=${INSTALL_LIB}/%}
 INSTALL_DBDS = ${MODULEDBD:%=${INSTALL_DBD}/%}
 INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(notdir ${HDRS}))
@@ -886,15 +895,15 @@ ${INSTALLRULE} ${INSTALLS}
 
 ${INSTALL_DBDS}: $(notdir ${INSTALL_DBDS})
 	@echo "Installing module dbd file $@"
-	$(INSTALL) -d -m444 $< $(@D)
+	$(INSTALL) -d -m444 $^ $(@D)
 
 ${INSTALL_LIBS}: $(notdir ${INSTALL_LIBS})
 	@echo "Installing module library $@"
-	$(INSTALL) -d -m555 $< $(@D)
+	$(INSTALL) -d -m555 $^ $(@D)
 
 ${INSTALL_DEPS}: $(notdir ${INSTALL_DEPS})
 	@echo "Installing module dependency file $@"
-	$(INSTALL) -d -m444 $< $(@D)
+	$(INSTALL) -d -m444 $^ $(@D)
 
 # Fix templates for older EPICS versions:
 # Remove 'alias' for EPICS <= 3.14.10
