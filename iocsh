@@ -353,8 +353,16 @@ fi
 
 if [ "$BASECODE" -ge 31412 ]
 then
-    EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
-    ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
+    if [ -x $EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA ]
+    then
+        EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA
+        ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
+        echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
+        echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
+    else
+        EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
+        ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
+    fi
     LDCMD="dlload"
 else
     # get rid of the compiled-in rpath because at PSI that is a link pointing to current EPICS version.
