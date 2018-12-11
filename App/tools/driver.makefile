@@ -473,7 +473,7 @@ else
 define ADD_OTHER_MODULE_INCLUDES
 $(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/../../include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/../../include 2>/dev/null))))
 export $(1)_VERSION
-OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$($(1)_VERSION)*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
+OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
 endef
 $(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
 # Include path for old style modules.
@@ -1070,7 +1070,7 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
 #	Check dependencies on ${REQ} and other module headers.
-	$(foreach m,$(sort ${REQ} $(shell cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/.*%\1%p' | sort -u)),echo "$m $(or $(if $(strip $(wildcard ${EPICS_MODULES}/$m/use_exact_version)$(shell echo ${$m_VERSION}|sed 'y/0123456789./           /')),${$m_VERSION},$(basename ${$m_VERSION})),$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numbered version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
+	$(foreach m,$(sort ${REQ} $(shell cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/.*%\1%p' | sort -u)),echo "$m $(or $(if $(strip $(wildcard ${EPICS_MODULES}/$m/use_exact_version)$(shell echo ${$m_VERSION}|sed 'y/0123456789./           /')),$(strip ${$m_VERSION}),$(basename ${$m_VERSION})),$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numbered version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
 ifdef OLD_INCLUDE
 #	Check dependencies on old style driver headers.
 	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw -e ${PRJ} -e ^$$ >> $@ && echo "Warning: dependency on old style driver"; true;
