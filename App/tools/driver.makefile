@@ -704,13 +704,14 @@ endif # !USE_EXACT_VERSION
 # For newer compilers they are ok and ignore files in system directories.
 # For old vxWorks gcc those rules ignore #include <...>,
 # which may be falsey used for non-system headers.
-ifdef HDEPENDS
-CPPFLAGS += -MMD
-endif
-ifneq (,$(filter T2-%,$(T_A)))
+ifeq ($(OS_CLASS)-$(firstword $(basename $(VX_GNU_VERSION)) 2),vxWorks-2)
 HDEPENDS_METHOD = COMP
 HDEPENDS_COMPFLAGS = -c
 CPPFLAGS += -MD
+else
+ifdef HDEPENDS
+CPPFLAGS += -MMD
+endif
 endif
 -include *.d
 
