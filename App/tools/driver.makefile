@@ -951,31 +951,25 @@ CPPSNCFLAGS1 += $(filter-out ${OP_SYS_INCLUDE_CPPFLAGS} ,${CPPFLAGS}) ${CPPSNCFL
 CPPSNCFLAGS1 += -I $(dir $(SNC))../../include
 SNCFLAGS += -r
 
-%$(OBJ) %_snl.dbd: %.st
+%.c %_snl.dbd: %.st
 	@echo "Preprocessing $(<F)"
 	$(RM) $(*F).i
 	$(CPP) ${CPPSNCFLAGS1} $< > $(*F).i
 	@echo "Converting $(*F).i"
 	$(RM) $@
 	$(SNC) $(TARGET_SNCFLAGS) $(SNCFLAGS) $(*F).i
-	@echo "Compiling $(*F).c"
-	$(RM) $@
-	$(COMPILE.c) ${SNC_CFLAGS} $(*F).c
 ifneq (${EPICS_BASETYPE},3.13)
 	@echo "Building $(*F)_snl.dbd"
 	awk -F [\(\)]  '/epicsExportRegistrar/ { print "registrar (" $$2 ")"}' $(*F).c > $(*F)_snl.dbd
 endif
 
-%$(OBJ) %_snl.dbd: %.stt
+%.c %_snl.dbd: %.stt
 	@echo "Preprocessing $(<F)"
 	$(RM) $(*F).i
 	$(CPP) ${CPPSNCFLAGS1} $< > $(*F).i
 	@echo "Converting $(*F).i"
 	$(RM) $@
 	$(SNC) $(TARGET_SNCFLAGS) $(SNCFLAGS) $(*F).i
-	@echo "Compiling $(*F).c"
-	$(RM) $@
-	$(COMPILE.c) ${SNC_CFLAGS} $(*F).c
 ifneq (${EPICS_BASETYPE},3.13)
 	@echo "Building $(*F)_snl.dbd"
 	awk -F [\(\)]  '/epicsExportRegistrar/ { print "registrar(" $$2 ")"}' $(*F).c > $(*F)_snl.dbd
