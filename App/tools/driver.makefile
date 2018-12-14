@@ -1070,6 +1070,11 @@ ifdef OLD_INCLUDE
 #	Check dependencies on old style driver headers.
 	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw -e ${PRJ} -e ^$$ >> $@ && echo "Warning: dependency on old style driver"; true;
 endif
+ifeq (${EPICS_BASETYPE},3.13)
+ifneq ($(strip $(filter %.st %.stt,$(SRCS))),)
+	@echo seq >> $@
+endif
+endif
 
 # Remove MakefileInclude after we are done because it interfers with our way to build.
 $(BUILDRULE)
