@@ -377,6 +377,8 @@ DOCUDIR = .
 #DOCU = $(foreach DIR,${DOCUDIR},$(wildcard ${DIR}/*README*) $(foreach EXT,${DOCUEXT}, $(wildcard ${DIR}/*.${EXT})))
 export DOCU
 
+export IGNORE_MODULES
+
 # Loop over all target architectures for third run.
 # Go to O.${T_A} subdirectory because RULES.Vx only work there:
 
@@ -528,8 +530,6 @@ SHRLIBS += $(foreach x, ${VAR_EXTENSIONS}, ${SHRLIBS_$x})
 export SHRLIBS
 
 export CFG
-
-export IGNORE_MODULES
 
 export USE_EXACT_VERSION += $(ABI_MAY_CHANGE)
 export USE_EXACT_MINOR_VERSION += $(ABI_MAY_CHANGE_BETWEEN_MINOR_VERSIONS)
