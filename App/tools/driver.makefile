@@ -339,8 +339,6 @@ ifndef T_A
 
 AUTOSRCS := $(filter-out ~%,$(wildcard *.c *.cc *.cpp *.st *.stt *.gt))
 SRCS = $(if ${SOURCES},$(filter-out -none-,${SOURCES}),${AUTOSRCS})
-#SRCS += ${SOURCES_${EPICS_BASETYPE}} # added later by VAR_EXTENSIONS
-#SRCS += ${SOURCES_${EPICSVERSION}}
 export SRCS
 
 DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard menu*.dbd *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
@@ -396,15 +394,6 @@ O.${EPICSVERSION}_$1:
 	$(LN) O.${EPICSVERSION}_$2 O.${EPICSVERSION}_$1
 endef 
 $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
-
-SRCS_Linux = ${SOURCES_Linux}
-SRCS_Linux += ${SOURCES_${EPICS_BASETYPE}_Linux}
-SRCS_Linux += ${SOURCES_Linux_${EPICS_BASETYPE}}
-export SRCS_Linux
-SRCS_vxWorks = ${SOURCES_vxWorks}
-SRCS_vxWorks += ${SOURCES_${EPICS_BASETYPE}_vxWorks}
-SRCS_vxWorks += ${SOURCES_vxWorks_${EPICS_BASETYPE}}
-export SRCS_vxWorks
 
 install build debug:: $(MAKE_FIRST)
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
