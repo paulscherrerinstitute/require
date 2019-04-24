@@ -988,12 +988,11 @@ MUNCH_6=tclsh $(VX_DIR)/host/resource/hutils/tcl/munch.tcl
 MUNCH_=$(MUNCH_5)
 # VXWORKS_MAJOR_VERSION exsists since EPICS 3.14.12 or so.
 MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
-%.munch: CMPLR=TRAD
 %.munch: %
 	@echo Munching $<
 	$(RM) ctct.o ctdt.c
 	$(NM) $< | $(MUNCH) > ctdt.c
-	$(COMPILE.c) ctdt.c
+	$(COMPILE.c) -traditional ctdt.c
 	$(LINK.c) $@ $< ctdt.o
 
 %_ctdt.c : %.nm
