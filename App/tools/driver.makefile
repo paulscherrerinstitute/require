@@ -632,11 +632,9 @@ PRODUCT_OBJS = ${LIBRARY_OBJS}
 # Linux
 LOADABLE_LIBRARY=$(if ${LIBRARY_OBJS},${PRJ},)
 
-# Hack needed needed for 3.14.8 host arch when no Makefile exists (but only for example GNUmakefile).
-ifeq (${EPICSVERSION}-${T_A},3.14.8-${EPICS_HOST_ARCH})
-ifeq ($(wildcard ../Makefile),)
+# Without this Linux library is not build in 3.14.8 if no Makefile exists (but e.g. GNUmakefile).
+ifeq (${EPICSVERSION},3.14.8)
 LOADABLE_BUILD_LIBRARY = ${LOADABLE_LIBRARY}
-endif
 endif
 
 # Handle registry stuff automagically if we have a dbd file.
@@ -801,6 +799,8 @@ INSTALL_LOADABLE_SHRLIBS=
 INSTALL_MUNCHS=
 include ${BASERULES}
 
+# restore overwritten commands
+MKDIR = mkdir -p -m 775
 # Fix incompatible release rules.
 RELEASE_DBDFLAGS = -I ${EPICS_BASE}/dbd
 RELEASE_INCLUDES = -I${EPICS_BASE}/include 
@@ -910,13 +910,13 @@ else ifeq (${EPICS_BASETYPE},3.13)
 # 3.13
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
 	@echo "Installing module template files $^ to $(@D)"
-	mkdir -p -m 775 $(@D)
+	$(MKDIR) $(@D)
 	for i in $^; do sed -r 's/\$$\{([^={]*)=[^}]*\}/$${\1}/g;s/\$$\(([^=(]*)=[^)]*\)/$$(\1)/g;s/(^|\))[ \t]*(alias|info)[ \t]*\(/#&/g' $$i > $(@D)/$$(basename $$i); done
 else
 # 3.14.9-
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
 	@echo "Installing module template files $^ to $(@D)"
-	mkdir -p -m 775 $(@D)
+	$(MKDIR) $(@D)
 	for i in $^; do sed -r 's/(^|\))[ \t]*alias[ \t]*/#&/g' $$i > $(@D)/$$(basename $$i); done
 endif
 
