@@ -634,7 +634,9 @@ LOADABLE_LIBRARY=$(if ${LIBRARY_OBJS},${PRJ},)
 
 # Without this Linux library is not build in 3.14.8 if no Makefile exists (but e.g. GNUmakefile).
 ifeq (${EPICSVERSION},3.14.8)
+ifeq ($(wildcard ../Makefile),)
 LOADABLE_BUILD_LIBRARY = ${LOADABLE_LIBRARY}
+endif
 endif
 
 # Handle registry stuff automagically if we have a dbd file.
