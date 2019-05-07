@@ -64,6 +64,11 @@ then
     fi
 fi
 
+if read BASE < EPICSVERSION || read BASE < cfg/EPICSVERSION
+then
+    unset EPICS_BASE
+fi 2> /dev/null   
+
 while true
 do
     case $1 in
