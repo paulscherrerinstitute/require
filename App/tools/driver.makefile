@@ -111,7 +111,7 @@ default: build
 IGNOREFILES = .cvsignore .gitignore
 %: ${IGNOREFILES}
 ${IGNOREFILES}:
-	@echo -e "O.*\n.cvsignore\n.gitignore" > $@
+	@echo -e "O.*\n.*ignore" > $@
 
 # Function that removes duplicates without re-ordering (unlike sort):
 define uniq
@@ -131,8 +131,12 @@ MISSING_EPICS_VERSIONS = $(filter-out ${BUILD_EPICS_VERSIONS},${EPICS_VERSIONS})
 BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
 $(foreach v,$(sort $(basename $(basename ${BUILD_EPICS_VERSIONS})) $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
 
+SUBMODULES:=$(foreach f,$(wildcard .gitmodules),$(shell awk '/^\[submodule/ { print gensub(/["\]]/,"","g",$$2) }' $f))
+
 # Check only version of files needed to build the module. But which are they?
-VERSIONCHECKFILES = $(filter-out /% -none-, $(wildcard *makefile* *Makefile* *.db *.template *.subs *.dbd *.cmd) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $($(filter SOURCES_% DBDS_%,${.VARIABLES})))
+VERSIONCHECKFILES = $(filter-out /% -none-, $(USERMAKEFILE) $(wildcard *.db *.template *.subs *.dbd *.cmd)
+VERSIONCHECKFILES += ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $($(filter SOURCES_% DBDS_%,${.VARIABLES})))
+VERSIONCHECKFILES += ${SUBMODULES}
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
 LIBVERSION = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
@@ -152,6 +156,7 @@ export OS_CLASS_LIST
 export ARCH_FILTER
 export EXCLUDE_ARCHS
 export MAKE_FIRST
+export SUBMODULES
 
 # Some shell commands:
 RMDIR = rm -rf
@@ -166,6 +171,8 @@ clean::
 
 clean.%::
 	$(RMDIR) $(wildcard O.*${@:clean.%=%}*)
+
+distclean: clean
 
 uninstall:
 	$(RMDIR) ${MODULE_LOCATION}
@@ -221,10 +228,18 @@ debug::
 	@echo "ARCH_FILTER = ${ARCH_FILTER}"
 	@echo "PRJ = ${PRJ}"
 
+prebuild: ${IGNOREFILES}
+
+ifneq ($(SUBMODULES),)
+prebuild: submodules
+submodules:
+	git submodule update --init --recursive
+endif
+
 # Loop over all EPICS versions for second run.
 MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION}
 
-build install debug:: ${IGNOREFILES}
+build install debug:: prebuild
 	@+for VERSION in ${BUILD_EPICS_VERSIONS}; do ${MAKEVERSION} EPICSVERSION=$$VERSION $@; done
 
 # Handle cases where user requests a group of EPICS versions:
@@ -232,10 +247,10 @@ build install debug:: ${IGNOREFILES}
 # make 3.13 or make 3.14 instead of make.
 
 define VERSIONRULES
-$(1): ${IGNOREFILES}
+$(1): prebuild
 	+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
 
-%.$(1): ${IGNOREFILES}
+%.$(1): prebuild
 	+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
 endef
 $(foreach v,$(sort $(basename $(basename ${INSTALLED_EPICS_VERSIONS})) $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIONRULES,$v)))
@@ -244,16 +259,16 @@ $(foreach v,$(sort $(basename $(basename ${INSTALLED_EPICS_VERSIONS})) $(basenam
 # make <action>.<version> instead of make <action> or
 # make <version> instead of make
 # EPICS version must be installed but need not be in EPICS_VERSIONS
-${INSTALLED_EPICS_VERSIONS}: ${IGNOREFILES}
+${INSTALLED_EPICS_VERSIONS}: prebuild
 	+${MAKEVERSION} EPICSVERSION=$@ build
 
-${INSTALLED_EPICS_VERSIONS:%=build.%}: ${IGNOREFILES}
+${INSTALLED_EPICS_VERSIONS:%=build.%}: prebuild
 	+${MAKEVERSION} EPICSVERSION=${@:build.%=%} build
 
-${INSTALLED_EPICS_VERSIONS:%=install.%}: ${IGNOREFILES}
+${INSTALLED_EPICS_VERSIONS:%=install.%}: prebuild
 	+${MAKEVERSION} EPICSVERSION=${@:install.%=%} install
 
-${INSTALLED_EPICS_VERSIONS:%=debug.%}: ${IGNOREFILES}
+${INSTALLED_EPICS_VERSIONS:%=debug.%}: prebuild
 	+${MAKEVERSION} EPICSVERSION=${@:debug.%=%} debug
 
 
@@ -395,7 +410,7 @@ O.${EPICSVERSION}_$1:
 endef 
 $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
-install build debug:: $(MAKE_FIRST)
+install build debug::
 	@echo "MAKING EPICS VERSION R${EPICSVERSION}"
 
 uninstall::
@@ -418,7 +433,7 @@ install build::
 	done
 
 # Loop over all architectures.
-install build debug::
+install build debug:: ${MAKE_FIRST}
 	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
 	    umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
