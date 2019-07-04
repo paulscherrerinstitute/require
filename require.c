@@ -467,9 +467,9 @@ static int setupDbPath(const char* module, const char* dbdir)
       EPICS_DB_INCLUDE_PATH   template path of all loaded modules (last in front after ".")
     */
 
-    putenvprintf("%s_DB=%s", module, absdir);
-    putenvprintf("%s_TEMPLATES=%s", module, absdir);
-    putenvprintf("TEMPLATES=%s", absdir);
+    putenvprintf("%s_DB=%s/", module, absdir);
+    putenvprintf("%s_TEMPLATES=%s/", module, absdir);
+    putenvprintf("TEMPLATES=%s/", absdir);
     pathAdd("EPICS_DB_INCLUDE_PATH", absdir);
     free(absdir);
     return 0;
