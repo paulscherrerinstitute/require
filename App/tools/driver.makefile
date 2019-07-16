@@ -390,8 +390,6 @@ DOCUDIR = .
 #DOCU = $(foreach DIR,${DOCUDIR},$(wildcard ${DIR}/*README*) $(foreach EXT,${DOCUEXT}, $(wildcard ${DIR}/*.${EXT})))
 export DOCU
 
-export IGNORE_MODULES
-
 # Loop over all target architectures for third run.
 # Go to O.${T_A} subdirectory because RULES.Vx only work there:
 
@@ -435,7 +433,7 @@ install build::
 # Loop over all architectures.
 install build debug:: ${MAKE_FIRST}
 	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-	    umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
+            umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; $(foreach v,$(filter IGNORE_MODULES%,${.VARIABLES}),$v=${$v}) ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
 else # T_A
@@ -463,6 +461,32 @@ install build:
 
 else
 
+# Add sources for specific epics types (3.13 or 3.14) or architectures.
+ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
+VAR_EXTENSIONS = ${EPICS_BASETYPE} ${EPICSVERSION} ${ARCH_PARTS} ${ARCH_PARTS:%=${EPICS_BASETYPE}_%} ${ARCH_PARTS:%=${EPICSVERSION}_%}
+export VAR_EXTENSIONS
+
+REQ = ${REQUIRED} $(foreach x, ${VAR_EXTENSIONS}, ${REQUIRED_$x})
+export REQ
+
+HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, ${HEADERS_$x})
+export HDRS
+
+SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
+USR_LIBOBJS += ${LIBOBJS} $(foreach x,${VAR_EXTENSIONS},${LIBOBJS_$x})
+export USR_LIBOBJS
+
+BINS += $(foreach x, ${VAR_EXTENSIONS}, ${BINS_$x})
+export BINS
+
+SHRLIBS += $(foreach x, ${VAR_EXTENSIONS}, ${SHRLIBS_$x})
+export SHRLIBS
+
+export CFG
+
+export USE_EXACT_VERSION += $(ABI_MAY_CHANGE)
+export USE_EXACT_MINOR_VERSION += $(ABI_MAY_CHANGE_BETWEEN_MINOR_VERSIONS)
+
 # Add include directory of other modules to include file search path.
 # By default use highest version of all other modules installed for
 # current EPICSVERSION and T_A.
@@ -476,8 +500,10 @@ else
 # Only accept numerical versions (needs extended glob).
 # This is slow, thus do it only once for each EPICSVERSION.
 
+IGNORE_MODULES+=$(foreach x, ${VAR_EXTENSIONS}, ${IGNORE_MODULES_$x})
+
 define ADD_OTHER_MODULE_INCLUDES
-$(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/../../include,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/../../include 2>/dev/null))))
+$(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/ 2>/dev/null))))
 export $(1)_VERSION
 OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
 endef
@@ -511,32 +537,6 @@ install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
 	@${MAKE} -C O.${EPICSVERSION}_${T_A} -f ../${USERMAKEFILE} $@
 
 endif
-
-# Add sources for specific epics types (3.13 or 3.14) or architectures.
-ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
-VAR_EXTENSIONS = ${EPICS_BASETYPE} ${EPICSVERSION} ${ARCH_PARTS} ${ARCH_PARTS:%=${EPICS_BASETYPE}_%} ${ARCH_PARTS:%=${EPICSVERSION}_%}
-export VAR_EXTENSIONS
-
-REQ = ${REQUIRED} $(foreach x, ${VAR_EXTENSIONS}, ${REQUIRED_$x})
-export REQ
-
-HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, ${HEADERS_$x})
-export HDRS 
-
-SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
-USR_LIBOBJS += ${LIBOBJS} $(foreach x,${VAR_EXTENSIONS},${LIBOBJS_$x})
-export USR_LIBOBJS
-
-BINS += $(foreach x, ${VAR_EXTENSIONS}, ${BINS_$x})
-export BINS
-
-SHRLIBS += $(foreach x, ${VAR_EXTENSIONS}, ${SHRLIBS_$x})
-export SHRLIBS
-
-export CFG
-
-export USE_EXACT_VERSION += $(ABI_MAY_CHANGE)
-export USE_EXACT_MINOR_VERSION += $(ABI_MAY_CHANGE_BETWEEN_MINOR_VERSIONS)
 
 else # in O.*
 ## RUN 4
@@ -1072,7 +1072,7 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	$(RM) $@
 	@echo "# Generated file. Do not edit." > $@
 #	Check dependencies on ${REQ} and other module headers.
-	$(foreach m,$(sort ${REQ} $(shell cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/.*%\1%p' | sort -u)),echo "$m $(or $(if $(strip $(wildcard ${EPICS_MODULES}/$m/use_exact_version)$(shell echo ${$m_VERSION}|sed 'y/0123456789./           /')),$(strip ${$m_VERSION}),$(basename ${$m_VERSION})),$(and $(wildcard ${EPICS_MODULES}/$m),$(error REQUIRED module $m has no numeric version. Set $m_VERSION)),$(warning REQUIRED module $m not found for ${T_A}.))" >> $@;)
+	$(foreach m,$(sort ${REQ} $(shell cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/.*%\1%p' | sort -u)),echo "$m $(or $(if $(strip $(wildcard ${EPICS_MODULES}/$m/use_exact_version)$(shell echo ${$m_VERSION}|sed 'y/0123456789./           /')),$(strip ${$m_VERSION}),$(addsuffix .,$(word 1,$(subst ., ,${$m_VERSION})))$(word 2,$(subst ., ,${$m_VERSION}))),$(and $(wildcard ${EPICS_MODULES}/$m),$(error No numeric version found for REQUIRED module "$m". For using a test version try setting $m_VERSION in your $(notdir $(USERMAKEFILE)))),$(error REQUIRED module "$m" not found for ${T_A}))" >> $@;)
 ifdef OLD_INCLUDE
 #	Check dependencies on old style driver headers.
 	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw -e ${PRJ} -e ^$$ >> $@ && echo "Warning: dependency on old style driver"; true;
