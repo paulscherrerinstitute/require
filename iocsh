@@ -403,17 +403,6 @@ if [ "$init" != NO ]
 then
     echo "iocInit"
 fi
-if [ "$SHELLBOX" ]
-then
-  PATH=$PATH:/home/ioc/bin
-  export BCAST_ADDR=$(/sbin/ifconfig | awk -F '[ :]+' '/Bcast/ {print $6; exit}')
-  echo "! rm -f /tmp/${IOC}.dbl"
-  echo 'dbl "","RTYP DESC" > /tmp/${IOC}.dbl'
-  echo "! dbl2odb.sh ${IOC} \"$BCAST_ADDR\" \"$EPICS_CA_SERVER_PORT\""
-  echo "! rm -f /tmp/${IOC}.libs"
-  echo "libversionShow > /tmp/${IOC}.libs"
-  echo "! upload_libinfo.py -i ${IOC} -l /tmp/${IOC}.libs"
-fi
 echo 'epicsEnvSet IOCSH_PS1,"${IOC}> "'
 } > $startup
 
