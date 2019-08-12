@@ -115,9 +115,19 @@ then
         EPICS_BASE=$(\ls -1vrd $EPICS/base/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
     else
         # find highest (requested) EPICS version that supports our architecture (or its 32 bit version)
-        EPICS_BASE=$(\ls -1vrd $EPICS/base-$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
+        EPICS_BASE=$(\ls -1vrd $EPICS/base-$BASE/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null)
+        if [ -z "$EPICS_BASE" ]
+        then
+            unset FILTER
+            if [ -f $EPICS/ignore ]
+            then
+                FILTER=$(echo "|grep -Ev '/base-($(sed < $EPICS/ignore -zr 's/\./\\./g;s/[ \t\r\n]+/|/g;s/\|$//'))/'")
+            fi
+            EPICS_BASE=$(eval \ls -1vrd $EPICS/base-$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null $FILTER | head -n1)
+        fi
+        
     fi
-    if [ -z $EPICS_BASE ]
+    if [ -z "$EPICS_BASE" ]
     then
         if [ -z "$(\ls -1vrd $EPICS/base-$BASE*/ 2>/dev/null)" ]
         then
