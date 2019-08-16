@@ -365,13 +365,14 @@ export DBD_SRCS
 RECORDS = $(filter %Record, $(basename $(notdir $(SRCS))))
 export RECORDS
 
-MENUS = $(patsubst %.dbd,%.h,$(wildcard menu*.dbd))
+MENUS = $(basename $(filter menu%.dbd, $(notdir $(DBDS))))
+MENUS += $(if ${DBDS}, $(shell awk '/^\s*include.*\<menu.*\.dbd\>/ {print gensub(/.*(menu.*)\.dbd.*/,"\\1","g")}' ${DBDS}))
 export MENUS
 
 BPTS = $(patsubst %.data,%.dbd,$(wildcard bpt*.data))
 export BPTS
 
-HDRS = ${HEADERS} ${RECORDS:%=${COMMON_DIR}/%.h}
+HDRS = ${HEADERS} ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
 HDRS += ${HEADERS_${EPICS_BASETYPE}}
 HDRS += ${HEADERS_${EPICSVERSION}}
 export HDRS
@@ -800,14 +801,15 @@ debug::
 	@echo "TEMPLS = ${TEMPLS}"
 	@echo "MODULE_LOCATION = ${MODULE_LOCATION}"
 
-# In 3.14.8- this is required to build %Record.h files
+# In 3.14.8- this is required to build %Record.h and menu%.h files
 ${BUILDRULE} ${RECORDS:%=${COMMON_DIR}/%.h}
+${BUILDRULE} ${MENUS:%=${COMMON_DIR}/%.h}
 ${BUILDRULE} MODULEINFOS
 ${BUILDRULE} ${MODULEDBD}
 ${BUILDRULE} ${DEPFILE}
 
-# In 3.15+ this is required to build %Record.h files
-COMMON_INC = ${RECORDS:%=${COMMON_DIR}/%.h}
+# In 3.15+ this is required to build %Record.h and menu%.h files
+COMMON_INC = ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
 
 # Include default EPICS Makefiles (version dependent).
 # Avoid library installation when doing 'make build'.
