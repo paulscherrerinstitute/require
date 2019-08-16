@@ -665,10 +665,7 @@ ifdef BASE_3_16
 ifndef USING_NEW_RSET
 SUPPRESS_RSET_WARNING = -DUSE_TYPED_RSET
 USR_CPPFLAGS += ${SUPPRESS_RSET_WARNING}
-%Record.o: SUPPRESS_RSET_WARNING=
-%Record.i: SUPPRESS_RSET_WARNING=
-%Record.ii: SUPPRESS_RSET_WARNING=
-%Record$(DEP): SUPPRESS_RSET_WARNING=
+%Record.o %Record.i %Record.ii %Record$(DEP): SUPPRESS_RSET_WARNING=-Wno-deprecated-declarations
 endif
 endif
 
