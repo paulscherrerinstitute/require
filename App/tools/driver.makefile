@@ -366,7 +366,7 @@ RECORDS = $(filter %Record, $(basename $(notdir $(SRCS))))
 export RECORDS
 
 MENUS = $(basename $(filter menu%.dbd, $(notdir $(DBDS))))
-MENUS += $(if ${DBDS}, $(shell awk '/^\s*include.*\<menu.*\.dbd\>/ {print gensub(/.*(menu.*)\.dbd.*/,"\\1","g")}' ${DBDS}))
+MENUS += $(basename $(notdir $(wildcard $(foreach m,$(if $(filter-out -none-,${DBDS}), $(shell awk '/^\s*include.*\<menu.*\.dbd\>/ {print gensub(/.*(menu.*\.dbd).*/,"\\1","g")}' $(filter-out -none-,${DBDS}))),$(addsuffix $m,$(sort $(dir $(DBDS))))))))
 export MENUS
 
 BPTS = $(patsubst %.data,%.dbd,$(wildcard bpt*.data))
