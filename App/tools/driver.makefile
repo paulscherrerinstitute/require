@@ -372,19 +372,23 @@ export MENUS
 BPTS = $(patsubst %.data,%.dbd,$(wildcard bpt*.data))
 export BPTS
 
-HDRS = ${HEADERS} ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
-HDRS += ${HEADERS_${EPICS_BASETYPE}}
-HDRS += ${HEADERS_${EPICSVERSION}}
+HDRS = ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
+HDRSX = ${HEADERS}
+HDRSX += ${HEADERS_${EPICS_BASETYPE}}
+HDRSX += ${HEADERS_${EPICSVERSION}}
+HDRS += $(filter-out $(realpath ${HDRSX:%=%/}),$(realpath ${HDRSX}))
 export HDRS
 
-TEMPLS = $(if ${TEMPLATES},$(filter-out -none-,${TEMPLATES}),$(wildcard *.template *.db *.subs))
-TEMPLS += ${TEMPLATES_${EPICS_BASETYPE}}
-TEMPLS += ${TEMPLATES_${EPICSVERSION}}
+TEMPLSX = $(if ${TEMPLATES},$(filter-out -none-,${TEMPLATES}),$(wildcard *.template *.db *.subs))
+TEMPLSX += ${TEMPLATES_${EPICS_BASETYPE}}
+TEMPLSX += ${TEMPLATES_${EPICSVERSION}}
+TEMPLS = $(filter-out $(realpath ${TEMPLSX:%=%/}),$(realpath ${TEMPLSX}))
 export TEMPLS
 
-SCR = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd))
-SCR += ${SCRIPTS_${EPICS_BASETYPE}}
-SCR += ${SCRIPTS_${EPICSVERSION}}
+SCRX = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd))
+SCRX += ${SCRIPTS_${EPICS_BASETYPE}}
+SCRX += ${SCRIPTS_${EPICSVERSION}}
+SCR = $(filter-out $(realpath ${SCRX:%=%/}),$(realpath ${SCRX}))
 export SCR
 
 DOCUDIR = .
