@@ -203,10 +203,11 @@ int runScript(const char* filename, const char* args)
         }
         if (runScriptDebug)
                 printf("runScript expanded line (%ld chars): '%s'\n", len, line_exp);
-        printf("%s\n", line_exp);
         p = line_exp;
         while (isspace((unsigned char)*p)) p++;
-        if (*p == 0 || *p == '#') continue;
+        if (p[0] != '#' || p[1] != '-')
+            printf("%s\n", line_exp);
+        if (p[0] == 0 || p[0] == '#') continue;
 
         /* find local variable assignments */
         if ((x = strpbrk(p, "=(, \t\n\r")) != NULL && *x=='=')
