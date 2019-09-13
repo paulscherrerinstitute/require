@@ -68,13 +68,13 @@ int runScript(const char* filename, const char* args)
     int status = 0;
     char* old_MODULE = NULL;
     char* old_MODULE_DIR = NULL;
-    
+
     if (!filename)
     {
         fprintf(stderr, "Usage: runScript filename [macro=value,...]\n");
         return -1;
     }
-    
+
     if (macCreateHandle(&mac,(
 #if (EPICSVER>=31501)
         const
@@ -98,7 +98,7 @@ int runScript(const char* filename, const char* args)
             *eq = 0;
             macPutValue(mac, var, eq+1);
         }
-        free(var);            
+        free(var);
     }
 #endif
 
@@ -109,10 +109,10 @@ int runScript(const char* filename, const char* args)
     /* expand macros (environment variables) in file name because vxWorks shell can't do it */
 #if (EPICSVER<31400)
     /* 3.13 version of macExpandString is broken and may write more than allowed */
-    while ((len = labs(macExpandString(mac, (char*)filename, line_exp, 
+    while ((len = labs(macExpandString(mac, (char*)filename, line_exp,
             line_exp_size/2))) >= line_exp_size/2)
 #else       
-    while ((len = labs(macExpandString(mac, filename, line_exp, 
+    while ((len = labs(macExpandString(mac, filename, line_exp,
             line_exp_size-1))) >= line_exp_size-2)
 #endif
     {
@@ -145,7 +145,7 @@ int runScript(const char* filename, const char* args)
         char* fullname;
         const char* path = getenv("SCRIPT_PATH");
         int dirlen;
-        
+
         for (dirname = path; dirname != NULL; dirname = end)
         {
             end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
@@ -155,7 +155,7 @@ int runScript(const char* filename, const char* args)
             else dirlen = (int)strlen(dirname);
             if (dirlen == 0) continue; /* ignore empty path elements */
             if (dirname[dirlen-1] == OSI_PATH_SEPARATOR[0]) dirlen--;
-            asprintf(&fullname, "%.*s" OSI_PATH_SEPARATOR "%s", 
+            asprintf(&fullname, "%.*s" OSI_PATH_SEPARATOR "%s",
                 dirlen, dirname, filename);
             if (runScriptDebug)
                 printf("runScript: trying %s\n", fullname);
@@ -166,7 +166,7 @@ int runScript(const char* filename, const char* args)
         }
     }
     if (file == NULL) { perror(filename); return errno; }
-    
+
     /* save some environments variables */
     SAVEENV(MODULE);
     SAVEENV(MODULE_DIR);
@@ -188,7 +188,7 @@ int runScript(const char* filename, const char* args)
         if (runScriptDebug)
                 printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
-        while ((len = labs(macExpandString(mac, line_raw, line_exp, 
+        while ((len = labs(macExpandString(mac, line_raw, line_exp,
 #if (EPICSVER<31400)
         /* 3.13 version of macExpandString is broken and may write more than allowed */
                 line_exp_size/2))) >= line_exp_size/2)
@@ -207,7 +207,7 @@ int runScript(const char* filename, const char* args)
         p = line_exp;
         while (isspace((unsigned char)*p)) p++;
         if (*p == 0 || *p == '#') continue;
-        
+
         /* find local variable assignments */
         if ((x = strpbrk(p, "=(, \t\n\r")) != NULL && *x=='=')
         {
@@ -280,7 +280,7 @@ void afterInitHook(initHookState state)
 {
     struct cmditem *item;
 
-    if (state != 
+    if (state !=
 #ifdef INCinitHooksh
         /* old: without iocPause etc */
         initHookAfterInterruptAccept
@@ -317,7 +317,7 @@ static struct cmditem *newItem(char* cmd, int type)
     {
         fprintf(stderr, "afterInit can only be used before iocInit\n");
         return NULL;
-    } 
+    }
     if (first_time)
     {
         first_time = 0;
@@ -340,7 +340,7 @@ int afterInit(char* cmd, char* a1, char* a2, char* a3, char* a4, char* a5, char*
 {
     struct cmditem *item = newItem(cmd, 0);
     if (!item) return -1;
-    
+
     item->x.a[0] = cmd;
     item->x.a[1] = a1;
     item->x.a[2] = a2;
@@ -365,7 +365,7 @@ static const iocshFuncDef runScriptDef = {
         &(iocshArg) { "filename", iocshArgString },
         &(iocshArg) { "substitutions", iocshArgString },
 }};
-    
+
 static void runScriptFunc(const iocshArgBuf *args)
 {
     runScript(args[0].sval, args[1].sval);
@@ -375,7 +375,7 @@ static const iocshFuncDef afterInitDef = {
     "afterInit", 1, (const iocshArg *[]) {
         &(iocshArg) { "commandline", iocshArgArgv },
 }};
-    
+
 static void afterInitFunc(const iocshArgBuf *args)
 {
     int i, n;
