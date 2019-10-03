@@ -49,7 +49,7 @@ version () {
 # realpath and readlink are not available on all systems, let's try what works...
 rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || (cd -P $1 && echo $PWD) || (x=$(\ls -ld $1) && echo ${x##* }) || echo $1 ) 2>/dev/null
-}    
+}
 
 # if EPICS_HOST_ARCH is not set guess it
 if [ -z "$EPICS_HOST_ARCH" ]
@@ -67,7 +67,7 @@ fi
 if read BASE < EPICSVERSION || read BASE < cfg/EPICSVERSION
 then
     unset EPICS_BASE
-fi 2> /dev/null   
+fi 2> /dev/null
 
 while true
 do
@@ -125,7 +125,6 @@ then
             fi
             EPICS_BASE=$(eval \ls -1vrd $EPICS/base-$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null $FILTER | head -n1)
         fi
-        
     fi
     if [ -z "$EPICS_BASE" ]
     then
@@ -153,6 +152,11 @@ then
     exit 1
 fi
 
+case $(uname) in
+    ( Darwin ) LIBPREFIX=lib; LIBPOSTFIX=.dylib;;
+    ( * )      LIBPREFIX=lib; LIBPOSTFIX=.so;;
+esac
+
 # Get actual EPICS revision
 if [ -f $EPICS_BASE/configure/CONFIG_BASE_VERSION ]
 then
@@ -162,9 +166,9 @@ then
         /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2+0}
         END {print "BASE="v"."r"."m";BASECODE="v*10000+r*100+m}
     ' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
-elif [ -f $EPICS_BASE/lib/$EPICS_HOST_ARCH/libCom.so ]
+elif [ -f $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX ]
 then
-    eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/libCom.so | awk -F'[.R-]' '
+    eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | awk -F'[.R-]' '
         /EPICS R[0-9]/ {print "BASE="$2"."$3"."$4";BASECODE="$2*10000+$3*100+$4 }')
 else
     echo "Cannot guess EPICS base version." >&2
@@ -208,12 +212,12 @@ export INSTBASE
 
 # convert for win32-x86 arch
 if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
-then 
+then
     EPICS_DRIVER_PATH=$(cygpath -wp $EPICS_DRIVER_PATH)
     DBD=$(cygpath -wp $DBD)
 fi
 if [ ${EPICS_HOST_ARCH#cygwin-} != $EPICS_HOST_ARCH ]
-then 
+then
     DBD=$(cygpath -wp $DBD)
 fi
 export EPICS_DRIVER_PATH
@@ -237,7 +241,7 @@ do
     ( -v | -ver | --ver | -version | --version )
         version
         ;;
-    ( @* )              
+    ( @* )
         loadFiles $(cat ${file#@})
         ;;
     ( -d | -dg | --debug )
@@ -249,7 +253,7 @@ do
     ( -dp )
         LOADER="perf record $LOADER"
         ;;
-    ( -c )               
+    ( -c )
         shift
         case $1 in
         ( seq* )
@@ -274,7 +278,7 @@ do
         fi
         echo "seq $1"
         ;;
-    ( -r )               
+    ( -r )
         shift
         echo "require $1"
         ;;
@@ -287,7 +291,7 @@ do
         echo "Try: $(basename $0) --help" >&2
         exit 1
        ;;
-    ( *.so )
+    ( *$LIBPOSTFIX )
         if [ "$BASECODE" -ge 31412 ]
         then
             echo "dlload \"$file\""
@@ -352,9 +356,6 @@ for var in IOC PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER
 do
     echo "# $var=\"${!var}\""
 done
-
-LIBPREFIX=lib
-LIBPOSTFIX=.so
 
 if [ -d $EPICS_MODULES/${REQUIRE:=require} ]
 then # new module pool model
@@ -423,7 +424,7 @@ then
 fi
 
 if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH -o ${EPICS_HOST_ARCH#cygwin-} != $EPICS_HOST_ARCH ]
-then 
+then
     PATH=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH:$EPIC_BASE/bin/$EPICS_HOST_ARCH:$EPICS_BASE/../seq/bin/$EPICS_HOST_ARCH:$PATH
 fi
 
