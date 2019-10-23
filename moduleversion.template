@@ -4,6 +4,7 @@ record (waveform, "$(IOC):MODULES")
     field (FTVL, "STRING")
     field (NELM, "$(MODULE_COUNT)")
     field (PINI, "YES")
+    field (ASG,  "READONLY")
 }
 
 record (waveform, "$(IOC):VERSIONS")
@@ -12,6 +13,7 @@ record (waveform, "$(IOC):VERSIONS")
     field (FTVL, "STRING")
     field (NELM, "$(MODULE_COUNT)")
     field (PINI, "YES")
+    field (ASG,  "READONLY")
 }
 
 record (waveform, "$(IOC):MOD_VER")
@@ -20,6 +22,7 @@ record (waveform, "$(IOC):MOD_VER")
     field (FTVL, "CHAR")
     field (NELM, "$(BUFFER_SIZE)")
     field (PINI, "YES")
+    field (ASG,  "READONLY")
 }
 
 record (stringin, "$(IOC):$(MODULE)_VER")
@@ -27,4 +30,5 @@ record (stringin, "$(IOC):$(MODULE)_VER")
     field (DESC, "Module $(MODULE) version")
     field (VAL,  "$(VERSION)")
     field (PINI, "YES")
+    field (ASG,  "READONLY")
 }
