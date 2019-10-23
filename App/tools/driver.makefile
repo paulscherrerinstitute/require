@@ -134,7 +134,7 @@ $(foreach v,$(sort $(basename $(basename ${BUILD_EPICS_VERSIONS})) $(basename ${
 SUBMODULES:=$(foreach f,$(wildcard .gitmodules),$(shell awk '/^\[submodule/ { print gensub(/["\]]/,"","g",$$2) }' $f))
 
 # Check only version of files needed to build the module. But which are they?
-VERSIONCHECKFILES = $(filter-out /% -none-, $(USERMAKEFILE) $(wildcard *.db *.template *.subs *.dbd *.cmd)
+VERSIONCHECKFILES = $(filter-out /% -none-, $(USERMAKEFILE) $(wildcard *.db *.template *.subs *.dbd *.cmd *.iocsh)
 VERSIONCHECKFILES += ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $($(filter SOURCES_% DBDS_%,${.VARIABLES})))
 VERSIONCHECKFILES += ${SUBMODULES}
 VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
@@ -197,7 +197,7 @@ help:
 	@echo "  DBDS             (*.dbd)"
 	@echo "  HEADERS          () [only those to install]"
 	@echo "  TEMPLATES        (*.template *.db *.subs) [db files]"
-	@echo "  SCRIPTS          (*.cmd) [startup and other scripts]"
+	@echo "  SCRIPTS          (*.cmd *.iocsh) [startup and other scripts]"
 	@echo "  BINS             () [programs to install]"
 	@echo "  SHRLIBS          () [extra shared libraries to install]"
 	@echo "  QT               (qt/*) [QT user interfaces to install]"
@@ -385,7 +385,7 @@ TEMPLSX += ${TEMPLATES_${EPICSVERSION}}
 TEMPLS = $(filter-out $(realpath ${TEMPLSX:%=%/}),$(realpath ${TEMPLSX}))
 export TEMPLS
 
-SCRX = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd))
+SCRX = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd *.iocsh))
 SCRX += ${SCRIPTS_${EPICS_BASETYPE}}
 SCRX += ${SCRIPTS_${EPICSVERSION}}
 SCR = $(filter-out $(realpath ${SCRX:%=%/}),$(realpath ${SCRX}))

@@ -1365,7 +1365,7 @@ static int require_priv(const char* module, const char* version, const char* arg
 
             dirlen += strlen(OSI_PATH_SEPARATOR);
             /* filename = "<dirname>/[dirlen]" */
-            
+
             snprintf(filename+dirlen, sizeof(filename)-dirlen, "%s" OSI_PATH_SEPARATOR "%n", module, &modulediroffs);
             modulediroffs += dirlen;
             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
@@ -1647,22 +1647,40 @@ loadlib:
     if (requireDebug)
         printf("require: looking for startup script\n");
     /* filename = "<dirname>/<module>/<version>/R<epicsRelease>/[releasediroffs]db" */
-    if (TRY_FILE(releasediroffs, "%s-%s.cmd", targetArch, epicsRelease) ||
+    if (TRY_FILE(releasediroffs, "%s-%s.iocsh", targetArch, epicsRelease) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", targetArch, epicsRelease) ||
+        TRY_FILE(releasediroffs, "%s-%s.cmd", targetArch, epicsRelease) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", targetArch, epicsRelease) ||
+        TRY_FILE(releasediroffs, "%s-%s.iocsh", targetArch, epicsBasetype) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", targetArch, epicsBasetype) ||
         TRY_FILE(releasediroffs, "%s-%s.cmd", targetArch, epicsBasetype) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", targetArch, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "%s-%s.iocsh", osClass, epicsRelease) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", osClass, epicsRelease) ||
         TRY_FILE(releasediroffs, "%s-%s.cmd", osClass, epicsRelease) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", osClass, epicsRelease) ||
+        TRY_FILE(releasediroffs, "%s-%s.iocsh", osClass, epicsBasetype) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", osClass, epicsBasetype) ||
         TRY_FILE(releasediroffs, "%s-%s.cmd", osClass, epicsBasetype) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", osClass, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "startup-%s.iocsh", epicsRelease) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.iocsh", epicsRelease) ||
         TRY_FILE(releasediroffs, "startup-%s.cmd", epicsRelease) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.cmd", epicsRelease) ||
+        TRY_FILE(releasediroffs, "startup-%s.iocsh", epicsBasetype) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.iocsh", epicsBasetype) ||
         TRY_FILE(releasediroffs, "startup-%s.cmd", epicsBasetype) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.cmd", epicsBasetype) ||
+        TRY_FILE(releasediroffs, "%s.iocsh", targetArch) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.iocsh", targetArch) ||
         TRY_FILE(releasediroffs, "%s.cmd", targetArch) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", targetArch) ||
+        TRY_FILE(releasediroffs, "%s.iocsh", osClass) ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.iocsh", osClass) ||
         TRY_FILE(releasediroffs, "%s.cmd", osClass) ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", osClass) ||
+        TRY_FILE(releasediroffs, "startup.iocsh") ||
+        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup.iocsh") ||
         TRY_FILE(releasediroffs, "startup.cmd") ||
         TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup.cmd")
         )
