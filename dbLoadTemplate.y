@@ -363,13 +363,16 @@ static int yyerror(char* str)
 
 static int is_not_inited = 1;
 
+#ifndef vxWorks
+#define dbLoadTemplate __dbLoadTemplate
+#endif
+
 int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *path)
 {
     FILE *fp;
     int i;
 
     line_num = 1;
-    
     if (!sub_file || !*sub_file) {
         fprintf(stderr, "must specify variable substitution file\n");
         return -1;
@@ -388,7 +391,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
         char* filename;
 
         if (!path || !*path) {
-	    path = getenv("EPICS_DB_INCLUDE_PATH");
+        path = getenv("EPICS_DB_INCLUDE_PATH");
         }
         for(dirname = path; dirname != NULL; dirname = end) {
             end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
@@ -466,12 +469,6 @@ static const iocshFuncDef dbLoadTemplateDef = {
         &(iocshArg) { "\"macro=value,...\"", iocshArgString },
         &(iocshArg) { "searchpath", iocshArgString },
 }};
-
-#ifdef __GNUC__
-/* Without this I always get the original dbLoadTemplate linked instead of my version */
-int __dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *path) __attribute__ ((alias ("dbLoadTemplate")));
-#define dbLoadTemplate __dbLoadTemplate
-#endif
 
 static void dbLoadTemplateFunc(const iocshArgBuf *args)
 {
