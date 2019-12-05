@@ -8,6 +8,7 @@ help () {
     echo "Options:"
     echo " -?, -h, --help  Show this page and exit."
     echo " -v, --version   Show version and exit."
+    echo " -win            Run Windows softIOC via WINE."
     echo " -32             Force 32 bit version (on 64 bit systems)."
     echo " -x[.z[.y]]      Select EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7)."
     echo " -d, --debug     Run IOC with gdb."
@@ -51,6 +52,15 @@ rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || (cd -P $1 && echo $PWD) || (x=$(\ls -ld $1) && echo ${x##* }) || echo $1 ) 2>/dev/null
 }
 
+# convert unix path to windows path
+unix2win() {
+    # add z: prefix to absolute path
+    p=${1/#\//z:\//}
+    # replace '/' with '\'
+    p=${p//\//\\\\}
+    echo $1
+}
+
 # if EPICS_HOST_ARCH is not set guess it
 if [ -z "$EPICS_HOST_ARCH" ]
 then
@@ -72,6 +82,9 @@ fi 2> /dev/null
 while true
 do
     case $1 in
+        ( -win )
+            EPICS_HOST_ARCH=windows-x64
+        ;;
         ( -32 )
             EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
         ;;
@@ -153,8 +166,16 @@ then
 fi
 
 case $(uname) in
-    ( Darwin ) LIBPREFIX=lib; LIBPOSTFIX=.dylib;;
-    ( * )      LIBPREFIX=lib; LIBPOSTFIX=.so;;
+    ( Darwin )
+        LIBPREFIX=lib; LIBPOSTFIX=.dylib
+    ;;
+    ( * )      
+        LIBPREFIX=lib; LIBPOSTFIX=.so; EXEPOSTFIX=
+        # assume we need to run Windows softIoc on UNIX via WINE
+        if [[ "$EPICS_HOST_ARCH" == win* ]]; then
+            LIBPREFIX=; LIBPOSTFIX=.dll; EXEPOSTFIX=.exe
+        fi
+    ;;
 esac
 
 # Get actual EPICS revision
@@ -369,14 +390,14 @@ fi
 
 if [ "$BASECODE" -ge 31412 ]
 then
-    if [ -x $EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA ]
+    if [ -x $EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX ]
     then
-        EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA
+        EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
         echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
         echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
     else
-        EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc
+        EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
     fi
     LDCMD="dlload"
@@ -392,7 +413,19 @@ else
     echo "${APP}_registerRecordDeviceDriver(pdbbase)"
 fi
 
-if [ ! -x $EXE ]
+# use WINE to run softIo, and convert EPICS_DRIVER_PATH to windows format
+if [[ $EXEPOSTFIX == ".exe" ]]
+then
+    LOADER="wine"
+    EPICS_DRIVER_PATH_WIN=
+    IFS=:
+    for p in $EPICS_DRIVER_PATH; do
+        EPICS_DRIVER_PATH_WIN="$EPICS_DRIVER_PATH_WIN;$(unix2win $p)"
+    done
+    EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH_WIN#;}
+fi
+
+if [ ! -x $EXE ];
 then
     echo "$EXE not found or not executable." >&2
     exit 1
