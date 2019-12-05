@@ -8,7 +8,7 @@
 * DISCLAIMER: Use at your own risc and so on. No warranty, no refund.
 */
 
-#ifdef __unix
+#ifdef UNIX
 /* for vasprintf and dl_iterate_phdr */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -24,6 +24,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <recSup.h>
 #include <initHooks.h>
 #include <osiFileName.h>
@@ -138,7 +139,7 @@ int requireDebug;
         return buf;
     }
 
-#elif defined(__unix)
+#elif defined(UNIX)
 
     #ifndef OS_CLASS
         #ifdef __linux
@@ -179,6 +180,10 @@ int requireDebug;
         #define PREFIX
         #define INFIX
         #define EXT ".dll"
+    #elif defined(darwin)
+        #define PREFIX "lib"
+        #define INFIX
+        #define EXT ".dylib"
     #else
         #define PREFIX "lib"
         #define INFIX
@@ -288,7 +293,7 @@ static HMODULE loadlib(const char* libname)
         return NULL;
     }
 
-#if defined (__unix)
+#if defined (UNIX)
     if ((libhandle = dlopen(libname, RTLD_NOW|RTLD_GLOBAL)) == NULL)
     {
         fprintf (stderr, "Loading %s library failed: %s\n",
