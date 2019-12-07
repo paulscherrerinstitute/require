@@ -119,6 +119,18 @@ define uniq
   $(foreach _,$1,$(if $(filter $_,${seen}),,$(eval seen += $_))) \
   ${seen}
 endef
+# Function that removes directories from list
+define filter_out_dir
+   $(shell perl -e 'foreach my $$x (qw($1)) {if(-f "$$x") {print "$$x "}}')
+endef
+# Function that retains the certian portion of the header file path
+# and then used as the subdirectory inside INSTALL_INCLUDE
+#   param 1 - list of header files, "src/os/Linux/jconfig.h src/pv.h src/os/default/jpeglib.h"
+#   param 2 - pattern "os/${OS_CLASS}/|os/default/"
+#   return - file path with pattern retained, "os/Linux/jconfig.h pv.h os/default/jpeglib.h"
+define os_include_dir
+  $(shell perl -e 'use File::Basename;foreach my $$x (qw($1)) { if ($$x =~ m[($2)(.*)]) {print "$$1$$2 ";} else {print(basename("$$x")," ");}}')
+endef
 
 ifndef EPICSVERSION
 ## RUN 1
@@ -340,7 +352,6 @@ CMPLR=STD
 GCC_STD = $(GCC)
 CXXCMPLR=ANSI
 G++_ANSI = $(G++) -ansi
-OBJ=.o
 
 ifndef T_A
 ## RUN 2
@@ -376,19 +387,19 @@ HDRS = ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
 HDRSX = ${HEADERS}
 HDRSX += ${HEADERS_${EPICS_BASETYPE}}
 HDRSX += ${HEADERS_${EPICSVERSION}}
-HDRS += $(filter-out $(realpath ${HDRSX:%=%/}),$(realpath ${HDRSX}))
+HDRS += $(call filter_out_dir,$(realpath ${HDRSX}))
 export HDRS
 
 TEMPLSX = $(if ${TEMPLATES},$(filter-out -none-,${TEMPLATES}),$(wildcard *.template *.db *.subs))
 TEMPLSX += ${TEMPLATES_${EPICS_BASETYPE}}
 TEMPLSX += ${TEMPLATES_${EPICSVERSION}}
-TEMPLS = $(filter-out $(realpath ${TEMPLSX:%=%/}),$(realpath ${TEMPLSX}))
+TEMPLS = $(call filter_out_dir,$(realpath ${TEMPLSX}))
 export TEMPLS
 
 SCRX = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd *.iocsh))
 SCRX += ${SCRIPTS_${EPICS_BASETYPE}}
 SCRX += ${SCRIPTS_${EPICSVERSION}}
-SCR = $(filter-out $(realpath ${SCRX:%=%/}),$(realpath ${SCRX}))
+SCR = $(call filter_out_dir,$(realpath ${SCRX}))
 export SCR
 
 DOCUDIR = .
@@ -511,6 +522,8 @@ define ADD_OTHER_MODULE_INCLUDES
 $(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/ 2>/dev/null))))
 export $(1)_VERSION
 OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
+OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/default 2>/dev/null)))
+OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/${OS_CLASS} 2>/dev/null)))
 endef
 $(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
 # Include path for old style modules.
@@ -661,7 +674,7 @@ endif
 
 # Handle registry stuff automagically if we have a dbd file.
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
-LIBOBJS += $(if $(MODULEDBD), $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} ${EXPORTFILE})))
+LIBOBJS += $(if $(MODULEDBD), $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} $(if $(filter WIN32,${OS_CLASS}),,${EXPORTFILE}))))
 
 ifdef BASE_3_16
 # Suppress "'rset' is deprecated" warning for old drivers
@@ -716,7 +729,9 @@ HDEPENDS_COMPFLAGS = -c
 CPPFLAGS += -MD
 else
 ifdef HDEPENDS
+ifneq (${OS_CLASS},WIN32)
 CPPFLAGS += -MMD
+endif
 endif
 endif
 -include *.d
@@ -819,6 +834,11 @@ INSTALL_LOADABLE_SHRLIBS=
 INSTALL_MUNCHS=
 include ${BASERULES}
 
+ifeq (${OS_CLASS},WIN32) # explicitly link required dependencies
+LIB_LIBS += ${EPICS_BASE_IOC_LIBS} ${REQ}
+endif
+SHRLIB_SEARCH_DIRS += ${EPICS_BASE}/lib/${T_A}
+$(foreach m,${REQ},$(eval ${m}_DIR=${EPICS_MODULES}/${m}/${${m}_VERSION}/R${EPICSVERSION}/lib/${T_A}))
 # restore overwritten commands
 MKDIR = mkdir -p -m 775
 # Fix incompatible release rules.
@@ -864,9 +884,12 @@ ${MODULEDBD}: ${DBDFILES}
 
 # Install everything.
 INSTALL_LIBS = $(addprefix ${INSTALL_LIB}/,${MODULELIB} $(notdir ${SHRLIBS}))
+ifeq (${OS_CLASS},WIN32) # .lib for WIN32 is also required for linking
+INSTALL_LIBS += $(addprefix ${INSTALL_LIB}/,${LIB_PREFIX}${PRJ}${LIB_SUFFIX})
+endif
 INSTALL_DEPS = ${DEPFILE:%=${INSTALL_LIB}/%}
 INSTALL_DBDS = ${MODULEDBD:%=${INSTALL_DBD}/%}
-INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(notdir ${HDRS}))
+INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(call os_include_dir,${HDRS},os/default/|os/${OS_CLASS}/))
 INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
 INSTALL_SCRS = $(addprefix ${INSTALL_SCR}/,$(notdir ${SCR}))
 INSTALL_BINS = $(addprefix ${INSTALL_BIN}/,$(notdir ${BINS}))
@@ -1012,7 +1035,8 @@ MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
 	$(MUNCH) < $< > $@ 
 
 ${VERSIONFILE}:
-	echo "char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
+	echo "#include <epicsExport.h>" >> $@
+	echo "epicsShareExtern char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
 
 # EPICS R3.14+:
 # Create file to fill registry from dbd file.
