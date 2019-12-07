@@ -18,6 +18,7 @@ DBDS    += dbLoadTemplate.dbd
 
 SOURCES_T2 += strdup.c
 SOURCES_vxWorks   += asprintf.c
+SOURCES_WIN32 += asprintf.c
 HEADERS += strdup.h asprintf.h
 HEADERS += require.h
 
