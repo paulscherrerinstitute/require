@@ -45,8 +45,6 @@ epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #include <epicsExport.h>
 #endif
 
-#define IS_ABS_PATH(filename) (filename[0] == OSI_PATH_SEPARATOR[0])  /* may be different for other OS ? */
-
 #include "expr.h"
 #include "require.h"
 
@@ -54,6 +52,24 @@ epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
 #define RESTOREENV(var) do { if(old_##var) { putenvprintf("%s=%s", #var, old_##var); free(old_##var); }} while(0)
 
 int runScriptDebug=0;
+
+int isAbsPath(const char* filename)
+{
+#ifdef _WIN32
+    /* network path, e.g. "\\x03ma\gac-x03ma\Data1" */
+    if (strncmp(filename, "\\\\", 2) == 0)
+        return 1;
+    /* driver letter, e.g. "C:\Temp" */
+    else if (strlen(filename) > 3
+            && ((filename[0]>='a'&&filename[0]<='z') || (filename[0]>='A'&&filename[0]<='Z'))
+            && strncmp(filename+1, ":\\", 2) == 0)
+        return 1;
+    else
+        return 0;
+#else
+    return filename[0] == OSI_PATH_SEPARATOR[0] ? 1 : 0;
+#endif
+}
 
 int runScript(const char* filename, const char* args)
 {
@@ -134,7 +150,7 @@ int runScript(const char* filename, const char* args)
         free(pairs);
     }
 
-    if (IS_ABS_PATH(filename))
+    if (isAbsPath(filename))
     {
         file = fopen(filename, "r");
     }
