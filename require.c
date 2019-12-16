@@ -127,12 +127,12 @@ int requireDebug;
         size_t len = 0;
         if (!buf) buf = malloc(PATH_MAX+1);
         if (!buf) return NULL;
-        if (path[0] != OSI_PATH_SEPARATOR[0])
+        if (path[0] != '/')
         {
             getcwd(buf, PATH_MAX);
             len = strlen(buf);
-            if (len && buf[len-1] != OSI_PATH_SEPARATOR[0])
-                buf[len++] = OSI_PATH_SEPARATOR[0];
+            if (len && buf[len-1] != '/')
+                buf[len++] = '/';
         }
         strcpy(buf+len, path);
         return buf;
@@ -209,6 +209,7 @@ int requireDebug;
     static char* realpath(const char* path, char* buffer)
     {
         int len = MAX_PATH;
+        char *p;
         if (buffer == NULL)
         {
             len = GetFullPathName(path, 0, NULL, NULL);
@@ -217,6 +218,10 @@ int requireDebug;
             if (buffer == NULL) return NULL;
         }
         GetFullPathName(path, len, buffer, NULL);
+        /* convert '\' to '/' */
+        p = buffer;
+        while ((p = strchr(p, '\\')) != NULL) *p = '/';
+
         return buffer;
     }
 
@@ -256,8 +261,8 @@ int requireDebug;
 
 #endif
 
-#define LIBDIR "lib" OSI_PATH_SEPARATOR
-#define TEMPLATEDIR "db" OSI_PATH_SEPARATOR
+#define LIBDIR "lib/"
+#define TEMPLATEDIR "db/"
 
 #define TOSTR(s) TOSTR2(s)
 #define TOSTR2(s) #s
@@ -611,9 +616,9 @@ void registerModule(const char* module, const char* version, const char* locatio
         if (!abslocation) abslocation = (char*)location;
         ll = strlen(abslocation) + 1;
         /* linux realpath removes trailing slash */
-        if (abslocation[ll-1-strlen(OSI_PATH_SEPARATOR)] != OSI_PATH_SEPARATOR[0])
+        if (abslocation[ll-2] != '/')
         {
-            addSlash = strlen(OSI_PATH_SEPARATOR);
+            addSlash = 1;
         }
     }
     m = (moduleitem*) malloc(sizeof(moduleitem) + lm + lv + ll + addSlash);
@@ -626,7 +631,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     strcpy (m->content, module);
     strcpy (m->content+lm, version);
     strcpy (m->content+lm+lv, abslocation ? abslocation : "");
-    if (addSlash) strcpy (m->content+lm+lv+ll-1, OSI_PATH_SEPARATOR);
+    if (addSlash) strcpy (m->content+lm+lv+ll-1, "/");
     if (abslocation != location) free(abslocation);
     for (pm = &loadedModules; *pm != NULL; pm = &(*pm)->next);
     *pm = m;
@@ -649,7 +654,7 @@ void registerModule(const char* module, const char* version, const char* locatio
     /* create a record with the version string */
     mylocation = getenv("require_DIR");
     if (mylocation == NULL) return;
-    if (asprintf(&abslocation, "%s" OSI_PATH_SEPARATOR "db" OSI_PATH_SEPARATOR "moduleversion.template", mylocation) < 0) return;
+    if (asprintf(&abslocation, "%s/db/moduleversion.template", mylocation) < 0) return;
     if (asprintf(&argstring, "IOC=%.30s, MODULE=%.24s, VERSION=%.39s, MODULE_COUNT=%lu, BUFFER_SIZE=%lu",
         getenv("IOC"), module, version, moduleCount,
         moduleListBufferSize+maxModuleNameLength*moduleCount) < 0) return;
@@ -1301,7 +1306,7 @@ static int require_priv(const char* module, const char* version, const char* arg
         dirname = getLibLocation(module);
         if (requireDebug && dirname[0])
             printf("require: library found in %s\n", dirname);
-        snprintf(filename, sizeof(filename), "%s%n.." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "use_exact_version",
+        snprintf(filename, sizeof(filename), "%s%n../../use_exact_version",
             dirname, &releasediroffs);
         if (fileExists(filename))
         {
@@ -1309,7 +1314,7 @@ static int require_priv(const char* module, const char* version, const char* arg
         }
         else
         {
-            snprintf(filename+releasediroffs, sizeof(filename)-releasediroffs, ".." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "use_exact_minor_version");
+            snprintf(filename+releasediroffs, sizeof(filename)-releasediroffs, "../../use_exact_minor_version");
             if (fileExists(filename))
                 exactnessLevel = 1;
         }
@@ -1352,7 +1357,7 @@ static int require_priv(const char* module, const char* version, const char* arg
             DIR_ENTRY direntry;
 
             end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
-            if (end && end[1] == OSI_PATH_SEPARATOR[0] && end[2] == OSI_PATH_SEPARATOR[0])   /* "http://..." and friends */
+            if (end && end[1] == '/' && end[2] == '/')   /* "http://..." and friends */
                 end = strchr(end+2, OSI_PATH_LIST_SEPARATOR[0]);
             if (end) dirlen = (int)(end++ - dirname);
             else dirlen = (int)strlen(dirname);
@@ -1360,13 +1365,13 @@ static int require_priv(const char* module, const char* version, const char* arg
             if (dirlen == 0)
                 continue; /* ignore empty driverpath elements */
 
-            if (!TRY_FILE(0, "%.*s" OSI_PATH_SEPARATOR, dirlen, dirname))
+            if (!TRY_FILE(0, "%.*s/", dirlen, dirname))
                 continue; /* ignore non-existing driverpath elements */
 
-            dirlen += strlen(OSI_PATH_SEPARATOR);
+            dirlen += 1;
             /* filename = "<dirname>/[dirlen]" */
 
-            snprintf(filename+dirlen, sizeof(filename)-dirlen, "%s" OSI_PATH_SEPARATOR "%n", module, &modulediroffs);
+            snprintf(filename+dirlen, sizeof(filename)-dirlen, "%s/%n", module, &modulediroffs);
             modulediroffs += dirlen;
             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
 
@@ -1406,7 +1411,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                             /* Even if it has no library, at least it has a dep file in the lib dir */
 
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
-                            if (!TRY_FILE(modulediroffs, "%s" OSI_PATH_SEPARATOR "R%s" OSI_PATH_SEPARATOR LIBDIR "%s" OSI_PATH_SEPARATOR,
+                            if (!TRY_FILE(modulediroffs, "%s/R%s/" LIBDIR "%s/",
                                 currentFilename, epicsRelease, targetArch))
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/lib/<targetArch>/" */
                             {
@@ -1520,12 +1525,12 @@ static int require_priv(const char* module, const char* version, const char* arg
         versionstr = "";
 
         /* founddir = "<dirname>/[dirlen]<module>/<version>" */
-        printf ("Module %s version %s found in %s" OSI_PATH_SEPARATOR "\n", module, found, founddir);
+        printf ("Module %s version %s found in %s/\n", module, found, founddir);
 
         if (requireDebug)
             printf("require: looking for dependency file\n");
 
-        if (!TRY_FILE(0, "%s" OSI_PATH_SEPARATOR "R%s" OSI_PATH_SEPARATOR "%n" LIBDIR "%s" OSI_PATH_SEPARATOR "%n%s.dep",
+        if (!TRY_FILE(0, "%s/R%s/%n" LIBDIR "%s/%n%s.dep",
             founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module))
         /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
         {
@@ -1582,11 +1587,11 @@ loadlib:
             }
 
             /* load dbd file */
-            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd" OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
+            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd/%s%s.dbd", module, versionstr) ||
                 TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "dbd" OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR ".." OSI_PATH_SEPARATOR "dbd" OSI_PATH_SEPARATOR "%s.dbd", module)) /* org EPICSbase */
+                TRY_NONEMPTY_FILE(releasediroffs, "../dbd/%s%s.dbd", module, versionstr) ||
+                TRY_NONEMPTY_FILE(releasediroffs, "../%s%s.dbd", module, versionstr) ||
+                TRY_NONEMPTY_FILE(releasediroffs, "../../dbd/%s.dbd", module)) /* org EPICSbase */
             {
                 printf("Loading dbd file %s\n", filename);
                 if (dbLoadDatabase(filename, NULL, NULL) != 0)
@@ -1632,7 +1637,7 @@ loadlib:
         printf("require: looking for template directory\n");
     /* filename = "<dirname>/<module>/<version>/R<epicsRelease>/[releasediroffs]..." */
     if (!((TRY_FILE(releasediroffs, TEMPLATEDIR) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR TEMPLATEDIR)) && setupDbPath(module, filename) == 0))
+        TRY_FILE(releasediroffs, "../" TEMPLATEDIR)) && setupDbPath(module, filename) == 0))
     {
         /* if no template directory found, restore TEMPLATES to initial value */
         char *t;
@@ -1648,41 +1653,41 @@ loadlib:
         printf("require: looking for startup script\n");
     /* filename = "<dirname>/<module>/<version>/R<epicsRelease>/[releasediroffs]db" */
     if (TRY_FILE(releasediroffs, "%s-%s.iocsh", targetArch, epicsRelease) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", targetArch, epicsRelease) ||
+        TRY_FILE(releasediroffs, "../" "%s-%s.iocsh", targetArch, epicsRelease) ||
         TRY_FILE(releasediroffs, "%s-%s.cmd", targetArch, epicsRelease) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", targetArch, epicsRelease) ||
+        TRY_FILE(releasediroffs, "../%s-%s.cmd", targetArch, epicsRelease) ||
         TRY_FILE(releasediroffs, "%s-%s.iocsh", targetArch, epicsBasetype) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", targetArch, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "../%s-%s.iocsh", targetArch, epicsBasetype) ||
         TRY_FILE(releasediroffs, "%s-%s.cmd", targetArch, epicsBasetype) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", targetArch, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "../%s-%s.cmd", targetArch, epicsBasetype) ||
         TRY_FILE(releasediroffs, "%s-%s.iocsh", osClass, epicsRelease) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", osClass, epicsRelease) ||
+        TRY_FILE(releasediroffs, "../%s-%s.iocsh", osClass, epicsRelease) ||
         TRY_FILE(releasediroffs, "%s-%s.cmd", osClass, epicsRelease) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", osClass, epicsRelease) ||
+        TRY_FILE(releasediroffs, "../%s-%s.cmd", osClass, epicsRelease) ||
         TRY_FILE(releasediroffs, "%s-%s.iocsh", osClass, epicsBasetype) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.iocsh", osClass, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "../%s-%s.iocsh", osClass, epicsBasetype) ||
         TRY_FILE(releasediroffs, "%s-%s.cmd", osClass, epicsBasetype) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s-%s.cmd", osClass, epicsBasetype) ||
+        TRY_FILE(releasediroffs, "../%s-%s.cmd", osClass, epicsBasetype) ||
         TRY_FILE(releasediroffs, "startup-%s.iocsh", epicsRelease) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.iocsh", epicsRelease) ||
+        TRY_FILE(releasediroffs, "../startup-%s.iocsh", epicsRelease) ||
         TRY_FILE(releasediroffs, "startup-%s.cmd", epicsRelease) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.cmd", epicsRelease) ||
+        TRY_FILE(releasediroffs, "../startup-%s.cmd", epicsRelease) ||
         TRY_FILE(releasediroffs, "startup-%s.iocsh", epicsBasetype) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.iocsh", epicsBasetype) ||
+        TRY_FILE(releasediroffs, "../startup-%s.iocsh", epicsBasetype) ||
         TRY_FILE(releasediroffs, "startup-%s.cmd", epicsBasetype) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup-%s.cmd", epicsBasetype) ||
+        TRY_FILE(releasediroffs, "../startup-%s.cmd", epicsBasetype) ||
         TRY_FILE(releasediroffs, "%s.iocsh", targetArch) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.iocsh", targetArch) ||
+        TRY_FILE(releasediroffs, "../%s.iocsh", targetArch) ||
         TRY_FILE(releasediroffs, "%s.cmd", targetArch) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", targetArch) ||
+        TRY_FILE(releasediroffs, "../%s.cmd", targetArch) ||
         TRY_FILE(releasediroffs, "%s.iocsh", osClass) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.iocsh", osClass) ||
+        TRY_FILE(releasediroffs, "../%s.iocsh", osClass) ||
         TRY_FILE(releasediroffs, "%s.cmd", osClass) ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "%s.cmd", osClass) ||
+        TRY_FILE(releasediroffs, "../%s.cmd", osClass) ||
         TRY_FILE(releasediroffs, "startup.iocsh") ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup.iocsh") ||
+        TRY_FILE(releasediroffs, "../startup.iocsh") ||
         TRY_FILE(releasediroffs, "startup.cmd") ||
-        TRY_FILE(releasediroffs, ".." OSI_PATH_SEPARATOR "startup.cmd")
+        TRY_FILE(releasediroffs, "../startup.cmd")
         )
     {
         if (args)

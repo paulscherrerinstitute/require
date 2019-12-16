@@ -34,7 +34,6 @@
 
 #if (EPICSVER<31400)
 extern char** ppGlobalEnviron;
-#define OSI_PATH_SEPARATOR "/"
 #define OSI_PATH_LIST_SEPARATOR ":"
 extern volatile int interruptAccept;
 
@@ -61,13 +60,13 @@ int isAbsPath(const char* filename)
         return 1;
     /* driver letter, e.g. "C:\Temp" */
     else if (strlen(filename) > 3
-            && ((filename[0]>='a'&&filename[0]<='z') || (filename[0]>='A'&&filename[0]<='Z'))
+            && isalpha(filename[0])
             && filename[1] == ':')
         return 1;
     else
         return 0;
 #else
-    return filename[0] == OSI_PATH_SEPARATOR[0] ? 1 : 0;
+    return filename[0] == '/' ? 1 : 0;
 #endif
 }
 
@@ -165,13 +164,13 @@ int runScript(const char* filename, const char* args)
         for (dirname = path; dirname != NULL; dirname = end)
         {
             end = strchr(dirname, OSI_PATH_LIST_SEPARATOR[0]);
-            if (end && end[1] == OSI_PATH_SEPARATOR[0] && end[2] == OSI_PATH_SEPARATOR[0])   /* "http://..." and friends */
+            if (end && end[1] == '/' && end[2] == '/')   /* "http://..." and friends */
                 end = strchr(end+2, OSI_PATH_LIST_SEPARATOR[0]);
             if (end) dirlen = (int)(end++ - dirname);
             else dirlen = (int)strlen(dirname);
             if (dirlen == 0) continue; /* ignore empty path elements */
-            if (dirname[dirlen-1] == OSI_PATH_SEPARATOR[0]) dirlen--;
-            asprintf(&fullname, "%.*s" OSI_PATH_SEPARATOR "%s",
+            if (dirname[dirlen-1] == '/') dirlen--;
+            asprintf(&fullname, "%.*s/%s",
                 dirlen, dirname, filename);
             if (runScriptDebug)
                 printf("runScript: trying %s\n", fullname);
