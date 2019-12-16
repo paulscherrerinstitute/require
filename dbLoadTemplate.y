@@ -50,6 +50,9 @@ extern void dbLoadRecords(const char*, const char*);
 #define dbmfStrdup(s) dbmfStrdup((char*)s) 
 #endif
 
+/* from runScript.c */
+extern int isAbsPath(const char* filename);
+
 static int line_num;
 static int yyerror(char* str);
 
@@ -385,7 +388,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
     }
 
     fp = fopen(sub_file, "r");
-    if (!fp && sub_file[0] != OSI_PATH_SEPARATOR[0]) {
+    if (!fp && !isAbsPath(sub_file)) {
         const char *dirname, *end;
         int dirlen;
         char* filename;
@@ -400,7 +403,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
             if (dirlen == 0) continue; /* ignore empty path elements */
             if (dirlen == 1 && dirname[0] == '.') continue; /* we had . already */
             filename = NULL;
-            if (asprintf(&filename, "%.*s" OSI_PATH_SEPARATOR "%s", dirlen, dirname, sub_file) < 0)
+            if (asprintf(&filename, "%.*s/%s", dirlen, dirname, sub_file) < 0)
             {
                 fprintf(stderr,"dbLoadTemplate: out of memory\n");
                 break;
