@@ -52,15 +52,6 @@ rp() {
   ( realpath $1 || readlink -f $1 || readlink $1 || (cd -P $1 && echo $PWD) || (x=$(\ls -ld $1) && echo ${x##* }) || echo $1 ) 2>/dev/null
 }
 
-# convert unix path to windows path
-unix2win() {
-    # add z: prefix to absolute path
-    p=${1/#\//z:\//}
-    # replace '/' with '\'
-    p=${p//\//\\\\}
-    echo $1
-}
-
 # if EPICS_HOST_ARCH is not set guess it
 if [ -z "$EPICS_HOST_ARCH" ]
 then
@@ -418,10 +409,9 @@ if [[ $EXEPOSTFIX == ".exe" ]]
 then
     LOADER="wine"
     EPICS_DRIVER_PATH_WIN=
-    IFS=:
-    for p in $EPICS_DRIVER_PATH; do
-        EPICS_DRIVER_PATH_WIN="$EPICS_DRIVER_PATH_WIN;$(unix2win $p)"
-    done
+    while read -d ':' p; do
+        EPICS_DRIVER_PATH_WIN="$EPICS_DRIVER_PATH_WIN;${p/#\//z:/}"
+    done <<< "$EPICS_DRIVER_PATH:"
     EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH_WIN#;}
 fi
 
