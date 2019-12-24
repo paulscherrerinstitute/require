@@ -885,7 +885,7 @@ ${MODULEDBD}: ${DBDFILES}
 # Install everything.
 INSTALL_LIBS = $(addprefix ${INSTALL_LIB}/,${MODULELIB} $(notdir ${SHRLIBS}))
 ifeq (${OS_CLASS},WIN32) # .lib for WIN32 is also required for linking
-    ifneq (${MODULElIB},)
+    ifneq (${MODULELIB},)
 	INSTALL_LIBS += $(addprefix ${INSTALL_LIB}/,${LIB_PREFIX}${PRJ}${LIB_SUFFIX})
     endif
 endif
