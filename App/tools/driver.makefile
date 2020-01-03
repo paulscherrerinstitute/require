@@ -834,6 +834,11 @@ INSTALL_LOADABLE_SHRLIBS=
 INSTALL_MUNCHS=
 include ${BASERULES}
 
+# In 7.0+ include submodules config files
+ifdef BASE_7_0
+include ${EPICS_BASE}/cfg/CONFIG_*_MODULE
+endif
+
 ifeq (${OS_CLASS},WIN32) # explicitly link required dependencies
 LIB_LIBS += ${EPICS_BASE_IOC_LIBS} ${REQ}
 endif
