@@ -300,21 +300,30 @@ static HMODULE loadlib(const char* libname)
             libname, dlerror());
     }
 #elif defined (_WIN32)
-    if ((libhandle = LoadLibrary(libname)) == NULL)
     {
-        LPVOID lpMsgBuf;
+        char *p;
+        char *libpath = strdup(libname);
+        if ((p = strrchr(libpath, '/')) != NULL)
+            *p = '\0';
+        SetDllDirectory(libpath);
+        if ((libhandle = LoadLibrary(libname)) == NULL)
+        {
+            LPVOID lpMsgBuf;
 
-        FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_FROM_SYSTEM,
-            NULL,
-            GetLastError(),
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR) &lpMsgBuf,
-            0, NULL );
-        fprintf (stderr, "Loading %s library failed: %s\n",
-            libname, lpMsgBuf);
-        LocalFree(lpMsgBuf);
+            FormatMessage(
+                FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                FORMAT_MESSAGE_FROM_SYSTEM,
+                NULL,
+                GetLastError(),
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                (LPTSTR) &lpMsgBuf,
+                0, NULL );
+            fprintf (stderr, "Loading %s library failed: %s\n",
+                libname, lpMsgBuf);
+            LocalFree(lpMsgBuf);
+        }
+        free(libpath);
+        SetDllDirectory(NULL);
     }
 #elif defined (vxWorks)
     {
