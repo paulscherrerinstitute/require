@@ -1042,8 +1042,9 @@ MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
 	$(MUNCH) < $< > $@ 
 
 ${VERSIONFILE}:
-	echo "#include <epicsExport.h>" >> $@
-	echo "epicsShareExtern char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
+	echo "#include <epicsExport.h>" > $@
+	echo "epicsShareExtern const char _${PRJ}LibRelease[];" >> $@
+	echo "const char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
 
 # EPICS R3.14+:
 # Create file to fill registry from dbd file.
