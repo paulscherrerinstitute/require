@@ -579,6 +579,7 @@ ifeq (${EPICS_BASETYPE},3.13)
 INSTALLRULE=install::
 BUILDRULE=build::
 BASERULES=${EPICS_BASE}/config/RULES.Vx
+OBJ=.o
 else # 3.14+
 INSTALLRULE=install:
 BUILDRULE=build:
