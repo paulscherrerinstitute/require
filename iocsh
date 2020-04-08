@@ -385,8 +385,13 @@ then
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
-        echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
-        echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
+        if [[ $EXEPOSTFIX == ".exe" ]]; then
+            echo "dlload $EPICS_BASE/bin/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
+            echo "dlload $EPICS_BASE/bin/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
+        else
+            echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
+            echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
+        fi
     else
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
