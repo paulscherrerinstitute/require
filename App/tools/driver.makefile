@@ -265,7 +265,7 @@ $(1): prebuild
 %.$(1): prebuild
 	+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
 endef
-$(foreach v,$(sort $(basename $(basename ${INSTALLED_EPICS_VERSIONS})) $(basename ${INSTALLED_EPICS_VERSIONS})),$(eval $(call VERSIONRULES,$v)))
+$(foreach v,$(filter-out ${INSTALLED_EPICS_VERSIONS},$(sort $(basename $(basename $(basename ${INSTALLED_EPICS_VERSIONS}))) $(basename $(basename ${INSTALLED_EPICS_VERSIONS})) $(basename ${INSTALLED_EPICS_VERSIONS}))),$(eval $(call VERSIONRULES,$v)))
 
 # Handle cases where user requests one specific version:
 # make <action>.<version> instead of make <action> or
