@@ -308,7 +308,7 @@ static HMODULE loadlib(const char* libname)
         SetDllDirectory(libpath);
         if ((libhandle = LoadLibrary(libname)) == NULL)
         {
-            LPVOID lpMsgBuf;
+            LPSTR lpMsgBuf;
 
             FormatMessage(
                 FORMAT_MESSAGE_ALLOCATE_BUFFER |
