@@ -364,8 +364,8 @@ typedef struct moduleitem
 
 static moduleitem* loadedModules = NULL;
 static unsigned long moduleCount = 0;
-static unsigned long moduleListBufferSize = 1;
-static unsigned long maxModuleNameLength = 0;
+static size_t moduleListBufferSize = 1;
+static size_t maxModuleNameLength = 0;
 
 int putenvprintf(const char* format, ...)
 {
@@ -489,7 +489,7 @@ static int setupDbPath(const char* module, const char* dbdir)
     return 0;
 }
 
-static int getRecordHandle(const char* namepart, short type, long minsize, DBADDR* paddr)
+static int getRecordHandle(const char* namepart, short type, size_t minsize, DBADDR* paddr)
 {
     char recordname[PVNAME_STRINGSZ];
     long dummy, offset;
@@ -507,10 +507,10 @@ static int getRecordHandle(const char* namepart, short type, long minsize, DBADD
             recordname, pamapdbfType[paddr->field_type].strvalue, pamapdbfType[type].strvalue);
         return -1;
     }
-    if (paddr->no_elements < minsize)
+    if ((size_t)paddr->no_elements < minsize)
     {
         fprintf(stderr, "require: record %s has not enough elements: %lu instead of %lu\n",
-            recordname, paddr->no_elements, minsize);
+            recordname, paddr->no_elements, (unsigned long)minsize);
         return -1;
     }
     if (paddr->pfield == NULL)
@@ -803,7 +803,7 @@ static void registerExternalModules()
 size_t foreachLoadedLib(size_t (*func)(const char* name, const char* version, const char* path, void* arg), void* arg)
 {
     moduleitem* m;
-    int result;
+    size_t result;
 
     for (m = loadedModules; m; m=m->next)
     {
@@ -1339,11 +1339,11 @@ static int require_priv(const char* module, const char* version, const char* arg
                 break;
             default:
             {
-                int i = strlen(version);
+                size_t i = strlen(version);
                 if (version[i-1] == '+') i--;
                 printf("Conflict between required %s%s version %.*s and already loaded version %s.\n",
                     exactnessLevel > 1 ? "exact " : exactnessLevel > 0 ? "exact minor " : "" ,
-                    module, i, version, loaded);
+                    module, (int)i, version, loaded);
                 return -1;
             }
         }
