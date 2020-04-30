@@ -176,15 +176,19 @@ then
         /^[ \t]*EPICS_VERSION[ \t]*=/ {v=$2}
         /^[ \t]*EPICS_REVISION[ \t]*=/ {r=$2}
         /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2+0}
-        END {print "BASE="v"."r"."m";BASECODE="v*10000+r*100+m}
+        END {print "XBASE="v"."r"."m";BASECODE="v*10000+r*100+m}
     ' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
 elif [ -f $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX ]
 then
     eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | awk -F'[.R-]' '
-        /EPICS R[0-9]/ {print "BASE="$2"."$3"."$4";BASECODE="$2*10000+$3*100+$4 }')
+        /EPICS R[0-9]/ {print "XBASE="$2"."$3"."$4";BASECODE="$2*10000+$3*100+$4 }')
 else
     echo "Cannot guess EPICS base version." >&2
     exit 1;
+fi
+if [ ${BASE#$XBASE} = $BASE ]
+then
+    BASE=$XBASE
 fi
 
 # IOC name derives from hostname

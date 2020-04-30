@@ -266,7 +266,11 @@ int requireDebug;
 
 #define TOSTR(s) TOSTR2(s)
 #define TOSTR2(s) #s
-const char epicsRelease[] = TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION)"."TOSTR(EPICS_MODIFICATION);
+
+#ifndef EPICSVERSION
+#error EPICSVERSION not defined: Compile with USR_CFLAGS += -DEPICSVERSION='"${EPICSVERSION}"'
+#endif
+const char epicsRelease[] = EPICSVERSION;
 const char epicsBasetype[] = TOSTR(EPICS_VERSION)"."TOSTR(EPICS_REVISION);
 
 #ifndef T_A
