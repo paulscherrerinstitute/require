@@ -170,6 +170,7 @@ int requireDebug;
         #endif
     #endif
 
+    #include <unistd.h>
     #include <dlfcn.h>
     #define HMODULE void *
 
@@ -192,10 +193,12 @@ int requireDebug;
     #endif
 
     #include <windows.h>
+    #include <direct.h>
     #include <Psapi.h>
     #pragma comment(lib, "kernel32.lib")
     #pragma comment(lib, "psapi.lib")
     #include "asprintf.h"
+    #define getcwd _getcwd
     #define snprintf _snprintf
     #define setenv(name,value,overwrite) _putenv_s(name,value)
     #define PATH_MAX MAX_PATH
@@ -1056,12 +1059,18 @@ int require(const char* module, const char* version, const char* args)
 
     if (firstTime)
     {
+        char* cwd;
+
         firstTime = 0;
+        cwd = malloc(PATH_MAX+1);
+        getcwd(cwd, PATH_MAX);
         putenvprintf("T_A=%s", targetArch);
         putenvprintf("EPICS_HOST_ARCH=%s", targetArch);
         putenvprintf("EPICS_RELEASE=%s", epicsRelease);
         putenvprintf("EPICS_BASETYPE=%s", epicsBasetype);
         putenvprintf("OS_CLASS=%s", osClass);
+        putenvprintf("IOC_DIR=%s", cwd);
+        free(cwd);
     }
 
     if (module == NULL)
