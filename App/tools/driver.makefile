@@ -824,6 +824,7 @@ ${BUILDRULE} ${MENUS:%=${COMMON_DIR}/%.h}
 ${BUILDRULE} MODULEINFOS
 ${BUILDRULE} ${MODULEDBD}
 ${BUILDRULE} ${DEPFILE}
+${BUILDRULE} AUTO_MODULES
 
 # In 3.15+ this is required to build %Record.h and menu%.h files
 COMMON_INC = ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
@@ -1101,6 +1102,17 @@ LSUFFIX=$(LSUFFIX_$(SHARED_LIBRARIES))
 ${EXPORTFILE}: $(filter-out $(basename ${EXPORTFILE})$(OBJ),${LIBOBJS})
 	$(RM) $@
 	$(NM) $^ ${BASELIBS:%=${EPICS_BASE}/lib/${T_A}/${LIB_PREFIX}%$(LSUFFIX)} ${CORELIB} | awk '$(makexportfile)' > $@
+
+define ADD_MODULE
+	$(firstword $(subst /, ,$1))_DIR = $${EPICS_MODULES}/$1/R$${EPICSVERSION}/lib/$${T_A}
+	LIB_LIBS += $(firstword $(subst /, ,$1))
+endef
+
+# Append modules from .d files for linking.
+AUTO_MODULES: ${LIBOBJS}
+ifeq (${OS_CLASS},WIN32)
+	$(foreach m,$(sort $(shell cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/\([^/]*\)/\([^/]*\)/.*%\1/\2%p' | sort -u)),$(eval $(call ADD_MODULE,${m})))
+endif
 
 # Create dependency file for recursive requires.
 ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
