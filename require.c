@@ -780,7 +780,7 @@ static void registerExternalModules()
         if (!GetModuleFileName(hMods[i], name, MAX_PATH)) continue;  /* no library name */
         name[sizeof(name)-1] = 0;                                /* WinXP may not terminate the string */
         p = strrchr(name, '\\');                                 /* find file name part in "<location>/<module>.dll" */
-        if (p) { location = name; } else p=name;                 /* find end of "<location>\\" (if exists) */
+        if (p) { location = name; p++; } else p=name;            /* find end of "<location>\\" (if exists) */
         symname = p;
         p = strchr(symname, '.');                                /* find ".dll" */
         if (p == NULL) p = symname + strlen(symname);            /* no file extension ? */
