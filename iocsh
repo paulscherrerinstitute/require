@@ -119,7 +119,7 @@ then
         EPICS_BASE=$(\ls -1vrd $EPICS/base/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
     else
         # find highest (requested) EPICS version that supports our architecture (or its 32 bit version)
-        EPICS_BASE=$(\ls -1vrd $EPICS/base-$BASE/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null)
+        EPICS_BASE=$(\ls -1vrd $EPICS/base-$BASE/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
         if [ -z "$EPICS_BASE" ]
         then
             unset FILTER
