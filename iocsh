@@ -363,7 +363,13 @@ done
 startup=/tmp/iocsh.startup.$$
 
 # clean up and kill the softIoc when killed by any signal
-trap "kill -s SIGTERM 0; (stty sane && echo) 2>/dev/null; rm -f $startup; " EXIT
+cleanup() {
+    trap EXIT
+    rm -f $startup
+    stty sane 2> /dev/null
+    echo
+}
+trap "kill -s SIGTERM 0; cleanup" EXIT
 
 {
 echo "# date=\"$(date)\""
@@ -464,3 +470,4 @@ echo $EXE $ARGS $startup
 #enable core dumps
 ulimit -c unlimited
 eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
+cleanup
