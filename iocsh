@@ -470,4 +470,7 @@ echo $EXE $ARGS $startup
 #enable core dumps
 ulimit -c unlimited
 eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
+STATUS=$?
 cleanup
+exit $STATUS
+
