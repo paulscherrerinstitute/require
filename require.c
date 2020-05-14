@@ -1064,12 +1064,12 @@ int require(const char* module, const char* version, const char* args)
         firstTime = 0;
         cwd = malloc(PATH_MAX+1);
         getcwd(cwd, PATH_MAX);
+        putenvprintf("IOC_DIR=%s/", cwd);
         putenvprintf("T_A=%s", targetArch);
         putenvprintf("EPICS_HOST_ARCH=%s", targetArch);
         putenvprintf("EPICS_RELEASE=%s", epicsRelease);
         putenvprintf("EPICS_BASETYPE=%s", epicsBasetype);
         putenvprintf("OS_CLASS=%s", osClass);
-        putenvprintf("IOC_DIR=%s", cwd);
         free(cwd);
     }
 
