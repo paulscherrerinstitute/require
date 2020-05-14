@@ -264,8 +264,8 @@ int requireDebug;
 
 #endif
 
-#define LIBDIR "lib/"
-#define TEMPLATEDIR "db/"
+#define LIBDIR "lib"
+#define TEMPLATEDIR "db"
 
 #define TOSTR(s) TOSTR2(s)
 #define TOSTR2(s) #s
@@ -744,7 +744,7 @@ static int findLibRelease (
     if (version)
     {
         *p=0; symname++;                                    /* get "<module>" from "_<module>LibRelease" */
-        if ((p = strstr(name, "/" LIBDIR)) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
+        if ((p = strstr(name, "/" LIBDIR "/" )) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
         if (getLibVersion(symname) == NULL)
             registerModule(symname, version, location);
     }
@@ -780,7 +780,7 @@ static void registerExternalModules()
         if (!GetModuleFileName(hMods[i], name, MAX_PATH)) continue;  /* no library name */
         name[sizeof(name)-1] = 0;                                /* WinXP may not terminate the string */
         p = strrchr(name, '\\');                                 /* find file name part in "<location>/<module>.dll" */
-        if (p) { location = name; } else p=name;                 /* find end of "<location>\\" (if exists) */
+        if (p) { location = name; p++; } else p=name;            /* find end of "<location>\\" (if exists) */
         symname = p;
         p = strchr(symname, '.');                                /* find ".dll" */
         if (p == NULL) p = symname + strlen(symname);            /* no file extension ? */
@@ -793,7 +793,7 @@ static void registerExternalModules()
         if (version)
         {
             *p=0; symname++;                                     /* get "<module>" from "_<module>LibRelease" */
-            if ((p = strstr(name, "\\" LIBDIR)) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
+            if ((p = strstr(name, "\\" LIBDIR "\\")) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
             if (getLibVersion(symname) == NULL)
                 registerModule(symname, version, location);
         }
@@ -1433,7 +1433,7 @@ static int require_priv(const char* module, const char* version, const char* arg
                             /* Even if it has no library, at least it has a dep file in the lib dir */
 
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
-                            if (!TRY_FILE(modulediroffs, "%s/R%s/" LIBDIR "%s/",
+                            if (!TRY_FILE(modulediroffs, "%s/R%s/" LIBDIR "/%s/",
                                 currentFilename, epicsRelease, targetArch))
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/lib/<targetArch>/" */
                             {
@@ -1552,7 +1552,7 @@ static int require_priv(const char* module, const char* version, const char* arg
         if (requireDebug)
             printf("require: looking for dependency file\n");
 
-        if (!TRY_FILE(0, "%s/R%s/%n" LIBDIR "%s/%n%s.dep",
+        if (!TRY_FILE(0, "%s/R%s/%n" LIBDIR "/%s/%n%s.dep",
             founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module))
         /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
         {
