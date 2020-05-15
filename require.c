@@ -1171,37 +1171,9 @@ static off_t fileSize(const char* filename)
                 printf("require: directory %s exists\n",
                     filename);
             return 0;
-        #ifdef S_IFBLK
-        case S_IFBLK:
-            if (requireDebug)
-                printf("require: %s is a block device\n",
-                    filename);
-            return -1;
-        #endif
-        #ifdef S_IFCHR
-        case S_IFCHR:
-            if (requireDebug)
-                printf("require: %s is a character device\n",
-                    filename);
-            return -1;
-        #endif
-        #ifdef S_IFIFO
-        case S_IFIFO:
-            if (requireDebug)
-                printf("require: %s is a FIFO/pipe\n",
-                    filename);
-            return -1;
-        #endif
-        #ifdef S_IFSOCK
-        case S_IFSOCK:
-            if (requireDebug)
-                printf("require: %s is a socket\n",
-                    filename);
-            return -1;
-        #endif
         default:
             if (requireDebug)
-                printf("require: %s is an unknown type of special file\n",
+                printf("require: %s is a special file type\n",
                     filename);
             return -1;
     }
