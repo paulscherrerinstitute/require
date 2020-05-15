@@ -1064,6 +1064,11 @@ int require(const char* module, const char* version, const char* args)
         firstTime = 0;
         cwd = malloc(PATH_MAX+1);
         getcwd(cwd, PATH_MAX);
+#ifdef _WIN32
+        /* convert '\' to '/' */
+        char* p = cwd;
+        while ((p = strchr(p, '\\')) != NULL) *p = '/';
+#endif
         putenvprintf("IOC_DIR=%s/", cwd);
         putenvprintf("T_A=%s", targetArch);
         putenvprintf("EPICS_HOST_ARCH=%s", targetArch);
