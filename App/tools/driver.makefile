@@ -149,7 +149,7 @@ SUBMODULES:=$(foreach f,$(wildcard .gitmodules),$(shell awk '/^\[submodule/ { pr
 VERSIONCHECKFILES = $(filter-out /% -none-, $(USERMAKEFILE) $(wildcard *.db *.template *.subs *.dbd *.cmd *.iocsh)
 VERSIONCHECKFILES += ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $($(filter SOURCES_% DBDS_%,${.VARIABLES})))
 VERSIONCHECKFILES += ${SUBMODULES}
-VERSIONCHECKCMD = ${MAKEHOME}/getVersion.tcl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
+VERSIONCHECKCMD = ${MAKEHOME}/getVersion.pl ${VERSIONDEBUGFLAG} ${VERSIONCHECKFILES}
 LIBVERSION = $(or $(filter-out test,$(shell ${VERSIONCHECKCMD} 2>/dev/null)),${USER},test)
 VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 
@@ -887,7 +887,7 @@ MODULEINFOS:
 # because it has too strict checks to be used for a loadable module.
 ${MODULEDBD}: ${DBDFILES}
 	@echo "Expanding $@"
-	${MAKEHOME}expandDBD.tcl -$(basename ${EPICSVERSION}) ${DBDEXPANDPATH} $^ > $@
+	${MAKEHOME}expandDBD.pl -$(basename ${EPICSVERSION}) ${DBDEXPANDPATH} $^ > $@
 
 # Install everything.
 INSTALL_LIBS = $(addprefix ${INSTALL_LIB}/,${MODULELIB} $(notdir ${SHRLIBS}))
