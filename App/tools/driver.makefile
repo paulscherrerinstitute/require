@@ -1044,8 +1044,10 @@ MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
 	$(MUNCH) < $< > $@ 
 
 ${VERSIONFILE}:
+ifneq (${EPICS_BASETYPE},3.13)
 	echo "#include <epicsExport.h>" > $@
 	echo "epicsShareExtern const char _${PRJ}LibRelease[];" >> $@
+endif
 	echo "const char _${PRJ}LibRelease[] = \"${LIBVERSION}\";" >> $@
 
 # EPICS R3.14+:
