@@ -873,7 +873,10 @@ vpath %Record.dbd ${DBD_PATH}
 vpath menu%.dbd ${DBD_PATH}
 
 # Find header files to install.
-vpath %.h $(addprefix ../,$(sort $(dir $(filter-out /%,${HDRS}) ${SRCS}))) $(sort $(dir $(filter /%,${HDRS})))
+# Order is important! First OS dependent, then os default, then others
+vpath %.h $(sort $(filter %/os/$(OS_CLASS)/,$(dir ${HDRS})))
+vpath %.h $(sort $(filter %/os/default/,$(dir ${HDRS})))
+vpath %.h $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))
 
 PRODUCTS = ${MODULELIB} ${MODULEDBD} ${DEPFILE}
 MODULEINFOS:
@@ -983,6 +986,10 @@ ${INSTALL_CFGS}: ${CFGS}
 ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
 	@echo "Installing binaries $^ to $(@D)"
 	$(INSTALL) -d -m555 $^ $(@D)
+
+$(INSTALL_INCLUDE)/os/default/% : %
+	$(ECHO) "Installing os dependent include file $@"
+	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
 
 # Create SNL code from st/stt file.
 # (RULES.Vx only allows ../%.st, 3.14 has no .st rules at all.)
