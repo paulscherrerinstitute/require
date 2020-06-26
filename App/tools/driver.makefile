@@ -121,7 +121,7 @@ define uniq
 endef
 # Function that removes directories from list
 define filter_out_dir
-   $(shell perl -e 'foreach my $$x (qw($1)) {if(-f "$$x") {print "$$x "}}')
+   $(shell perl -e 'foreach my $$x (qw($1)) {unless(-d "$$x") {print "$$x "}}')
 endef
 # Function that retains the certian portion of the header file path
 # and then used as the subdirectory inside INSTALL_INCLUDE
