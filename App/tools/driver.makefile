@@ -522,8 +522,8 @@ define ADD_OTHER_MODULE_INCLUDES
 $(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/ 2>/dev/null))))
 export $(1)_VERSION
 OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
-OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/default 2>/dev/null)))
 OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/${OS_CLASS} 2>/dev/null)))
+OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/default 2>/dev/null)))
 endef
 $(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
 # Include path for old style modules.
