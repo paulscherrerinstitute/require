@@ -169,27 +169,46 @@ case $(uname) in
     ;;
 esac
 
-# Get actual EPICS revision
+# Get actual EPICS BASE version, either from CONFIG_BASE_VERSION (text) file or from version string in libCom.so
+# Version may have 3 or 4 digits. We make a (4*2 digit) BASECODE too for easier comparison.
+# How many digits the drivers use is another question.
 if [ -f $EPICS_BASE/configure/CONFIG_BASE_VERSION ]
 then
     eval $(awk -F '[ \t]*=[ \t]*' '
         /^[ \t]*EPICS_VERSION[ \t]*=/ {v=$2}
         /^[ \t]*EPICS_REVISION[ \t]*=/ {r=$2}
         /^[ \t]*EPICS_MODIFICATION[ \t]*=/ {m=$2+0}
-        END {print "XBASE="v"."r"."m";BASECODE="v*10000+r*100+m}
+        /^[ \t]*EPICS_PATCH_LEVEL[ \t]*=/ {p=$2+0}
+        END {print "BASE3="v"."r"."m";BASE4="v"."r"."m"."p";BASECODE="v*1000000+r*10000+m*100+p}
     ' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
 elif [ -f $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX ]
 then
-    eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | awk -F'[.R-]' '
-        /EPICS R[0-9]/ {print "XBASE="$2"."$3"."$4";BASECODE="$2*10000+$3*100+$4 }')
+    strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | grep "EPICS R[0-9]"
+    eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | awk -F'[.R]' '
+        /EPICS R[0-9]/ {print "BASE3="$2"."$3"."$4+0";BASE4="$2"."$3"."$4+0"."$5+0";BASECODE="$2*1000000+$3*10000+$4*100+$5 }')
 else
     echo "Cannot guess EPICS base version." >&2
     exit 1;
 fi
-if [ ${BASE#$XBASE} = $BASE ]
-then
-    BASE=$XBASE
-fi
+
+# Check how many digits of BASE we need to find the drivers
+for B in $BASE $BASE4 $BASE3 ${EPICS_BASE#*/base-}
+do
+    if [ -d ${EPICS_MODULES:=/ioc/modules}/${REQUIRE:=require} ]
+    then # new module pool model
+        REQUIRE_LIB=$(ls -1rv $EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:-*.*.*}/R$B/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX 2>/dev/null | head -n 1)
+        REQUIRE_DBD=${REQUIRE_LIB%/lib/*}/dbd/$REQUIRE.dbd
+    else # old driver pool model
+        REQUIRE=misc${REQUIRE_VERSION:+-}$REQUIRE_VERSION
+        REQUIRE_LIB=$INSTBASE/iocBoot/R$B/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
+        REQUIRE_DBD=$INSTBASE/iocBoot/R$B/dbd/$REQUIRE.dbd
+    fi
+    if [ -n "$REQUIRE_LIB" ]
+    then
+        BASE=$B
+        break
+    fi
+done
 
 # IOC name derives from hostname
 # (trailing possible '\r' under cygwin)
@@ -223,7 +242,7 @@ then
     INSTBASE=$I
 fi
 
-EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH%:}:${EPICS_MODULES:=/ioc/modules}:${INSTBASE:=/work}/iocBoot/R$BASE/$EPICS_HOST_ARCH
+EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH%:}:${EPICS_MODULES}:${INSTBASE:=/work}/iocBoot/R$BASE/$EPICS_HOST_ARCH
 export INSTBASE
 
 # convert for win32-x86 arch
@@ -308,7 +327,7 @@ do
         exit 1
        ;;
     ( *$LIBPOSTFIX )
-        if [ "$BASECODE" -ge 31412 ]
+        if [ "$BASECODE" -ge 3141200 ]
         then
             echo "dlload \"$file\""
         else
@@ -344,7 +363,7 @@ do
                 echo "dbLoadDatabase '$file','$DBD','$subst'"
                 ;;
             ( * )
-                if [ "$BASECODE" -ge 31500 ]
+                if [ "$BASECODE" -ge 3150000 ]
                 then
                     echo "iocshLoad '$file','$subst'"
                 else
@@ -379,17 +398,7 @@ do
     echo "# $var=\"${!var}\""
 done
 
-if [ -d $EPICS_MODULES/${REQUIRE:=require} ]
-then # new module pool model
-    REQUIRE_LIB=$(ls -1rv $EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:-*.*.*}/R$BASE/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX | head -n 1)
-    REQUIRE_DBD=${REQUIRE_LIB%/lib/*}/dbd/$REQUIRE.dbd
-else # old driver pool model
-    REQUIRE=misc${REQUIRE_VERSION:+-}$REQUIRE_VERSION
-    REQUIRE_LIB=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX
-    REQUIRE_DBD=$INSTBASE/iocBoot/R$BASE/dbd/$REQUIRE.dbd
-fi
-
-if [ "$BASECODE" -ge 31412 ]
+if [ "$BASECODE" -ge 3141200 ]
 then
     if [ -x $EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX ]
     then
