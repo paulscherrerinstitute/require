@@ -485,7 +485,7 @@ export VAR_EXTENSIONS
 REQ = ${REQUIRED} $(foreach x, ${VAR_EXTENSIONS}, ${REQUIRED_$x})
 export REQ
 
-HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, ${HEADERS_$x})
+HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, $(call filter_out_dir,$(realpath ${HEADERS_$x})))
 export HDRS
 
 SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
