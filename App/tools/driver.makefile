@@ -988,7 +988,11 @@ ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
 	$(INSTALL) -d -m555 $^ $(@D)
 
 $(INSTALL_INCLUDE)/os/default/% : %
-	$(ECHO) "Installing os dependent include file $@"
+	@echo "Installing default include file $@"
+	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
+
+$(INSTALL_INCLUDE)/os/$(OS_CLASS)/% : %
+	@echo "Installing default include file $@"
 	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
 
 # Create SNL code from st/stt file.
