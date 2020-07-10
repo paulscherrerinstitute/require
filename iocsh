@@ -125,7 +125,7 @@ then
             unset FILTER
             if [ -f $EPICS/ignore ]
             then
-                FILTER=$(echo "|grep -Ev '/base-($(sed < $EPICS/ignore -zr 's/\./\\./g;s/[ \t\r\n]+/|/g;s/\|$//'))/'")
+                FILTER=$(echo "|grep -Ev '/base-("$(sed < $EPICS/ignore ':b;$!N;s/\n/|/;tb;s/\./\\./g')")/'")
             fi
             EPICS_BASE=$(eval \ls -1vrd $EPICS/base-$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null $FILTER | head -n1)
         fi
