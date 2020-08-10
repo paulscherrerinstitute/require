@@ -993,11 +993,11 @@ ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
 
 $(INSTALL_INCLUDE)/os/default/% : %
 	@echo "Installing default include file $@"
-	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
+	$(INSTALL) -d -m444 $< $(@D)
 
 $(INSTALL_INCLUDE)/os/$(OS_CLASS)/% : %
-	@echo "Installing default include file $@"
-	@$(INSTALL) -d -m $(INSTALL_PERMISSIONS) $< $(@D)
+	@echo "Installing $(OS_CLASS) include file $@"
+	$(INSTALL) -d -m444 $< $(@D)
 
 # Create SNL code from st/stt file.
 # (RULES.Vx only allows ../%.st, 3.14 has no .st rules at all.)
