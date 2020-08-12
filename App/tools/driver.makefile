@@ -303,6 +303,7 @@ endef
 
 # You can add more UI rules following this pattern:
 #$(eval $(call INSTALL_UI_RULE,VARIABLE,installdir,sourcedefaultlocation))
+CONFIGBASE ?= ${EPICS_MODULES}
 $(eval $(call INSTALL_UI_RULE,QT,${CONFIGBASE}/qt,qt/*))
 
 else # EPICSVERSION
