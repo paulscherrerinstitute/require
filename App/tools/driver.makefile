@@ -249,7 +249,8 @@ submodules:
 endif
 
 # Loop over all EPICS versions for second run.
-MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION}
+# Clear EPICS_SITE_VERSION to get rid of git warnings with some base installations
+MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION} EPICS_SITE_VERSION=
 
 build install debug:: prebuild
 	@+for VERSION in ${BUILD_EPICS_VERSIONS}; do ${MAKEVERSION} EPICSVERSION=$$VERSION $@; done
