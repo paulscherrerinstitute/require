@@ -129,7 +129,7 @@ endef
 #   param 2 - pattern "os/${OS_CLASS}/|os/default/"
 #   return - file path with pattern retained, "os/Linux/jconfig.h pv.h os/default/jpeglib.h"
 define os_include_dir
-  $(shell perl -e 'use File::Basename;foreach my $$x (qw($1)) { if ($$x =~ m[($2)(.*)]) {print "$$1$$2 ";} else {print(basename("$$x")," ");}}')
+  $(shell perl -e 'use File::Basename;foreach my $$x (qw($1)) {if ($$x =~ m[(^|/)os/]) {if ($$x =~ m[os/(default|$2)/(.*)]) {print "os/$$1/$$2 "}} else {print(basename("$$x")," ")}}')
 endef
 
 ifndef EPICSVERSION
@@ -524,9 +524,9 @@ IGNORE_MODULES+=$(foreach x, ${VAR_EXTENSIONS}, ${IGNORE_MODULES_$x})
 define ADD_OTHER_MODULE_INCLUDES
 $(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/ 2>/dev/null))))
 export $(1)_VERSION
-OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
 OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/${OS_CLASS} 2>/dev/null)))
 OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/default 2>/dev/null)))
+OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
 endef
 $(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
 # Include path for old style modules.
@@ -908,7 +908,7 @@ ifeq (${OS_CLASS},WIN32) # .lib for WIN32 is also required for linking
 endif
 INSTALL_DEPS = ${DEPFILE:%=${INSTALL_LIB}/%}
 INSTALL_DBDS = ${MODULEDBD:%=${INSTALL_DBD}/%}
-INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(call os_include_dir,${HDRS},os/default/|os/${OS_CLASS}/))
+INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(call os_include_dir,${HDRS},${OS_CLASS}))
 INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
 INSTALL_SCRS = $(addprefix ${INSTALL_SCR}/,$(notdir ${SCR}))
 INSTALL_BINS = $(addprefix ${INSTALL_BIN}/,$(notdir ${BINS}))
