@@ -5,7 +5,8 @@ use strict;
 use 5.010;
 
 use File::Glob qw/bsd_glob/;
-use IPC::Open3;
+use IPC::Open3 qw/open3/;
+use Symbol qw/gensym/;
 
 # cvs status parsing state
 use constant {
@@ -35,27 +36,49 @@ while (@ARGV) {
 my $files = join(' ', @files);
 
 sub check_output {
-    my ($child_stdin, $child_stdout, $child_stderr);
+    my ($child_stdout, $child_stderr);
+    $child_stderr = gensym();
+
     chomp(my $command = $_[0]);
 
-    # start the child process and wait for it to finish
-    my $child_pid = open3($child_stdin, $child_stdout, $child_stderr, $command);
-    waitpid($child_pid, 0);
-    if ($? != 0) {
-        my $error;
-        foreach (<$child_stdout>) {
-            $error .= $_;
+    # start the child process capturing stdout and stderr
+    my $child_pid = open3(undef, $child_stdout, $child_stderr, $command);
+
+    # filehandles' bitmask for read
+    my $out_set = '';
+    vec($out_set, fileno($child_stdout), 1) = 1;
+    vec($out_set, fileno($child_stderr), 1) = 1;
+    my $num_bits = 2;
+
+    # output and error from the child process
+    my $output = '';
+    my $error = '';
+
+    while ($num_bits and select(my $rout=$out_set, undef, undef, 5)) {
+        for my $fh ($child_stdout, $child_stderr) {
+            next unless vec($rout, fileno($fh), 1);
+
+            my $bytes_read = sysread($fh, my $line, 4096);
+            if ($bytes_read) {
+                if ($fh == $child_stdout) {
+                    $output .= $line;
+                }
+                elsif ($fh == $child_stdout) {
+                    $error .= $line;
+                }
+            }
+            else {
+
+                vec($out_set, fileno($fh), 1) = 0;
+                $num_bits -= 1;
+            }
         }
-        die $error;
     }
 
-    # read child process output
-    my @output = ();
-    foreach my $line (<$child_stdout>) {
-        push @output, $line;
-    }
+    waitpid($child_pid, 0);
+    die $error if $?;
 
-    return @output;
+    return split(/\n/, $output);
 }
 
 sub parse_cvs_output {
@@ -126,7 +149,7 @@ sub parse_cvs_output {
                 return;
             }
             elsif ($line =~ /no such directory `(.*)'/) {
-                say STDERR "checking directory $1: so such directory";
+                say STDERR "checking directory $1: no so such directory";
                 return;
             }
             elsif ($line =~ /cvs \[status aborted\]: there is no version here/) {
