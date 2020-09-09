@@ -97,12 +97,12 @@ SUBFUNCFILE = ${PRJ}_subRecordFunctions.dbd
 DEPFILE = ${PRJ}.dep
 
 # Clear potential environment variables.
-TEMPLATES=
-SOURCES=
-DBDS=
-HEADERS=
-BASH_ENV=
-ENV=
+undefine TEMPLATES
+undefine SOURCES
+undefine DBDS
+undefine HEADERS
+undefine BASH_ENV
+undefine ENV
 
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules).
@@ -121,7 +121,7 @@ define uniq
 endef
 # Function that removes directories from list
 define filter_out_dir
-   $(shell perl -e 'foreach my $$x (qw($1)) {unless(-d "$$x") {print "$$x "}}')
+  $(shell perl -e 'foreach my $$x (qw($1)) {unless(-d "$$x") {print "$$x "}}')
 endef
 # Function that retains the certian portion of the header file path
 # and then used as the subdirectory inside INSTALL_INCLUDE
@@ -197,7 +197,7 @@ help:
 	@for target in '' build '<EPICS version>' \
 	install 'install.<EPICS version>' \
 	uninstall 'uninstall.<EPICS version>' \
-        installui uninstallui \
+	installui uninstallui \
 	clean help version; \
 	do echo "  make $$target"; \
 	done
@@ -409,6 +409,11 @@ DOCUDIR = .
 #DOCU = $(foreach DIR,${DOCUDIR},$(wildcard ${DIR}/*README*) $(foreach EXT,${DOCUEXT}, $(wildcard ${DIR}/*.${EXT})))
 export DOCU
 
+# Search for modules only if building code
+# Also add REQUIRED modules (even if not building code)
+OTHER_MODULES=$(sort $(if $(SRCS)$(filter SOURCES%,${.VARIABLES}),$(notdir $(abspath $(wildcard ${EPICS_MODULES}/*/*.*.*/R${EPICSVERSION}/include/../../..)))) $(foreach r,$(filter REQUIRED%,${.VARIABLES}),$($r)))
+export OTHER_MODULES
+
 # Loop over all target architectures for third run.
 # Go to O.${T_A} subdirectory because RULES.Vx only work there:
 
@@ -424,7 +429,7 @@ define MAKELINKDIRS
 LINKDIRS+=O.${EPICSVERSION}_$1
 O.${EPICSVERSION}_$1:
 	$(LN) O.${EPICSVERSION}_$2 O.${EPICSVERSION}_$1
-endef 
+endef
 $(foreach a,${CROSS_COMPILER_TARGET_ARCHS},$(foreach l,$(LINK_$a),$(eval $(call MAKELINKDIRS,$l,$a))))
 
 install build debug::
@@ -435,8 +440,8 @@ uninstall::
 
 debug::
 	@echo "EPICS_BASE = ${EPICS_BASE}"
-	@echo "EPICSVERSION = ${EPICSVERSION}" 
-	@echo "EPICS_BASETYPE = ${EPICS_BASETYPE}" 
+	@echo "EPICSVERSION = ${EPICSVERSION}"
+	@echo "EPICS_BASETYPE = ${EPICS_BASETYPE}"
 	@echo "CROSS_COMPILER_TARGET_ARCHS = ${CROSS_COMPILER_TARGET_ARCHS}"
 	@echo "EXCLUDE_ARCHS = ${EXCLUDE_ARCHS}"
 	@echo "LIBVERSION = ${LIBVERSION}"
@@ -452,7 +457,7 @@ install build::
 # Loop over all architectures.
 install build debug:: ${MAKE_FIRST}
 	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-            umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; $(foreach v,$(filter IGNORE_MODULES%,${.VARIABLES}),$v=${$v}) ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
+	    umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; $(foreach v,$(filter IGNORE_MODULES%,${.VARIABLES}),$v=${$v}) ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
 else # T_A
@@ -517,28 +522,26 @@ export USE_EXACT_MINOR_VERSION += $(ABI_MAY_CHANGE_BETWEEN_MINOR_VERSIONS)
 # The tricky part is to sort versions numerically.
 # Make can't but ls -v can.
 # Only accept numerical versions (needs extended glob).
-# This is slow, thus do it only once for each EPICSVERSION.
-
-IGNORE_MODULES+=$(foreach x, ${VAR_EXTENSIONS}, ${IGNORE_MODULES_$x})
+# We have to do it once for each EPICSVERSION and target architecture.
 
 define ADD_OTHER_MODULE_INCLUDES
 $(eval $(1)_VERSION = $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION}/lib/$(T_A)/,%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION}/lib/$(T_A)/ 2>/dev/null))))
 export $(1)_VERSION
-OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/${OS_CLASS} 2>/dev/null)))
-OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include/os/default 2>/dev/null)))
-OTHER_MODULE_INCLUDES += $$(addprefix -I,$$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9]))/R${EPICSVERSION}/include 2>/dev/null)))
+# Deferred evaluation allows user to overwrite module version.
+# Do not search if no version is found or set (module not supported for this EPICSVERSION/T_A)
+# Search again only if version has been modified to match potentially incomplete version numbers.
+OTHER_MODULE_INCLUDES += $$(if $$($(1)_VERSION),$$(if $$(filter-out $($(1)_VERSION),$$($(1)_VERSION)),\
+        $$(firstword $$(shell ls -dvr ${EPICS_MODULES}/$(1)/$$(strip $$($(1)_VERSION))*(.+([0-9])) 2>/dev/null)),\
+        ${EPICS_MODULES}/$(1)/$($(1)_VERSION))/R${EPICSVERSION}/include)
 endef
-$(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),$(notdir $(wildcard ${EPICS_MODULES}/*))),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
-# Include path for old style modules.
-OLD_INCLUDE = $(wildcard ${INSTBASE}/iocBoot/R${EPICSVERSION}/include)
-OTHER_MODULE_INCLUDES += $(addprefix -I,$(OLD_INCLUDE))
+# Search modules found earlier (those which have an include directory in any version)
+# but skip the module built right now and any module the user wants to be skipped (possibly for this T_A/EPICSVERSION/OS_CLASS only)
+IGNORE_MODULES+=$(foreach x, ${VAR_EXTENSIONS}, ${IGNORE_MODULES_$x})
+$(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),${OTHER_MODULES}),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
 export OTHER_MODULE_INCLUDES
 
-# Manually required modules.
-define ADD_MANUAL_DEPENDENCIES
-$(eval $(1)_VERSION = $(or $(patsubst ${EPICS_MODULES}/$(1)/%/R${EPICSVERSION},%,$(firstword $(shell ls -dvr ${EPICS_MODULES}/$(1)/+([0-9]).+([0-9]).+([0-9])/R${EPICSVERSION} 2>/dev/null))),$(basename $(lastword $(subst -, ,$(basename $(realpath ${INSTBASE}/iocBoot/R${EPICSVERSION}/${T_A}/$(1).dep)))))))
-endef
-$(eval $(foreach m,${REQ},$(call ADD_MANUAL_DEPENDENCIES,$m)))
+# Include path for old style modules.
+OTHER_MODULE_INCLUDES += ${INSTBASE}/iocBoot/R${EPICSVERSION}/include
 
 O.%:
 	$(MKDIR) $@
@@ -546,12 +549,12 @@ O.%:
 ifeq ($(shell echo "${LIBVERSION}" | grep -v -E "^[0-9]+\.[0-9]+\.[0-9]+\$$"),)
 install:: build
 	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
-        (echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.\nNote: If you really want to overwrite then uninstall first."; false)
+	(echo -e "Error: ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} already exists.\nNote: If you really want to overwrite then uninstall first."; false)
 else
 install:: build
 	@test ! -d ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A} || \
-        (echo -e "Warning: Re-installing ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A}"; \
-        $(RMDIR) ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A})
+	(echo -e "Warning: Re-installing ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A}"; \
+	$(RMDIR) ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A})
 endif
 
 install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
@@ -574,7 +577,7 @@ COMMON_DIR = ${COMMON_DIR_${EPICS_BASETYPE}}
 
 # Remove include directory for this module from search path.
 # 3.13 and 3.14+ use different variables
-INSTALL_INCLUDES = $(strip $(OTHER_MODULE_INCLUDES))
+INSTALL_INCLUDES = $(addprefix -I,$(wildcard $(foreach d, $(OTHER_MODULE_INCLUDES), $d $(addprefix $d/, os/${OS_CLASS} $(POSIX_$(POSIX)) os/default))))
 EPICS_INCLUDES =
 
 # EPICS 3.13 uses :: in some rules where 3.14 uses :
@@ -781,7 +784,7 @@ DBDFILES += $(patsubst %.gt,%.dbd,$(notdir $(filter %.gt,${SRCS})))
 #    match ($$0,/(\w+)[\t ]*\([\t ]*(struct)?[\t ]*\w+Record[\t ]*\*[\t ]*\w+[\t ]*\)/, a); \
 #    n=a[1];if(!static && !f[n]){f[n]=1;print "function (" n ")"}} \
 #/[;{}]/ {static=0}
-#endef 
+#endef
 #
 #$(shell awk '$(maksubfuncfile)' $(addprefix ../,$(filter %.c %.cc %.C %.cpp, $(SRCS))) > ${SUBFUNCFILE})
 #DBDFILES += $(if $(shell cat ${SUBFUNCFILE}),${SUBFUNCFILE})
@@ -817,7 +820,7 @@ debug::
 	@echo "BPTS = ${BPTS}"
 	@echo "HDRS = ${HDRS}"
 	@$(foreach s,$(filter SOURCES%,${.VARIABLES}),echo "$s = $($s)";)
-	@echo "SRCS = ${SRCS}" 
+	@echo "SRCS = ${SRCS}"
 	@echo "LIBOBJS = ${LIBOBJS}"
 	@$(foreach s,$(filter DBDS%,${.VARIABLES}),echo "$s = $($s)";)
 	@echo "DBD_SRCS = ${DBD_SRCS}"
@@ -1108,17 +1111,17 @@ END {for (name in func_missing) if (!func_found[name]) { \
 	print "epicsExportAddress(" type ", " name ");"} \
     }
 endef
- 
+
 CORELIB = ${CORELIB_${OS_CLASS}}
 CORELIB_vxWorks = $(firstword $(wildcard ${EPICS_BASE}/bin/${T_A}/softIoc.munch ${EPICS_BASE}/bin/${T_A}/iocCoreLibrary.munch))
- 
+
 ifeq (${OS_CLASS},vxWorks)
 SHARED_LIBRARIES=NO
 endif
 LSUFFIX_YES=$(SHRLIB_SUFFIX)
 LSUFFIX_NO=$(LIB_SUFFIX)
 LSUFFIX=$(LSUFFIX_$(SHARED_LIBRARIES))
- 
+
 ${EXPORTFILE}: $(filter-out $(basename ${EXPORTFILE})$(OBJ),${LIBOBJS})
 	$(RM) $@
 	$(NM) $^ ${BASELIBS:%=${EPICS_BASE}/lib/${T_A}/${LIB_PREFIX}%$(LSUFFIX)} ${CORELIB} | awk '$(makexportfile)' > $@
