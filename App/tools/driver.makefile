@@ -96,13 +96,9 @@ EXPORTFILE = ${PRJ}_exportAddress.c
 SUBFUNCFILE = ${PRJ}_subRecordFunctions.dbd
 DEPFILE = ${PRJ}.dep
 
-# Clear potential environment variables.
-undefine TEMPLATES
-undefine SOURCES
-undefine DBDS
-undefine HEADERS
-undefine BASH_ENV
-undefine ENV
+# Clear potentially problematic environment variables.
+BASH_ENV=
+ENV=
 
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules).
