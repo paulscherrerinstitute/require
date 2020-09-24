@@ -165,6 +165,7 @@ export ARCH_FILTER
 export EXCLUDE_ARCHS
 export MAKE_FIRST
 export SUBMODULES
+export USE_LIBVERSION
 
 # Some shell commands:
 RMDIR = rm -rf
@@ -582,6 +583,8 @@ INSTALLRULE=install::
 BUILDRULE=build::
 BASERULES=${EPICS_BASE}/config/RULES.Vx
 OBJ=.o
+LIB_SUFFIX=.a
+LIB_PREFIX=lib
 else # 3.14+
 INSTALLRULE=install:
 BUILDRULE=build:
@@ -624,12 +627,12 @@ INSTALL_SCR     = ${INSTALL_REV}
 # Different settings required to build library in EPICS 3.13 and 3.14+.
 ifeq (${EPICS_BASETYPE},3.13) # only 3.13 from here
 
-# Convert sources to object code, skip .a and .o here.
-LIBOBJS += $(patsubst %,%.o,$(notdir $(basename $(filter-out %.o %.a,${SRCS}))))
+# Convert sources to object code, skip *Lib, *.a and *.o here.
+LIBOBJS += $(patsubst %,%.o,$(notdir $(basename $(filter-out %.o %.a %Lib,${SRCS}))))
 # Add all .a and .o with absolute path.
-LIBOBJS += $(filter /%.o /%.a,${SRCS})
+LIBOBJS += $(filter /%.o /%.a /%Lib,${SRCS})
 # Add all .a and .o with relative path, but go one directory up.
-LIBOBJS += $(patsubst %,../%,$(filter-out /%,$(filter %.o %.a,${SRCS})))
+LIBOBJS += $(patsubst %,../%,$(filter-out /%,$(filter %.o %.a %Lib,${SRCS})))
 LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
 LIBOBJS += $(foreach l,${USR_LIBOBJS}, $(addprefix ../,$(filter-out /%,$l)) $(filter /%,$l))
 
@@ -646,7 +649,7 @@ PROD = ${MODULELIB}
 
 else # Only 3.14+ from here.
 
-LIBRARY_OBJS = $(strip ${LIBOBJS} $(foreach l,${USR_LIBOBJS},$(addprefix ../,$(filter-out /%,$l))$(filter /%,$l)))
+LIBRARY_OBJS = $(strip ${LIBOBJS} $(foreach l,${USR_LIBOBJS},$(addprefix ../,$(filter-out /%,$l)) $(filter /%,$l)))
 
 ifeq (${OS_CLASS},vxWorks)
 # Only install the munched library.
@@ -658,9 +661,12 @@ endif
 
 # vxWorks
 PROD_vxWorks=${MODULELIB}
-LIBOBJS += $(addsuffix $(OBJ),$(notdir $(basename $(filter-out %.$(OBJ) %(LIB_SUFFIX),$(sort ${SRCS})))))
-LIBOBJS += $(filter /%.$(OBJ) /%(LIB_SUFFIX),${SRCS})
-LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/%Lib}
+LIBOBJS += $(addsuffix $(OBJ),$(notdir $(basename $(filter-out %$(OBJ) %$(LIB_SUFFIX) %Lib,$(sort ${SRCS})))))
+# Add all libs and objs with absolute path.
+LIBOBJS += $(filter /%$(OBJ) /%$(LIB_SUFFIX) /%Lib,${SRCS})
+# Add all libs and objs with relative path, but go one directory up.
+LIBOBJS += $(patsubst %,../%,$(filter-out /%,$(filter %$(OBJ) %$(LIB_SUFFIX) %Lib,${SRCS})))
+LIBOBJS += ${LIBRARIES:%=${INSTALL_LIB}/$(LIB_PREFIX)%$(LIB_SUFFIX)}
 LIBS = -L ${EPICS_BASE_LIB} ${BASELIBS:%=-l%}
 LINK.cpp += ${LIBS}
 PRODUCT_OBJS = ${LIBRARY_OBJS}
@@ -796,7 +802,9 @@ endif
 
 # If we build a library, provide a version variable.
 ifneq ($(MODULELIB),)
+ifneq ($(USE_LIBVERSION),NO)
 LIBOBJS += $(addsuffix $(OBJ),$(basename ${VERSIONFILE}))
+endif # USE_LIBVERSION
 endif # MODULELIB
 
 debug::
@@ -838,6 +846,8 @@ COMMON_INC = ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
 # Include default EPICS Makefiles (version dependent).
 # Avoid library installation when doing 'make build'.
 INSTALL_LOADABLE_SHRLIBS=
+INSTALL_SHRLIBS=
+INSTALL_LIBS=
 # Avoid installing *.munch to bin directory.
 INSTALL_MUNCHS=
 include ${BASERULES}
@@ -1050,10 +1060,10 @@ MUNCH_=$(MUNCH_5)
 MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
 %.munch: %
 	@echo Munching $<
-	$(RM) ctct.o ctdt.c
+	$(RM) ctct$(OBJ) ctdt.c
 	$(NM) $< | $(MUNCH) > ctdt.c
 	$(COMPILE.c) -traditional ctdt.c
-	$(LINK.c) $@ $< ctdt.o
+	$(LINK.c) $@ $< ctdt$(OBJ)
 
 %_ctdt.c : %.nm
 	@echo Munching $*
