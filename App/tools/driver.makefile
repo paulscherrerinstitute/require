@@ -6,7 +6,7 @@
 # changing anything in this file.
 #
 # Usage: Create a Makefile containig the line:
-#        include /ioc/tool/driver.makefile
+#        include /ioc/tools/driver.makefile
 #        Optionally add variable definitions below that line.
 #
 # This makefile automatically finds the source file (unless overwritten with
