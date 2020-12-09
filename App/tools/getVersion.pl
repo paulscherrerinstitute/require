@@ -184,6 +184,8 @@ sub parse_git_output {
         if ($line =~ /fatal: Not a git repository/) {
             return;
         }
+        elsif ($line =~ /^#/) {
+        }
         elsif ($line =~ /^\?\? (.*)/) {
             say STDERR "$1: not in git => version test";
             $version = "test";
