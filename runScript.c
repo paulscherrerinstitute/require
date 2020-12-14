@@ -200,6 +200,11 @@ int runScript(const char* filename, const char* args)
             if (fgets(line_raw + len, line_raw_size - len, file) == NULL) break;
         }
         while (len > 0 && isspace((unsigned char)line_raw[len-1])) line_raw[--len] = 0; /* get rid of '\n' and friends */
+
+        /* Remember state of macros in case environment variable gets expanded */
+        /* This would otherwise "freeze" environment macros to the state of their first expansion */
+        macPushScope(mac);
+
         if (runScriptDebug)
                 printf("runScript raw line (%ld chars): '%s'\n", len, line_raw);
         /* expand and check the buffer size (different epics versions write different may number of bytes)*/
@@ -218,6 +223,9 @@ int runScript(const char* filename, const char* args)
         }
         if (runScriptDebug)
                 printf("runScript expanded line (%ld chars): '%s'\n", len, line_exp);
+
+        macPopScope(mac);
+
         p = line_exp;
         while (isspace((unsigned char)*p)) p++;
         if (p[0] != '#' || p[1] != '-')
