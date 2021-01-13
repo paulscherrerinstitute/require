@@ -216,6 +216,8 @@ sub parse_git_output {
             say STDERR "no tag on this version => version test";
             $version = "test";
         }
+        elsif ($line =~ /On branch/) {
+        }
         elsif ($line =~ /^([0-9]+)\.([0-9]+)(\.([0-9]+))?$/) {
             my $major = $1;
             my $minor = $2;
@@ -223,7 +225,7 @@ sub parse_git_output {
             $version = "$major.$minor.$patch";
             say STDERR "checking tag $line => version $version";
         }
-        elsif ($line =~ /^[a-zA-Z]+[a-zA-Z0-9]*_([0-9]+)_([0-9]+)(_([0-9]+))?$/) {
+        elsif ($line =~ /[a-zA-Z]+[a-zA-Z0-9]*_([0-9]+)_([0-9]+)(_([0-9]+))?$/) {
             my $major = $1;
             my $minor = $2;
             my $patch = $4 || "0";
