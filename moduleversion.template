@@ -25,7 +25,7 @@ record (waveform, "$(IOC):MOD_VER")
     field (ASG,  "READONLY")
 }
 
-record (stringin, "$(IOC):$(MODULE)_VER")
+record (stringin, "$(IOC):$(MODULE)_VERS")
 {
     field (DESC, "Module $(MODULE) version")
     field (VAL,  "$(VERSION)")
