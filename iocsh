@@ -216,7 +216,8 @@ IOC=$(hostname|tr -d '\r')
 # trailing possible domain name
 IOC=${IOC%%.*}
 # or get IOC name from start directory following PSI convention
-if [ $(basename $(dirname $PWD)) = "ioc" ]
+D=$(basename $(dirname $PWD))
+if [ ${D#*_} = "ioc" ]
 then
     IOC=$(basename $PWD)
 fi
