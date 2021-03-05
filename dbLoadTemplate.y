@@ -24,6 +24,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(vxWorks)
+#include <ioLib.h>
+#endif
+
 #include "macLib.h"
 #include "dbmf.h"
 
