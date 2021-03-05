@@ -448,13 +448,13 @@ fi
 
 if [ ! -f "$REQUIRE_LIB" ]
 then
-    echo "Library $REQUIRE_LIB not found." >&2
+    echo "Library ${REQUIRE_LIB:-$LIBPREFIX$REQUIRE$LIBPOSTFIX} not found." >&2
     echo "Command 'require' is not available." >&2
 else
     echo "$LDCMD $REQUIRE_LIB"
     echo "dbLoadDatabase $REQUIRE_DBD"
     echo "${REQUIRE%-*}_registerRecordDeviceDriver"
-    echo "require misc $MISC_VERSION"
+    echo "require misc ${MISC_VERSION:-ifexists}"
 fi
 
 loadFiles "$@"
