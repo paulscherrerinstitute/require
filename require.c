@@ -80,8 +80,16 @@ int requireDebug;
     #define INFIX "Lib"
     #define EXT ".munch"
 
-    #define getAddress(module, name) __extension__ \
-        ({SYM_TYPE t; char* a = NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
+    #if _WRS_VXWORKS_MAJOR*10+_WRS_VXWORKS_MINOR*1+_WRS_VXWORKS_MAINT < 69
+        #define FUNCTYPE (FUNCPTR)
+        #define getAddress(module, name) __extension__ \
+            ({SYM_TYPE t; char* a = NULL; symFindByName(sysSymTbl, (name), &a, &t); a;})
+    #else
+        #define FUNCTYPE
+        #define getAddress(module, name) \
+            ({SYMBOL_DESC s={SYM_FIND_BY_NAME, (name), 0, 0, 0, 0}; symFind(sysSymTbl, &s); s.value;})
+    #endif
+
 
 #ifndef _WRS_VXWORKS_MAJOR
     /* vxWorks 5 has no snprintf() */
@@ -687,11 +695,11 @@ void registerModule(const char* module, const char* version, const char* locatio
 
 #if defined (vxWorks)
 static BOOL findLibRelease (
-    char      *name,  /* symbol name       */
-    int       val,    /* value of symbol   */
-    SYM_TYPE  type,   /* symbol type       */
-    int       arg,    /* user-supplied arg */
-    UINT16    group   /* group number      */
+    char          *name,  /* symbol name       */
+    char*         val,    /* value of symbol   */
+    SYM_TYPE      type,   /* symbol type       */
+    int           arg,    /* user-supplied arg */
+    UINT16        group   /* group number      */
 ) {
     /* find symbols with a name like "_<module>LibRelease" */
     char* module;
@@ -705,7 +713,7 @@ static BOOL findLibRelease (
     module = strdup(name+1);                  /* remove '_' */
     module[lm-1]=0;                           /* remove "libRelase" */
     if (getLibVersion(module) == NULL)
-        registerModule(module, (char*)val, NULL);
+        registerModule(module, val, NULL);
     free(module);
     return TRUE;
 }
@@ -713,7 +721,7 @@ static BOOL findLibRelease (
 void registerExternalModules()
 {
     /* iterate over all symbols */
-    symEach(sysSymTbl, (FUNCPTR)findLibRelease, 0);
+    symEach(sysSymTbl, FUNCTYPE findLibRelease, 0);
 }
 
 #elif defined (__linux)
