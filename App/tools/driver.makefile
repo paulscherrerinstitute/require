@@ -1079,9 +1079,10 @@ endif
 
 # EPICS R3.14+:
 # Create file to fill registry from dbd file.
+# Avoid calling iocshRegisterCommon() repeatedly for each module
 ${REGISTRYFILE}: ${MODULEDBD}
 	$(RM) $@ temp.cpp
-	$(PERL) $(EPICS_BASE_HOST_BIN)/registerRecordDeviceDriver.pl $< $(basename $@) | grep -v iocshRegisterCommon > temp.cpp
+	$(PERL) $(EPICS_BASE_HOST_BIN)/registerRecordDeviceDriver.pl $< $(basename $@) | grep -v 'iocshRegisterCommon.*;' > temp.cpp
 	$(MV) temp.cpp $@
 
 # 3.14.12 complains if this rule is not overwritten
