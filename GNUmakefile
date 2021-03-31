@@ -4,7 +4,7 @@ include Makefile
 else
 include /ioc/tools/driver.makefile
 
-BUILDCLASSES += Linux
+BUILDCLASSES += vxWorks Linux WIN32
 
 SOURCES += require.c
 DBDS    += require.dbd
