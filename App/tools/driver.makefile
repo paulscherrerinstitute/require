@@ -65,7 +65,7 @@ MAKEHOME:=$(dir $(lastword ${MAKEFILE_LIST}))
 USERMAKEFILE:=$(lastword $(filter-out $(lastword ${MAKEFILE_LIST}), ${MAKEFILE_LIST}))
 
 # Some configuration:
-DEFAULT_EPICS_VERSIONS = 3.13.9 3.13.10 3.14.8 3.14.12 7.0.3
+DEFAULT_EPICS_VERSIONS = 3.13.10 3.14.12 7.0.5
 BUILDCLASSES = vxWorks
 EPICS_MODULES ?= /ioc/modules
 MODULE_LOCATION = ${EPICS_MODULES}/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
@@ -133,7 +133,7 @@ ifndef EPICSVERSION
 # In source directory
 
 # Find out which EPICS versions to build.
-INSTALLED_EPICS_VERSIONS := $(patsubst ${EPICS_LOCATION}/base-%,%,$(wildcard ${EPICS_LOCATION}/base-*[0-9]))
+INSTALLED_EPICS_VERSIONS := $(sort $(patsubst ${EPICS_LOCATION}/base-%,%,$(realpath $(wildcard ${EPICS_LOCATION}/base-*[0-9]))))
 EPICS_VERSIONS = $(filter-out ${EXCLUDE_VERSIONS:=%},${DEFAULT_EPICS_VERSIONS})
 MISSING_EPICS_VERSIONS = $(filter-out ${BUILD_EPICS_VERSIONS},${EPICS_VERSIONS})
 BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
