@@ -14,6 +14,7 @@ help () {
     echo " -d, --debug     Run IOC with gdb."
     echo " -dv             Run IOC with valgrind."
     echo " -dp             Run IOC with perf record."
+    echo " -i bashscript   Source bashscript before starting ioc."
     echo " -c 'cmd args'   Ioc shell command."
     echo " -s 'prog m=v'   Sequencer program (and arguments), run with 'seq'."
     echo "                 This forces an 'iocInit' before running the program."
@@ -29,6 +30,9 @@ help () {
     echo " *.so                     loaded via 'dlload' (or 'ld' before 3.14.12)"
     echo "All other files are executed as startup scripts by the EPICS shell."
     echo "After a file you can specify substitutions like m1=v1 m2=v1 for that file."
+    echo
+    echo "If a readable file iocsh.init exists in ./, cfg/, or /etc/, it is sourced"
+    echo "when iocsh starts. Only the first one found is sourced."
     echo
     echo "Examples:"
     echo "  iocsh st.cmd"
@@ -70,6 +74,19 @@ then
     unset EPICS_BASE
 fi 2> /dev/null
 
+# IOC name derives from hostname
+# (trailing possible '\r' under cygwin)
+IOC=$(hostname|tr -d '\r')
+# trailing possible domain name
+IOC=${IOC%%.*}
+# or get IOC name from start directory following PSI convention
+D=$(basename $(dirname $PWD))
+if [ ${D#*_} = "ioc" ]
+then
+    IOC=$(basename $PWD)
+fi
+export IOC
+
 while true
 do
     case $1 in
@@ -82,6 +99,10 @@ do
         ( -[1-9]* )
             unset EPICS_BASE
             BASE=${1#-}
+        ;;
+        ( -n )
+            shift
+            IOC="$1"
         ;;
         ( * ) break
         ;;
@@ -210,19 +231,6 @@ do
     fi
 done
 
-# IOC name derives from hostname
-# (trailing possible '\r' under cygwin)
-IOC=$(hostname|tr -d '\r')
-# trailing possible domain name
-IOC=${IOC%%.*}
-# or get IOC name from start directory following PSI convention
-D=$(basename $(dirname $PWD))
-if [ ${D#*_} = "ioc" ]
-then
-    IOC=$(basename $PWD)
-fi
-export IOC
-
 # Check for 64 bit versions, default to 32 bit
 if [ ! -d $EPICS_BASE/lib/${EPICS_HOST_ARCH} -a -d $EPICS_BASE/lib/${EPICS_HOST_ARCH%_64} ]
 then
@@ -258,6 +266,16 @@ then
 fi
 export EPICS_DRIVER_PATH
 
+# Call init script after IOC name, EPICS_HOST_ARCH and EPICS_BASE are set.
+for dir in . cfg /etc
+do
+    if [ -r $dir/iocsh.init ]
+    then
+        source $dir/iocsh.init
+        break
+    fi
+done
+
 loadFiles () {
 while [ "$#" -gt 0 ]
 do
@@ -289,6 +307,10 @@ do
     ( -dp )
         LOADER="perf record $LOADER"
         ;;
+    ( -i )
+        shift
+        source $1
+        ;;
     ( -c )
         shift
         case $1 in
@@ -317,10 +339,6 @@ do
     ( -r )
         shift
         echo "require $1"
-        ;;
-    ( -n )
-        shift
-        IOC="$1"
         ;;
     ( -* )
         echo "Unknown option $1" >&2
