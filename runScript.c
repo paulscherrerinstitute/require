@@ -40,7 +40,9 @@ extern volatile int interruptAccept;
 #else
 #include <osiFileName.h>
 #include <iocsh.h>
+#ifndef EPICS_VERSION_INT
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
+#endif
 #include <epicsExport.h>
 #endif
 

@@ -47,7 +47,9 @@ extern volatile int interruptAccept;
 #include <iocsh.h>
 #include <dbAccess.h>
 /* This prototype is missing in older EPICS versions */
+#ifndef EPICS_VERSION_INT
 epicsShareFunc int epicsShareAPI iocshCmd(const char *cmd);
+#endif
 #include <epicsExit.h>
 #include <epicsStdio.h>
 #include <osiFileName.h>
