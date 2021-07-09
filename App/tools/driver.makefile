@@ -472,7 +472,7 @@ install build:
 %:
 	@true
 
-else ifeq ($(shell which $(firstword ${CC})),)
+else ifeq ($(shell PATH=$(PATH) which $(firstword ${CC})),)
 
 install% build%: build
 install build:
