@@ -167,6 +167,8 @@ export MAKE_FIRST
 export SUBMODULES
 export USE_LIBVERSION
 
+export ORIGIN=$(firstword $(shell git remote -v 2>/dev/null | awk '/psi.ch.*(fetch)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null)) $(addsuffix /,$(shell cat CVS/Root 2>/dev/null))$(shell cat CVS/Repository 2>/dev/null) $(PWD))
+
 # Some shell commands:
 RMDIR = rm -rf
 LN = ln -s
@@ -940,19 +942,25 @@ debug::
 	@echo "INSTALL_BIN = $(INSTALL_BIN)"
 	@echo "INSTALL_BINS = $(INSTALL_BINS)"
 
+INSTALLS += .ORIGIN
 INSTALLS += ${INSTALL_CFGS} ${INSTALL_SCRS} ${INSTALL_HDRS} ${INSTALL_DBDS} ${INSTALL_DBS} ${INSTALL_LIBS} ${INSTALL_BINS} ${INSTALL_DEPS}
-
 ifdef USE_EXACT_VERSION
 INSTALLS += ${EPICS_MODULES}/${PRJ}/use_exact_version
-%/use_exact_version:
+%/use_exact_version: | %
 	touch $@
 else
 ifdef USE_EXACT_MINOR_VERSION
 INSTALLS += ${EPICS_MODULES}/${PRJ}/use_exact_minor_version
-%/use_exact_minor_version:
+%/use_exact_minor_version: | %
 	touch $@
 endif
 endif
+
+.ORIGIN: ${INSTALL_REV}
+	echo '${ORIGIN}' > ${INSTALL_REV}/ORIGIN
+
+${INSTALL_REV}:
+	$(MKDIR) $@
 
 ${INSTALLRULE} ${INSTALLS}
 

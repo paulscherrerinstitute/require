@@ -32,3 +32,12 @@ record (stringin, "$(IOC):$(MODULE)_VERS")
     field (PINI, "YES")
     field (ASG,  "READONLY")
 }
+
+record (waveform, "$(IOC):$(MODULE)_ORIGIN")
+{
+    field (DESC, "Module $(MODULE) origin")
+    field (FTVL, "CHAR")
+    field (NELM, "$(ORIGIN_SIZE=1)")
+    field (PINI, "YES")
+    field (ASG,  "READONLY")
+}

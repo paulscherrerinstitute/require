@@ -388,6 +388,8 @@ static moduleitem* loadedModules = NULL;
 static unsigned long moduleCount = 0;
 static size_t moduleListBufferSize = 1;
 static size_t maxModuleNameLength = 0;
+static size_t maxVersionLength = 0;
+static size_t maxLocationLength = 0;
 
 int putenvprintf(const char* format, ...)
 {
@@ -519,8 +521,9 @@ static int getRecordHandle(const char* namepart, short type, size_t minsize, DBA
     sprintf(recordname, "%.*s%s", (int)(PVNAME_STRINGSZ-strlen(namepart)-1), getenv("IOC"), namepart);
     if (dbNameToAddr(recordname, paddr) != 0)
     {
-        fprintf(stderr, "require: record %s not found\n",
-            recordname);
+        if (requireDebug)
+            fprintf(stderr, "require: record %s not found\n",
+                recordname);
         return -1;
     }
     if (paddr->field_type != type)
@@ -556,11 +559,12 @@ static void fillModuleListRecord(initHookState state)
 {
     if (state == initHookAfterFinishDevSup) /* MODULES record exists and has allocated memory */
     {
-        DBADDR modules, versions, modver;
+        DBADDR modules, versions, modver, origin;
         int have_modules, have_versions, have_modver;
         moduleitem *m;
         int i = 0;
         long c = 0;
+        char originName[PVNAME_STRINGSZ];
 
         if (requireDebug)
             printf("require: fillModuleListRecord\n");
@@ -574,6 +578,9 @@ static void fillModuleListRecord(initHookState state)
         for (m = loadedModules, i = 0; m; m=m->next, i++)
         {
             size_t lm = strlen(m->content)+1;
+            size_t lv = strlen(m->content+lm)+1;
+            size_t ll = strlen(m->content+lm+lv)+1;
+            size_t lo = strlen(m->content+lm+lv+ll)+1;
             if (have_modules)
             {
                 if (requireDebug)
@@ -601,12 +608,54 @@ static void fillModuleListRecord(initHookState state)
                 c += sprintf((char*)(modver.pfield) + c, "%-*s%s\n",
                         (int)maxModuleNameLength, m->content, m->content+lm);
             }
+
+            sprintf(originName, ":%.*s_ORIGIN", (int)(PVNAME_STRINGSZ-9), m->content);
+            if (getRecordHandle(originName, DBF_CHAR, lo, &origin) == 0)
+            {
+                strncpy(origin.pfield, m->content+lm+lv+ll, lo);
+                dbGetRset(&origin)->put_array_info(&origin, (int)lo);
+            }
         }
         if (have_modules) dbGetRset(&modules)->put_array_info(&modules, i);
         if (have_versions) dbGetRset(&versions)->put_array_info(&versions, i);
         if (have_modver) dbGetRset(&modver)->put_array_info(&modver, c+1);
     }
 }
+
+static off_t fileSize(const char* filename)
+{
+    struct stat filestat;
+    if (stat(
+#ifdef vxWorks
+        (char*) /* vxWorks has buggy stat prototype */
+#endif
+        filename, &filestat) != 0)
+    {
+        if (requireDebug)
+            printf("require: %s does not exist\n", filename);
+        return -1;
+    }
+    switch (filestat.st_mode & S_IFMT)
+    {
+        case S_IFREG:
+            if (requireDebug)
+                printf("require: file %s exists, size %llu bytes\n",
+                    filename, (unsigned long long)filestat.st_size);
+            return filestat.st_size;
+        case S_IFDIR:
+            if (requireDebug)
+                printf("require: directory %s exists\n",
+                    filename);
+            return 0;
+        default:
+            if (requireDebug)
+                printf("require: %s is a special file type\n",
+                    filename);
+            return -1;
+    }
+}
+#define fileExists(filename) (fileSize(filename)>=0)
+#define fileNotEmpty(filename) (fileSize(filename)>0)
 
 void registerModule(const char* module, const char* version, const char* location)
 {
@@ -619,6 +668,8 @@ void registerModule(const char* module, const char* version, const char* locatio
     int addSlash=0;
     const char *mylocation;
     static int firstTime = 1;
+    off_t originSize = 0;
+    char* originStr = NULL;
 
     if (requireDebug)
         printf("require: registerModule(%s,%s,%s)\n", module, version, location);
@@ -643,6 +694,26 @@ void registerModule(const char* module, const char* version, const char* locatio
 
     if (location)
     {
+        /* see if we get an origin string */
+        char* originFileName = NULL;
+        if (asprintf(&originFileName, "%sORIGIN", location) > 0) {
+            originSize = fileSize(originFileName);
+            if (originSize > 0) {
+                FILE* originFile = fopen(originFileName, "r");
+                if (originFile) {
+                    originStr = malloc(originSize + 1);
+                    if (originStr)
+                        fgets(originStr, originSize, originFile);
+                    fclose(originFile);
+                } else {
+                    perror(originFileName);
+                }
+            } else {
+                originSize = 0;
+            }
+            free(originFileName);
+        }
+
         abslocation = realpath(location, NULL);
         if (!abslocation) abslocation = (char*)location;
         ll = strlen(abslocation) + 1;
@@ -652,7 +723,8 @@ void registerModule(const char* module, const char* version, const char* locatio
             addSlash = 1;
         }
     }
-    m = (moduleitem*) malloc(sizeof(moduleitem) + lm + lv + ll + addSlash);
+
+    m = (moduleitem*) calloc(1, sizeof(moduleitem) + lm + lv + ll + addSlash + originSize + 1);
     if (m == NULL)
     {
         fprintf(stderr, "require: out of memory\n");
@@ -663,10 +735,14 @@ void registerModule(const char* module, const char* version, const char* locatio
     strcpy (m->content+lm, version);
     strcpy (m->content+lm+lv, abslocation ? abslocation : "");
     if (addSlash) strcpy (m->content+lm+lv+ll-1, "/");
+    if (originStr) strcpy (m->content+lm+lv+ll+addSlash, originStr);
+    free(originStr);
     if (abslocation != location) free(abslocation);
     for (pm = &loadedModules; *pm != NULL; pm = &(*pm)->next);
     *pm = m;
     if (lm > maxModuleNameLength) maxModuleNameLength = lm;
+    if (lv > maxVersionLength) maxVersionLength = lv;
+    if (ll > maxLocationLength) maxLocationLength = ll;
     moduleListBufferSize += lv;
     moduleCount++;
 
@@ -686,9 +762,9 @@ void registerModule(const char* module, const char* version, const char* locatio
     mylocation = getenv("require_DIR");
     if (mylocation == NULL) return;
     if (asprintf(&abslocation, "%s/db/moduleversion.template", mylocation) < 0) return;
-    if (asprintf(&argstring, "IOC=%.30s, MODULE=%.24s, VERSION=%.39s, MODULE_COUNT=%lu, BUFFER_SIZE=%lu",
+    if (asprintf(&argstring, "IOC=%.30s, MODULE=%.24s, VERSION=%.39s, MODULE_COUNT=%lu, BUFFER_SIZE=%lu, ORIGIN_SIZE=%ld",
         getenv("IOC"), module, version, moduleCount,
-        moduleListBufferSize+maxModuleNameLength*moduleCount) < 0) return;
+        moduleListBufferSize+maxModuleNameLength*moduleCount, (long)originSize) < 0) return;
     printf("Loading module info records for %s\n", module);
     dbLoadRecords(abslocation, argstring);
     free(argstring);
@@ -889,9 +965,10 @@ int libversionShow(const char* outfile)
     {
         lm = strlen(m->content)+1;
         lv = strlen(m->content+lm)+1;
-        fprintf(out, "%-*s%-20s %s\n",
+        fprintf(out, "%-*s%-*s%-*s\n",
             (int)maxModuleNameLength, m->content,
-            m->content+lm, m->content+lm+lv);
+            (int)maxVersionLength, m->content+lm,
+            (int)maxLocationLength, m->content+lm+lv);
     }
     if (fflush(out) < 0 && outfile)
     {
@@ -1160,41 +1237,6 @@ int require(const char* module, const char* version, const char* args)
     #endif
     return status;
 }
-
-static off_t fileSize(const char* filename)
-{
-    struct stat filestat;
-    if (stat(
-#ifdef vxWorks
-        (char*) /* vxWorks has buggy stat prototype */
-#endif
-        filename, &filestat) != 0)
-    {
-        if (requireDebug)
-            printf("require: %s does not exist\n", filename);
-        return -1;
-    }
-    switch (filestat.st_mode & S_IFMT)
-    {
-        case S_IFREG:
-            if (requireDebug)
-                printf("require: file %s exists, size %llu bytes\n",
-                    filename, (unsigned long long)filestat.st_size);
-            return filestat.st_size;
-        case S_IFDIR:
-            if (requireDebug)
-                printf("require: directory %s exists\n",
-                    filename);
-            return 0;
-        default:
-            if (requireDebug)
-                printf("require: %s is a special file type\n",
-                    filename);
-            return -1;
-    }
-}
-#define fileExists(filename) (fileSize(filename)>=0)
-#define fileNotEmpty(filename) (fileSize(filename)>0)
 
 static int handleDependencies(const char* module, char* depfilename)
 {
