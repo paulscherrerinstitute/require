@@ -749,7 +749,9 @@ CPPFLAGS += -MMD
 endif
 endif
 endif
--include *.d
+
+# Ignore *.h.d files because EPICS 3.14 adds ../Makefile which may not exist
+-include $(filter-out %.h.d,$(wildcard *.d))
 
 # Need to find source dbd files relative to one dir up but generated dbd files in this dir.
 DBDFILES += ${DBD_SRCS:%=../%}
