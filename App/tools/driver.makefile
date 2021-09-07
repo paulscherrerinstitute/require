@@ -175,7 +175,7 @@ LN = ln -s
 EXISTS = test -e
 NM = nm
 RM = rm -f
-MKDIR = mkdir -p -m 775
+MKDIR = umask 002; mkdir -p -m 775
 
 clean::
 	$(RMDIR) O.*
@@ -292,9 +292,9 @@ $(1)_FILES=$$(wildcard $$(or $${$(1)},$(3)))
 installui: install$(1)
 install$(1): uninstall$(1)
 	@$$(if $${$(1)_FILES},echo "Installing $(1) user interfaces";$$(MKDIR) $${INSTALL_$(1)})
-	@$$(if $${$(1)_FILES},$(CP) -v -t $${INSTALL_$(1)} $${$(1)_FILES:%='%'})
+	@$$(if $${$(1)_FILES},umask 002; $(CP) -v -t $${INSTALL_$(1)} $${$(1)_FILES:%='%'})
 	@# One can never have enough quotes:  "'"'%'"'" means: quote the name in case '%' it contains $(bla) or something, and also write quotes "'" to the file
-	@$$(if $${$(1)_FILES},echo $$(patsubst %,"'"'%'"'",$$(notdir $${$(1)_FILES})) > $${INSTALL_$(1)}/.$${PRJ}-$$(LIBVERSION)-$(1).txt)
+	@$$(if $${$(1)_FILES},umask 002; echo $$(patsubst %,"'"'%'"'",$$(notdir $${$(1)_FILES})) > $${INSTALL_$(1)}/.$${PRJ}-$$(LIBVERSION)-$(1).txt)
 
 uninstallui: uninstall$(1)
 uninstall$(1):
@@ -867,7 +867,7 @@ endif
 SHRLIB_SEARCH_DIRS += ${EPICS_BASE}/lib/${T_A}
 $(foreach m,${REQ},$(eval ${m}_DIR=${EPICS_MODULES}/${m}/${${m}_VERSION}/R${EPICSVERSION}/lib/${T_A}))
 # restore overwritten commands
-MKDIR = mkdir -p -m 775
+MKDIR = umask 002; mkdir -p -m 775
 # Fix incompatible release rules.
 RELEASE_DBDFLAGS = -I ${EPICS_BASE}/dbd
 RELEASE_INCLUDES = -I${EPICS_BASE}/include 
