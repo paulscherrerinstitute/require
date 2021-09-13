@@ -692,7 +692,7 @@ ifdef BASE_3_16
 # but not on record types where it would cause an error
 ifndef USING_NEW_RSET
 SUPPRESS_RSET_WARNING = -DUSE_TYPED_RSET=
-USR_CPPFLAGS += ${SUPPRESS_RSET_WARNING}
+CPPFLAGS += ${SUPPRESS_RSET_WARNING}
 REC_SUPPRESS_RSET_WARNING=-Wno-deprecated-declarations
 ifeq ($(OS_CLASS),WIN32)
 REC_SUPPRESS_RSET_WARNING=
