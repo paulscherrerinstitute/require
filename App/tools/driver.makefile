@@ -372,6 +372,7 @@ export SRCS
 DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard menu*.dbd *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
 DBD_SRCS += ${DBDS_${EPICS_BASETYPE}}
 DBD_SRCS += ${DBDS_${EPICSVERSION}}
+DBD_SRCS += ${DBDS_$(firstword $(subst ., ,${EPICSVERSION}))}
 export DBD_SRCS
 
 #record dbd files given in DBDS
