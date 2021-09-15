@@ -336,7 +336,7 @@ endif
 endif # 3.14+
 
 ${CONFIG}/CONFIG:
-	@echo "ERROR: EPICS release ${EPICSVERSION} not installed on this host."
+	@echo "ERROR: Development environment for EPICS ${EPICSVERSION} is not installed on this host."
 
 # Some TOP and EPICS_BASE tweeking necessary to work around release check in 3.14.10+.
 EB:=${EPICS_BASE}
