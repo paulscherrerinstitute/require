@@ -605,7 +605,11 @@ To change this, list the source code files in the variable `SOURCES`. If
 that variable is defined, no automatic detection of source code is done.
 For code only to be compiled with certain EPICS versions, OS classes, or
 architectures, use variables like `SOURCES_*`, for example `SOURCES_3.13`,
-`SOURCES_3.14.12`, `SOURCES_Linux`, `SOURCES_vxWorks`.
+`SOURCES_3.14.12`, `SOURCES_7`, `SOURCES_Linux`, `SOURCES_vxWorks`,
+`SOURCES_7.0.6_SL6`.
+
+For backward compatibility, `SOURCES_3.14`, `SOURCES_3.14_Linux` and such
+are built for any EPICS release from 3.14 on like 3.15 and 7.
 
 **Example:**
 ```
@@ -614,7 +618,10 @@ SOURCES += mycode.c
 SOURCES += subdir/othercode.cc
 SOURCES += statemachine.st
 SOURCES_3.13 += codeOnlyFor3.13.c
+SOURCES_3.14 += codeFor3.14orHigherIncluding7.c
 SOURCES_3.14.12 += codeOnlyFor3.14.12.c
+SOURCES_3 += codeOnlyFor3.c
+SOURCES_7 += codeOnlyFor7.c
 ```
 
 If all files are OS class specific or EPICS base version specific so that
