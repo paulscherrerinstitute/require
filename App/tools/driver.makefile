@@ -754,8 +754,8 @@ endif
 -include $(filter-out %.h.d,$(wildcard *.d))
 
 # Need to find source dbd files relative to one dir up but generated dbd files in this dir.
-DBDFILES += ${DBD_SRCS:%=../%}
-DBD_PATH = $(sort $(dir ${DBDFILES}))
+DBDFILES += $(addprefix ../,${DBD_SRCS})
+DBD_PATH = $(sort $(dir ${DBDFILES} $(addprefix ../,$(filter %Record.c %Record.cc %Record.cpp,${SRCS}))))
 
 DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${EPICS_BASE}/dbd)
 USR_DBDFLAGS += $(DBDEXPANDPATH)
