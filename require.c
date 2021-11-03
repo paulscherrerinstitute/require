@@ -1302,7 +1302,7 @@ static int require_priv(const char* module, const char* version, const char* arg
     const char *end;
 
     int releasediroffs;
-    int libdiroffs;
+    int libdiroffs = 0;
     int extoffs;
     char* founddir = NULL;
     char* symbolname;
@@ -1457,22 +1457,34 @@ static int require_priv(const char* module, const char* version, const char* arg
                         case EXACT: /* exact match found */
                         case MATCH: /* all given numbers match. */
                         {
+                            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
+                            /* Add our EPICS version */
+                            snprintf(filename+modulediroffs, sizeof(filename)-modulediroffs, "%s/R%s/%n",
+                                currentFilename, epicsRelease, &releasediroffs);
+                            releasediroffs += modulediroffs;
+                            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/[releasediroffs]" */
+
                             someArchFound = 1;
 
                             if (requireDebug)
                                 printf("require: %s %s may match %s\n",
                                     module, currentFilename, version);
 
-                            /* Check if it has our EPICS version and architecture. */
-                            /* Even if it has no library, at least it has a dep file in the lib dir */
-
-                            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
-                            if (!TRY_FILE(modulediroffs, "%s/R%s/" LIBDIR "/%s/",
-                                currentFilename, epicsRelease, targetArch))
-                            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/lib/<targetArch>/" */
+                            /* Check if it is an architecture independent module without lib dir */
+                            if (!TRY_FILE(releasediroffs, LIBDIR "/"))
                             {
                                 if (requireDebug)
-                                    printf("require: %s %s has no support for %s %s\n",
+                                    printf("require: %s %s is architecture independent for R%s \n",
+                                        module, currentFilename, epicsRelease);
+                            }
+                            else
+
+                            /* Else check if it has our architecture. */
+                            if (!TRY_FILE(releasediroffs, LIBDIR "/%s/", targetArch))
+                            /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/[releasediroffs]lib/<targetArch>/" */
+                            {
+                                if (requireDebug)
+                                    printf("require: %s %s has no support for R%s %s\n",
                                         module, currentFilename, epicsRelease, targetArch);
                                 continue;
                             }
@@ -1489,7 +1501,7 @@ static int require_priv(const char* module, const char* version, const char* arg
 
                             /* Is it higher than the one we found before? */
                             if (requireDebug)
-                                printf("require: %s %s support for %s %s found, compare against previously found %s\n",
+                                printf("require: %s %s support for R%s %s found, compare against previously found %s\n",
                                     module, currentFilename, epicsRelease, targetArch, found);
                             if (!found || compareVersions(currentFilename, found, exactnessLevel) == HIGHER)
                             {
@@ -1587,99 +1599,109 @@ static int require_priv(const char* module, const char* version, const char* arg
             printf("require: looking for dependency file\n");
 
         if (!TRY_FILE(0, "%s/R%s/%n" LIBDIR "/%s/%n%s.dep",
-            founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module))
-        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
+                founddir, epicsRelease, &releasediroffs, targetArch, &libdiroffs, module) &&
+            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/<module>.dep" */
+            !TRY_FILE(releasediroffs, "%n%s.dep", &libdiroffs, module))
+            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/<module>.dep" */
         {
             fprintf(stderr, "Dependency file %s not found\n", filename);
         }
         else
         {
 checkdep:
-            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/module.dep" */
-            /* or (old)   "<dirname>/[dirlen]][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
+            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/<module>.dep" */
+            /* or         "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/<module>.dep" */
+            /* or (old)   "<dirname>/[dirlen][releasediroffs][libdiroffs]<module>(-<version>)?.dep" */
             if (handleDependencies(module, filename) == -1)
                 return -1;
         }
 
-        if (requireDebug)
-            printf("require: looking for library file\n");
-
-        if (!(TRY_FILE(libdiroffs, PREFIX "%s" INFIX "%s%n" EXT, module, versionstr, &extoffs)
-        #ifdef vxWorks
-            /* try without extension */
-            || (filename[libdiroffs + extoffs] = 0, fileExists(filename))
-        #endif
-            ))
-        /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs](EXT)?" */
-        /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs](EXT)?" */
+        if (!libdiroffs)
         {
-            printf("Module %s has no library\n", module);
+            printf("Module %s is architecture independent\n", module);
         }
         else
         {
-loadlib:
-            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs]EXT" */
-            /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
-            printf("Loading library %s\n", filename);
-            if ((libhandle = loadlib(filename)) == NULL)
-                return -1;
-
-            /* now check what version we really got (with compiled-in version number) */
-            if (asprintf (&symbolname, "_%sLibRelease", module) < 0)
-                return errno;
-
-            found = (const char*) getAddress(libhandle, symbolname);
-            free(symbolname);
-            printf("Loaded %s version %s\n", module, found);
-
-            /* check what we got */
             if (requireDebug)
-                printf("require: compare requested version %s with loaded version %s\n", version, found);
-            if (compareVersions(found, version, exactnessLevel) == MISMATCH)
+                printf("require: looking for library file in %.*s\n", libdiroffs, filename);
+
+            if (!(TRY_FILE(libdiroffs, PREFIX "%s" INFIX "%s%n" EXT, module, versionstr, &extoffs)
+            #ifdef vxWorks
+                /* try without extension */
+                || (filename[libdiroffs + extoffs] = 0, fileExists(filename))
+            #endif
+                ))
+            /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs](EXT)?" */
+            /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs](EXT)?" */
             {
-                fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
-                    module, version, found);
-                return -1;
-            }
-
-            /* load dbd file */
-            if (TRY_NONEMPTY_FILE(releasediroffs, "dbd/%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, "../dbd/%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, "../%s%s.dbd", module, versionstr) ||
-                TRY_NONEMPTY_FILE(releasediroffs, "../../dbd/%s.dbd", module)) /* org EPICSbase */
-            {
-                printf("Loading dbd file %s\n", filename);
-                if (dbLoadDatabase(filename, NULL, NULL) != 0)
-                {
-                    fprintf (stderr, "Error loading %s\n", filename);
-                    return -1;
-                }
-
-                #ifndef EPICS_3_13
-                /* when dbd is loaded call register function */
-                if (asprintf(&symbolname, "%s_registerRecordDeviceDriver", module) < 0)
-                    return errno;
-
-                printf ("Calling function %s\n", symbolname);
-                #ifdef vxWorks
-                {
-                    FUNCPTR f = (FUNCPTR) getAddress(NULL, symbolname);
-                    if (f)
-                        f(pdbbase);
-                    else
-                        fprintf (stderr, "require: can't find %s function\n", symbolname);
-                }
-                #else /* !vxWorks */
-                iocshCmd(symbolname);
-                #endif /* !vxWorks */
-                free(symbolname);
-                #endif /* !EPICS_3_13 */
+                printf("Module %s has no library\n", module);
             }
             else
             {
-                /* no dbd file, but that might be OK */
-                printf("%s has no dbd file\n", module);
+loadlib:
+                /* filename = "<dirname>/[dirlen]<module>/<version>/R<epicsRelease>/[releasediroffs]/lib/<targetArch>/[libdiroffs]/PREFIX<module>INFIX[extoffs]EXT" */
+                /* or  (old)  "<dirname>/[dirlen][releasediroffs][libdiroffs]PREFIX<module>INFIX(-<version>)?[extoffs]EXT" */
+                printf("Loading library %s\n", filename);
+                if ((libhandle = loadlib(filename)) == NULL)
+                    return -1;
+
+                /* now check what version we really got (with compiled-in version number) */
+                if (asprintf (&symbolname, "_%sLibRelease", module) < 0)
+                    return errno;
+
+                found = (const char*) getAddress(libhandle, symbolname);
+                free(symbolname);
+                printf("Loaded %s version %s\n", module, found);
+
+                /* check what we got */
+                if (requireDebug)
+                    printf("require: compare requested version %s with loaded version %s\n", version, found);
+                if (compareVersions(found, version, exactnessLevel) == MISMATCH)
+                {
+                    fprintf(stderr, "Requested %s version %s not available, found only %s.\n",
+                        module, version, found);
+                    return -1;
+                }
+
+                /* load dbd file */
+                if (TRY_NONEMPTY_FILE(releasediroffs, "dbd/%s%s.dbd", module, versionstr) ||
+                    TRY_NONEMPTY_FILE(releasediroffs, "%s%s.dbd", module, versionstr) ||
+                    TRY_NONEMPTY_FILE(releasediroffs, "../dbd/%s%s.dbd", module, versionstr) ||
+                    TRY_NONEMPTY_FILE(releasediroffs, "../%s%s.dbd", module, versionstr) ||
+                    TRY_NONEMPTY_FILE(releasediroffs, "../../dbd/%s.dbd", module)) /* org EPICSbase */
+                {
+                    printf("Loading dbd file %s\n", filename);
+                    if (dbLoadDatabase(filename, NULL, NULL) != 0)
+                    {
+                        fprintf (stderr, "Error loading %s\n", filename);
+                        return -1;
+                    }
+
+                    #ifndef EPICS_3_13
+                    /* when dbd is loaded call register function */
+                    if (asprintf(&symbolname, "%s_registerRecordDeviceDriver", module) < 0)
+                        return errno;
+
+                    printf ("Calling function %s\n", symbolname);
+                    #ifdef vxWorks
+                    {
+                        FUNCPTR f = (FUNCPTR) getAddress(NULL, symbolname);
+                        if (f)
+                            f(pdbbase);
+                        else
+                            fprintf (stderr, "require: can't find %s function\n", symbolname);
+                    }
+                    #else /* !vxWorks */
+                    iocshCmd(symbolname);
+                    #endif /* !vxWorks */
+                    free(symbolname);
+                    #endif /* !EPICS_3_13 */
+                }
+                else
+                {
+                    /* no dbd file, but that might be OK */
+                    printf("%s has no dbd file\n", module);
+                }
             }
         }
         /* register module with path */

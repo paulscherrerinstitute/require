@@ -919,7 +919,7 @@ ifeq (${OS_CLASS},WIN32) # .lib for WIN32 is also required for linking
 	INSTALL_LIBS += $(addprefix ${INSTALL_LIB}/,${LIB_PREFIX}${PRJ}${LIB_SUFFIX})
     endif
 endif
-INSTALL_DEPS = ${DEPFILE:%=${INSTALL_LIB}/%}
+INSTALL_DEPS = ${DEPFILE:%=$(if ${MODULELIB},${INSTALL_LIB},${INSTALL_REV})/%}
 INSTALL_DBDS = ${MODULEDBD:%=${INSTALL_DBD}/%}
 INSTALL_HDRS = $(addprefix ${INSTALL_INCLUDE}/,$(call os_include_dir,${HDRS},${OS_CLASS}))
 INSTALL_DBS  = $(addprefix ${INSTALL_DB}/,$(notdir ${TEMPLS}))
