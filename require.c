@@ -1457,14 +1457,19 @@ static int require_priv(const char* module, const char* version, const char* arg
                         case EXACT: /* exact match found */
                         case MATCH: /* all given numbers match. */
                         {
+                            someArchFound = 1;
+
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]" */
                             /* Add our EPICS version */
-                            snprintf(filename+modulediroffs, sizeof(filename)-modulediroffs, "%s/R%s/%n",
-                                currentFilename, epicsRelease, &releasediroffs);
+                            if (!TRY_FILE(modulediroffs, "%s/R%s/%n", currentFilename, epicsRelease, &releasediroffs))
+                            {
+                                if (requireDebug)
+                                    printf("require: %s %s not available for R%s\n",
+                                        module, currentFilename, epicsRelease);
+                                continue;
+                            }
                             releasediroffs += modulediroffs;
                             /* filename = "<dirname>/[dirlen]<module>/[modulediroffs]<version>/R<epicsRelease>/[releasediroffs]" */
-
-                            someArchFound = 1;
 
                             if (requireDebug)
                                 printf("require: %s %s may match %s\n",
