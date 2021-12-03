@@ -317,7 +317,6 @@ ifneq ($(filter 3.13.%,$(EPICSVERSION)),)
 EPICS_BASETYPE=3.13
 CONFIG=${EPICS_BASE}/config
 export BUILD_TYPE=Vx
-
 else # 3.14+
 
 EPICS_BASETYPE=3.14
@@ -448,7 +447,7 @@ debug::
 install build::
 # Delete old build if INSTBASE has changed and module depends on other modules.
 	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-	    echo '$(realpath ${EPICS_MODULES})' | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE || \
+	    echo '$(findmnt -t noautofs -n -o SOURCE --target ${EPICS_MODULES})' | cmp -s O.${EPICSVERSION}_$$ARCH/INSTBASE || \
 	    ( grep -qs "^[^#]" O.${EPICSVERSION}_$$ARCH/*.dep && \
 	     (echo "rebuilding $$ARCH"; $(RMDIR) O.${EPICSVERSION}_$$ARCH) ) || true; \
 	done
@@ -901,7 +900,7 @@ vpath %.h $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))
 PRODUCTS = ${MODULELIB} ${MODULEDBD} ${DEPFILE}
 MODULEINFOS:
 	@echo ${PRJ} > MODULENAME
-	@echo $(realpath ${EPICS_MODULES}) > INSTBASE
+	@echo $(shell findmnt -t noautofs -n -o SOURCE --target ${EPICS_MODULES}) > INSTBASE
 	@echo ${PRODUCTS} > PRODUCTS
 	@echo ${LIBVERSION} > LIBVERSION
 
