@@ -1091,10 +1091,10 @@ endif
 # EPICS R3.14+:
 # Create file to fill registry from dbd file.
 # Avoid calling iocshRegisterCommon() repeatedly for each module
+# Filter out silly warnings about undefined record types
 ${REGISTRYFILE}: ${MODULEDBD}
-	$(RM) $@ temp.cpp
-	$(PERL) $(EPICS_BASE_HOST_BIN)/registerRecordDeviceDriver.pl $< $(basename $@) | grep -v 'iocshRegisterCommon.*;' > temp.cpp
-	$(MV) temp.cpp $@
+	$(RM) $@
+	($(PERL) $(EPICS_BASE_HOST_BIN)/registerRecordDeviceDriver.pl $< $(basename $@) | grep -v 'iocshRegisterCommon.*;' > $@) 2> >(grep -iv 'record type'>&2)
 
 # 3.14.12 complains if this rule is not overwritten
 ./%Include.dbd:
