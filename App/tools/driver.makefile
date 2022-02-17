@@ -1067,14 +1067,16 @@ endif
 MUNCH_5=tclsh $(VX_DIR)/host/src/hutils/munch.tcl
 MUNCH_6=tclsh $(VX_DIR)/host/resource/hutils/tcl/munch.tcl
 MUNCH_=$(MUNCH_5)
+MUNCH_LDFLAGS_6 = -T $(VX_DIR)/target/h/tool/gnu/ldscripts/link.OUT
 # VXWORKS_MAJOR_VERSION exsists since EPICS 3.14.12 or so.
 MUNCH=$(MUNCH_$(VXWORKS_MAJOR_VERSION))
+MUNCH_LDFLAGS=$(MUNCH_LDFLAGS_$(VXWORKS_MAJOR_VERSION))
 %.munch: %
 	@echo Munching $<
 	$(RM) ctct$(OBJ) ctdt.c
 	$(NM) $< | $(MUNCH) > ctdt.c
-	$(COMPILE.c) -traditional ctdt.c
-	$(LINK.c) $@ $< ctdt$(OBJ)
+	$(COMPILE.c) -fdollars-in-identifiers ctdt.c
+	$(LD) $(MUNCH_LDFLAGS) -o $@ ctdt$(OBJ) $<
 
 %_ctdt.c : %.nm
 	@echo Munching $*
