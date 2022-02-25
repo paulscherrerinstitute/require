@@ -646,7 +646,7 @@ dependent files can be listed in variables like `DBD_3.13` or `DBD_3.14.12`.
 
 :exclamation: There is no support for architecture dependent DBD files.
 
-### Header Files and Dependencies, `HEADERS`, `*_VERSION` and `REQUIRED` Variables
+### Header Files and Dependencies, `HEADERS`, `*_VERSION`, `REQUIRED` and `IGNORE_MODULES` Variables
 
 If a module provides features (in particular functions) to be used by other
 modules, it contains one or more C/C++  header files which can be included
@@ -671,9 +671,9 @@ defining a variable `<module>_VERSION`.
 asyn_VERSION = 4.8.1
 ```
 
-:bulb: As *all* other modules are searched for header files, it makes sense
-to avoid too generic header file names, such as `version.h`. At least to not
-install them.
+:bulb: As *all* other modules are searched for header files (in unspecified
+order), it makes sense to avoid too generic header file names, such as
+`version.h`. At least to not install them.
 
 :bulb: OS class dependent header files which are located in an appropriate
 subdirectory like `os/Linux/` keep their location in such a subdirectory
@@ -702,6 +702,21 @@ without incrementing the major version number. In such cases, define either
 `GNUmakefile` of that module. This will prevent `reqire` to assume that 
 higher minor versions (or even patch levels) are backward compatible when
 a dependency on that module is found.
+
+Problematic header files installed by another module may be ignored, e.g.
+in case of file name clashes. Set the variable `IGNORE_MODULES` to a list
+of modules whose header files should not be found automatically.
+
+**Example:**
+```
+IGNORE_MODULES = motorBase asynMotor
+```
+
+:exclamation: Do not install different versions a module with headers under
+different names (for the same EPICS version).
+This will inevitably create file name clashes which cause problems to all
+other modules that use this module.
+
 
 ### Template Files and `TEMPLATES` Variable
 
