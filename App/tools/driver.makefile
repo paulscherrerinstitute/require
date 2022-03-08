@@ -367,7 +367,7 @@ AUTOSRCS := $(filter-out ~%,$(wildcard *.c *.cc *.cpp *.st *.stt *.gt))
 SRCS = $(if ${SOURCES},$(filter-out -none-,${SOURCES}),${AUTOSRCS})
 export SRCS
 
-DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard menu*.dbd *Record.dbd) $(strip $(filter-out %Include.dbd dbCommon.dbd %Record.dbd,$(wildcard *.dbd)) ${BPTS}))
+DBD_SRCS = $(if ${DBDS},$(filter-out -none-,${DBDS}),$(wildcard menu*.dbd menu*.dbd.pod *Record.dbd *Record.dbd.pod) $(strip $(filter-out %Include.dbd dbCommon.dbd menu%.dbd menu%.dbd.pod %Record.dbd %Record.dbd.pod,$(wildcard *.dbd *.dbd.pod)) ${BPTS}))
 DBD_SRCS += ${DBDS_${EPICS_BASETYPE}}
 DBD_SRCS += ${DBDS_${EPICSVERSION}}
 DBD_SRCS += ${DBDS_$(firstword $(subst ., ,${EPICSVERSION}))}
@@ -378,6 +378,7 @@ RECORDS = $(filter %Record, $(basename $(notdir $(SRCS))))
 export RECORDS
 
 MENUS = $(basename $(filter menu%.dbd, $(notdir $(DBDS))))
+MENUS += $(basename $(basename $(filter menu%.dbd.pod, $(notdir $(DBDS)))))
 MENUS += $(basename $(notdir $(wildcard $(foreach m,$(if $(filter-out -none-,${DBDS}), $(shell awk '/^\s*include.*\<menu.*\.dbd\>/ {print gensub(/.*(menu.*\.dbd).*/,"\\1","g")}' $(filter-out -none-,${DBDS}))),$(addsuffix $m,$(sort $(dir $(DBDS))))))))
 export MENUS
 
@@ -753,7 +754,8 @@ endif
 -include $(filter-out %.h.d,$(wildcard *.d))
 
 # Need to find source dbd files relative to one dir up but generated dbd files in this dir.
-DBDFILES += $(addprefix ../,${DBD_SRCS})
+DBDFILES += $(patsubst %.pod,${COMMON_DIR}/%,$(filter %.pod,$(notdir ${DBD_SRCS})))
+DBDFILES += $(addprefix ../,$(filter-out %.pod,${DBD_SRCS}))
 DBD_PATH = $(sort $(dir ${DBDFILES} $(addprefix ../,$(filter %Record.c %Record.cc %Record.cpp,${SRCS}))))
 
 DBDEXPANDPATH = $(addprefix -I , ${DBD_PATH} ${EPICS_BASE}/dbd)
@@ -889,7 +891,9 @@ endif
 # But the %Record.h and menu%.h rules need to find their dbd files (example: asyn).
 vpath %.dbd
 vpath %Record.dbd ${DBD_PATH}
+vpath %Record.dbd.pod ${DBD_PATH}
 vpath menu%.dbd ${DBD_PATH}
+vpath menu%.dbd.pod ${DBD_PATH}
 
 # Find header files to install.
 # Order is important! First OS dependent, then os default, then others
