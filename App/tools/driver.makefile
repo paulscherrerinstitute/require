@@ -893,9 +893,9 @@ vpath menu%.dbd ${DBD_PATH}
 
 # Find header files to install.
 # Order is important! First OS dependent, then os default, then others
-vpath %.h $(sort $(filter %/os/$(OS_CLASS)/,$(dir ${HDRS})))
-vpath %.h $(sort $(filter %/os/default/,$(dir ${HDRS})))
-vpath %.h $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))
+vpath %.h $(foreach path, os/${OS_CLASS} ${POSIX_{POSIX}} os/default, $(sort $(filter %/${path}/,$(dir ${HDRS})))) $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))
+vpath %.hpp $(foreach path, os/${OS_CLASS} ${POSIX_{POSIX}} os/default, $(sort $(filter %/${path}/,$(dir ${HDRS})))) $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))
+vpath %.H $(foreach path, os/${OS_CLASS} ${POSIX_{POSIX}} os/default, $(sort $(filter %/${path}/,$(dir ${HDRS})))) $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))
 
 PRODUCTS = ${MODULELIB} ${MODULEDBD} ${DEPFILE}
 MODULEINFOS:
