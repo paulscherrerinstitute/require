@@ -455,7 +455,7 @@ install build::
 # Loop over all architectures.
 install build debug:: ${MAKE_FIRST}
 	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-	    umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; $(foreach v,$(filter IGNORE_MODULES%,${.VARIABLES}),"$v=${$v}") ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
+	    umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; $(foreach v,$(filter IGNORE_MODULES%,${.VARIABLES}),$v="${$v}") ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
 else # T_A
