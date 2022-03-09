@@ -898,7 +898,7 @@ vpath menu%.dbd.pod ${DBD_PATH}
 # Find header files to install.
 # Order is important! First OS dependent, then os default, then others
 # Allow any header extention the user comes up with (.h, .H, .hpp, .hxx, ...)
-$(foreach ext, $(sort $(suffix ${HDRS})), $(eval vpath %.${ext} $(foreach path, os/${OS_CLASS} ${POSIX_{POSIX}} os/default, $(sort $(filter %/${path}/,$(dir ${HDRS})))) $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))))
+$(foreach ext, $(sort $(suffix ${HDRS})), $(eval vpath %${ext} $(foreach path, os/${OS_CLASS} ${POSIX_{POSIX}} os/default, $(sort $(filter %/${path}/,$(dir ${HDRS})))) $(sort $(dir ${HDRS} $(filter-out /%,${SRCS})))))
 
 PRODUCTS = ${MODULELIB} ${MODULEDBD} ${DEPFILE}
 MODULEINFOS:
