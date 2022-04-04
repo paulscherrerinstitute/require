@@ -97,8 +97,21 @@ int runScript(const char* filename, const char* args)
     macSuppressWarning(mac, 1);
 #if (EPICSVER<31403)
     /* Have no environment macro substitution, thus load envionment explicitly */
-    /* Actually, environmant macro substitution was introduced in 3.14.3 */
+#ifndef vxWorks
+    /* In 3.14 before 3.14.3 we may have non-vxWorks without environment macro substitution */
+    /* non-vxWorks systems have environ instead of ppGlobalEnviron */
+    #define ppGlobalEnviron environ
+#endif
+#ifdef _WRS_VXWORKS_MAJOR
+    /* VxWorks 6 bug: environment is not NULL terminated ! */
+    /* There is a non-public counter 8 bytes after ppGlobalEnviron */
+    char** endEnviron = ppGlobalEnviron+((unsigned int*)&ppGlobalEnviron)[2];
+    if (runScriptDebug)
+            printf("runScript: %u environment variables\n", ((unsigned int*)&ppGlobalEnviron)[2]);
+    for (pairs = ppGlobalEnviron; pairs < endEnviron; pairs++)
+#else
     for (pairs = ppGlobalEnviron; *pairs; pairs++)
+#endif
     {
         char* var, *eq;
         if (runScriptDebug)
