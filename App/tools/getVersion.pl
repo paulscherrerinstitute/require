@@ -234,11 +234,17 @@ sub parse_git_output {
         }
         elsif ($line =~ /(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g/) {
             $version = "test";
-            say STDERR "tag $1 is $3 commits old => version test";
+            my $s = $3 != 1 ? "s" : "";
+            say STDERR "tag $1 is $3 commit$s old => version test";
         }
         elsif ($line =~ /Your branch is ahead of '(.*)\/(.*)'/) {
             say STDERR "branch \"$2\" not yet pushed to remote \"$1\" => version test";
             say STDERR "try: git push --tags $1 $2";
+            $version = "test";
+        }
+        elsif ($line =~ /Your branch and '(.*)\/(.*)' have diverged/) {
+            say STDERR "diverged branch \"$2\" not yet force-pushed to remote \"$1\" => version test";
+            say STDERR "try: git push --force --tags $1 $2";
             $version = "test";
         }
     }
