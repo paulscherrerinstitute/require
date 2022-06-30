@@ -891,6 +891,43 @@ static void registerExternalModules()
     }
 }
 
+#elif defined (darwin)
+#include <mach-o/dyld.h>
+
+static void registerExternalModules()
+{
+    void *handle;
+    const char *image_name;
+    char* location = NULL;
+    char* p;
+    char* version;
+    char* symname;
+    unsigned int i;
+    char name[PATH_MAX + 11];                                   /* get space for library path + "LibRelease" */
+
+    for (i=0; i < _dyld_image_count(); i++) {
+        image_name = _dyld_get_image_name(i);
+        if (image_name == NULL) continue;                       /* no library name */
+        strcpy(name, image_name);                               /* get a modifiable copy of the library name */
+        handle = dlopen(image_name, RTLD_LAZY);                 /* re-open already loaded library */
+        p = strrchr(name, '/');                                 /* find file name part in "<location>/lib<module>.dylib" */
+        if (p) {location = name; *++p=0;} else p=name;          /* terminate "<location>/" (if exists) */
+        *(symname = p+2) = '_';                                 /* replace "lib" with "_" */
+        p = strchr(symname, '.');                               /* find ".dylib" extension */
+        if (p == NULL) p = symname + strlen(symname);           /* no file extension ? */
+        strcpy(p, "LibRelease");                                /* append "LibRelease" to module name */
+        version = dlsym(handle, symname);                       /* find symbol "_<module>LibRelease" */
+        if (version)
+        {
+            *p=0; symname++;                                    /* get "<module>" from "_<module>LibRelease" */
+            if ((p = strstr(name, "/" LIBDIR "/" )) != NULL) p[1]=0; /* cut "<location>" before LIBDIR */
+            if (getLibVersion(symname) == NULL)
+                registerModule(symname, version, location);
+        }
+        dlclose(handle);
+    }
+}
+
 #else
 static void registerExternalModules()
 {
