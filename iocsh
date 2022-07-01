@@ -10,6 +10,7 @@ help () {
     echo " -v, --version   Show version and exit."
     echo " -win            Run Windows softIOC via WINE."
     echo " -32             Force 32 bit version (on 64 bit systems)."
+    echo " --nopva         Do not use PVA (in EPICS 7)"
     echo " -x[.z[.y]]      Select EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7)."
     echo " -d, --debug     Run IOC with gdb."
     echo " -dv             Run IOC with valgrind."
@@ -90,7 +91,7 @@ export IOC
 while true
 do
     case $1 in
-        ( -win )
+        ( -win | --win )
             EPICS_HOST_ARCH=windows-x64
         ;;
         ( -32 )
@@ -99,6 +100,9 @@ do
         ( -[1-9]* )
             unset EPICS_BASE
             BASE=${1#-}
+        ;;
+        ( -nopva | --nopva )
+            NOPVA=1
         ;;
         ( -n )
             shift
@@ -289,6 +293,10 @@ do
         echo "EPICS version $file option must be set earlier" >&2
         exit 1
         ;;
+    ( -nopva | --nopva )
+        echo "Option $file must be set earlier" >&2
+        exit 1
+        ;;
     ( -h | "-?" | -help | --help )
         help
         ;;
@@ -419,7 +427,7 @@ done
 
 if [ "$BASECODE" -ge 3141200 ]
 then
-    if [ -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]
+    if [ -z "$NOPVA" -a -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
