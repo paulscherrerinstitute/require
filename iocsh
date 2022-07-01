@@ -53,13 +53,13 @@ version () {
 
 # realpath and readlink are not available on all systems, let's try what works...
 rp() {
-  ( realpath $1 || readlink -f $1 || readlink $1 || (cd -P $1 && echo $PWD) || (x=$(\ls -ld $1) && echo ${x##* }) || echo $1 ) 2>/dev/null
+  ( realpath "$1" || readlink -f "$1" || readlink "$1" || (cd -P "$1" && echo $PWD) || (x=$(\ls -ld "$1") && echo ${x##* }) || echo $1 ) 2>/dev/null
 }
 
 # if EPICS_HOST_ARCH is not set guess it
 if [ -z "$EPICS_HOST_ARCH" ]
 then
-    EPICS_HOST_ARCH=$(basename $(dirname $(rp $(which caRepeater))))
+    EPICS_HOST_ARCH=$(basename $(dirname $(rp $(which caRepeater 2>/dev/null)) 2>/dev/null) 2>/dev/null)
     if [ -n "$EPICS_HOST_ARCH" ]
     then
         echo "Guessing EPICS_HOST_ARCH=$EPICS_HOST_ARCH" >&2
@@ -81,7 +81,7 @@ IOC=$(hostname|tr -d '\r')
 IOC=${IOC%%.*}
 # or get IOC name from start directory following PSI convention
 D=$(basename $(dirname $PWD))
-if [ ${D#*_} = "ioc" ]
+if [ "${D#*_}" = "ioc" ]
 then
     IOC=$(basename $PWD)
 fi
@@ -118,7 +118,7 @@ then
         # look for some standard install directories
         for EPICS in /usr/local/epics /opt/epics /epics
         do
-            if [ -d $EPICS ]
+            if [ -d "$EPICS" ]
             then
                 break
             fi
@@ -144,7 +144,7 @@ then
         if [ -z "$EPICS_BASE" ]
         then
             unset FILTER
-            if [ -f $EPICS/ignore ]
+            if [ -f "$EPICS/ignore" ]
             then
                 FILTER=$(echo "|grep -Ev '/base-("$(sed < $EPICS/ignore ':b;$!N;s/\n/|/;tb;s/\./\\./g')")/'")
             fi
@@ -162,7 +162,7 @@ then
         exit 1
     fi
     # maybe we need to change from 64 bit to 32 bit
-    if [ $EPICS_HOST_ARCH != ${EPICS_BASE#*/bin/} ]
+    if [ "$EPICS_HOST_ARCH" != "${EPICS_BASE#*/bin/}" ]
     then
         EPICS_HOST_ARCH=${EPICS_BASE#*/bin/}
         echo "No 64 bit version in ${EPICS_BASE%bin*}." >&2
@@ -170,7 +170,7 @@ then
     fi
     EPICS_BASE=$(rp ${EPICS_BASE%bin*})
 fi
-if [ ! -d $EPICS_BASE ]
+if [ ! -d "$EPICS_BASE" ]
 then
     echo "Cannot find EPICS_BASE directory." >&2
     echo "Try setting EPICS_BASE environment variable to full path" >&2
@@ -193,7 +193,7 @@ esac
 # Get actual EPICS BASE version, either from CONFIG_BASE_VERSION (text) file or from version string in libCom.so
 # Version may have 3 or 4 digits. We make a (4*2 digit) BASECODE too for easier comparison.
 # How many digits the drivers use is another question.
-if [ -f $EPICS_BASE/configure/CONFIG_BASE_VERSION ]
+if [ -f "$EPICS_BASE/configure/CONFIG_BASE_VERSION" ]
 then
     eval $(awk -F '[ \t]*=[ \t]*' '
         /^[ \t]*EPICS_VERSION[ \t]*=/ {v=$2}
@@ -202,7 +202,7 @@ then
         /^[ \t]*EPICS_PATCH_LEVEL[ \t]*=/ {p=$2+0}
         END {print "BASE3="v"."r"."m";BASE4="v"."r"."m"."p";BASECODE="v*1000000+r*10000+m*100+p}
     ' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
-elif [ -f $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX ]
+elif [ -f "$EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX" ]
 then
     strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | grep "EPICS R[0-9]"
     eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | awk -F'[.R]' '
@@ -215,7 +215,7 @@ fi
 # Check how many digits of BASE we need to find the drivers
 for B in $BASE $BASE4 $BASE3 ${EPICS_BASE#*/base-}
 do
-    if [ -d ${EPICS_MODULES:=/ioc/modules}/${REQUIRE:=require} ]
+    if [ -d "${EPICS_MODULES:=/ioc/modules}/${REQUIRE:=require}" ]
     then # new module pool model
         REQUIRE_LIB=$(ls -1rv $EPICS_MODULES/$REQUIRE/${REQUIRE_VERSION:-*.*.*}/R$B/lib/$EPICS_HOST_ARCH/$LIBPREFIX$REQUIRE$LIBPOSTFIX 2>/dev/null | head -n 1)
         REQUIRE_DBD=${REQUIRE_LIB%/lib/*}/dbd/$REQUIRE.dbd
@@ -232,7 +232,7 @@ do
 done
 
 # Check for 64 bit versions, default to 32 bit
-if [ ! -d $EPICS_BASE/lib/${EPICS_HOST_ARCH} -a -d $EPICS_BASE/lib/${EPICS_HOST_ARCH%_64} ]
+if [ ! -d "$EPICS_BASE/lib/${EPICS_HOST_ARCH}" -a -d "$EPICS_BASE/lib/${EPICS_HOST_ARCH%_64}" ]
 then
     echo "No 64 bit EPICS installation found. Defaulting to 32 bit" >&2
     EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
@@ -246,7 +246,7 @@ EPICS_DRIVER_PATH=.:bin/$EPICS_HOST_ARCH:bin:snl:../snl:$ODIR:src/$ODIR:snl/$ODI
 #Special PSI: find installation base for libs from working directory
 D=$(rp $PWD)
 I=${D%/iocBoot/*}
-if [ $I != $D ]
+if [ "$I" != "$D" ]
 then
     INSTBASE=$I
 fi
@@ -255,12 +255,12 @@ EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH%:}:${EPICS_MODULES}:${INSTBASE:=/work}/ioc
 export INSTBASE
 
 # convert for win32-x86 arch
-if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
+if [ "${EPICS_HOST_ARCH#win32-}" != "$EPICS_HOST_ARCH" ]
 then
     EPICS_DRIVER_PATH=$(cygpath -wp $EPICS_DRIVER_PATH)
     DBD=$(cygpath -wp $DBD)
 fi
-if [ ${EPICS_HOST_ARCH#cygwin-} != $EPICS_HOST_ARCH ]
+if [ "${EPICS_HOST_ARCH#cygwin-}" != "$EPICS_HOST_ARCH" ]
 then
     DBD=$(cygpath -wp $DBD)
 fi
@@ -269,7 +269,7 @@ export EPICS_DRIVER_PATH
 # Call init script after IOC name, EPICS_HOST_ARCH and EPICS_BASE are set.
 for dir in . cfg /etc
 do
-    if [ -r $dir/iocsh.init ]
+    if [ -r "$dir/iocsh.init" ]
     then
         source $dir/iocsh.init
         break
@@ -419,11 +419,11 @@ done
 
 if [ "$BASECODE" -ge 3141200 ]
 then
-    if [ -x $EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX ]
+    if [ -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
-        if [[ $EXEPOSTFIX == ".exe" ]]; then
+        if [[ "$EXEPOSTFIX" == ".exe" ]]; then
             echo "dlload $EPICS_BASE/bin/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
             echo "dlload $EPICS_BASE/bin/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
         else
@@ -448,7 +448,7 @@ else
 fi
 
 # use WINE to run softIo, and convert EPICS_DRIVER_PATH to windows format
-if [[ $EXEPOSTFIX == ".exe" ]]
+if [[ "$EXEPOSTFIX" == ".exe" ]]
 then
     LOADER="wine"
     EPICS_DRIVER_PATH_WIN=
@@ -458,7 +458,7 @@ then
     EPICS_DRIVER_PATH=${EPICS_DRIVER_PATH_WIN#;}
 fi
 
-if [ ! -x $EXE ];
+if [ ! -x "$EXE" ];
 then
     echo "$EXE not found or not executable." >&2
     exit 1
@@ -484,12 +484,12 @@ echo 'epicsEnvSet IOCSH_PS1,"${IOC}> "'
 } > $startup
 
 # convert startup script file name for win32-x86
-if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH ]
+if [ "${EPICS_HOST_ARCH#win32-}" != "$EPICS_HOST_ARCH" ]
 then
     startup=`cygpath -w $startup`
 fi
 
-if [ ${EPICS_HOST_ARCH#win32-} != $EPICS_HOST_ARCH -o ${EPICS_HOST_ARCH#cygwin-} != $EPICS_HOST_ARCH ]
+if [ "${EPICS_HOST_ARCH#win32-}" != "$EPICS_HOST_ARCH" -o "${EPICS_HOST_ARCH#cygwin-}" != "$EPICS_HOST_ARCH" ]
 then
     PATH=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH:$EPIC_BASE/bin/$EPICS_HOST_ARCH:$EPICS_BASE/../seq/bin/$EPICS_HOST_ARCH:$PATH
 fi
