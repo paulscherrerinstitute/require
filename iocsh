@@ -407,7 +407,7 @@ do
 done
 }
 
-startup=/tmp/iocsh.startup.$$
+startup=${IOCSH_TMP:-/tmp}/iocsh.startup.$$
 
 # clean up and kill the softIoc when killed by any signal
 cleanup() {
