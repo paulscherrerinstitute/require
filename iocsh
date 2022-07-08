@@ -1,50 +1,56 @@
 #!/bin/bash
 
 help () {
-    {
-    echo "Usage: iocsh [options] [files] [macro=value] ..."
-    echo "Start an EPICS iocsh and load files"
-    echo
-    echo "Options:"
-    echo " -?, -h, --help  Show this page and exit."
-    echo " -v, --version   Show version and exit."
-    echo " -win            Run Windows softIOC via WINE."
-    echo " -32             Force 32 bit version (on 64 bit systems)."
-    echo " --nopva         Do not use PVA (in EPICS 7)"
-    echo " -x[.z[.y]]      Select EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7)."
-    echo " -d, --debug     Run IOC with gdb."
-    echo " -dv             Run IOC with valgrind."
-    echo " -dp             Run IOC with perf record."
-    echo " -i bashscript   Source bashscript before starting ioc."
-    echo " -c 'cmd args'   Ioc shell command."
-    echo " -s 'prog m=v'   Sequencer program (and arguments), run with 'seq'."
-    echo "                 This forces an 'iocInit' before running the program."
-    echo " -r module[,ver] Modue (optionally with version) loaded via 'require'."
-    echo " -n name         Name of the IOC, used for prompt and \${IOC} variable."
-    echo "                 Default: dirname if parent dir is \"ioc\" otherwise hostname."
-    echo " @file           More arguments are read from file."
-    echo
-    echo "Supported filetypes:"
-    echo " *.db, *.dbt, *.template  loaded via 'dbLoadRecords'"
-    echo " *.subs, *.subst          loaded via 'dbLoadTemplate'"
-    echo " *.dbd                    loaded via 'dbLoadDatabase'"
-    echo " *.so                     loaded via 'dlload' (or 'ld' before 3.14.12)"
-    echo "All other files are executed as startup scripts by the EPICS shell."
-    echo "After a file you can specify substitutions like m1=v1 m2=v1 for that file."
-    echo
-    echo "If a readable file iocsh.init exists in ./, cfg/, or /etc/, it is sourced"
-    echo "when iocsh starts. Only the first one found is sourced."
-    echo
-    echo "If the environment variable NOPVA is not empty, it works like --nopva"
-    echo "except if set to 0, n, no, f, false or off (case insensitive)."
-    echo
-    echo "Examples:"
-    echo "  iocsh st.cmd"
-    echo "  iocsh my_database.template P=XY M=3"
-    echo "  iocsh -r my_module,version -c 'initModule()'"
-    echo "  iocsh -3.15.4 -dp st.cmd"
-    echo "  iocsh -c 'var requireDebug 1' st.cmd"
-    } >&2
+    cat <<- EOF >&2
+	Usage: iocsh [options] [files] [macro=value] ...
+	Start an EPICS iocsh and load files
+	
+	Options:
+	 -?, -h, --help  Show this page and exit.
+	 -v, --version   Show version and exit.
+	 -win, --win     Run Windows softIOC via wine.
+	 -32             Force 32 bit version (on 64 bit systems).
+	 --nopva         Do not use PVA (in EPICS 7)
+	 -x[.z[.y]]      Select EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7).
+	 -d, --debug     Run IOC with gdb.
+	 -dv             Run IOC with valgrind.
+	 -dp             Run IOC with perf record.
+	 -i bashscript   Source bashscript before starting ioc.
+	 -c 'cmd args'   Ioc shell command.
+	 -s 'prog m=v'   Sequencer program (and arguments), run with 'seq'.
+	                 This forces an 'iocInit' before running the program.
+	 -r module[,ver] Module (optionally with version) loaded via 'require'.
+	 -n name         Name of the IOC, used for prompt and \${IOC} variable.
+	                 Default: dirname if parent dir is "ioc" otherwise hostname.
+	 @file           More arguments are read from file.
+	
+	Supported filetypes:
+	 *.db, *.dbt, *.template  loaded via 'dbLoadRecords'
+	 *.subs, *.subst          loaded via 'dbLoadTemplate'
+	 *.dbd                    loaded via 'dbLoadDatabase'
+	 *.so                     loaded via 'dlload' (or 'ld' before 3.14.12)
+	All other files are executed as startup scripts by the EPICS shell.
+	After a file you can specify substitutions like m1=v1 m2=v1 for that file.
+	
+	If a readable file iocsh.init exists in ./, cfg/, or /etc/, it is sourced
+	when iocsh starts. Only the first one found is sourced.
+	
+	If the environment variable NOPVA is not empty, it works like --nopva
+	except if set to 0, n, no, f, false or off (case insensitive).
+	
+	The environment variable LOADER can be used to run EPICS inside another
+	program. Internally this is used for wine, gdb, valgrind, etc.
+	
+	A file EPICSVERSION or cfg/EPICSVERSION may contain a default EPICS version
+	like 3.14.8, 3.15, or 7 but the command line option takes precedence.
+	
+	Examples:
+	  iocsh st.cmd
+	  iocsh my_database.template P=XY M=3
+	  iocsh -r my_module,version -c 'initModule()'
+	  iocsh -3.15.4 -dp st.cmd
+	  iocsh -c 'var requireDebug 1' st.cmd
+EOF
     exit
 }
 
@@ -96,21 +102,30 @@ do
     case $1 in
         ( -win | --win )
             EPICS_HOST_ARCH=windows-x64
-        ;;
+            ;;
         ( -32 )
             EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
-        ;;
+            ;;
         ( -[1-9]* )
             unset EPICS_BASE
             BASE=${1#-}
-        ;;
+            ;;
         ( -nopva | --nopva )
             NOPVA=1
-        ;;
-        ( -n )
+            ;;
+        ( -n | --name )
             shift
             IOC="$1"
-        ;;
+            ;;
+        ( -d | -dg | --debug )
+            LOADER="gdb --eval-command run --args $LOADER"
+            ;;
+        ( -dv )
+            LOADER="valgrind --leak-check=full $LOADER"
+            ;;
+        ( -dp )
+            LOADER="perf record $LOADER"
+            ;;
         ( * ) break
         ;;
     esac
@@ -286,126 +301,109 @@ done
 loadFiles () {
 while [ "$#" -gt 0 ]
 do
-  file=$1
-  case $file in
-    ( -32 )
-        echo "-32 option must be set earlier" >&2
-        exit 1
-        ;;
-    ( -[1-9]* )
-        echo "EPICS version $file option must be set earlier" >&2
-        exit 1
-        ;;
-    ( -nopva | --nopva )
-        echo "Option $file must be set earlier" >&2
-        exit 1
-        ;;
-    ( -h | "-?" | -help | --help )
-        help
-        ;;
-    ( -v | -ver | --ver | -version | --version )
-        version
-        ;;
-    ( @* )
-        loadFiles $(cat ${file#@})
-        ;;
-    ( -d | -dg | --debug )
-        LOADER="gdb --eval-command run --args $LOADER"
-        ;;
-    ( -dv )
-        LOADER="valgrind --leak-check=full $LOADER"
-        ;;
-    ( -dp )
-        LOADER="perf record $LOADER"
-        ;;
-    ( -i )
-        shift
-        source $1
-        ;;
-    ( -c )
-        shift
-        case $1 in
-        ( seq* )
+    file=$1
+    case $file in
+        ( -[1-9]* | -32 | -nopva | --nopva | -win | --win | -d | -dg | --debug | -dv | -dp | -n | --name )
+            echo "Option $file must be used earlier" >&2
+            exit 1
+            ;;
+        ( -h | "-?" | -help | --help )
+            help
+            ;;
+        ( -v | -ver | --ver | -version | --version )
+            version
+            ;;
+        ( @* )
+            loadFiles $(cat ${file#@})
+            ;;
+        ( -i )
+            shift
+            source $1
+            ;;
+        ( -c )
+            shift
+            case $1 in
+            ( seq* )
+                if [ "$init" != NO ]
+                then
+                    echo "iocInit"
+                    init=NO
+                fi
+                ;;
+            ( iocInit )
+                init=NO
+                ;;
+            esac
+            echo $1
+            ;;
+        ( -s )
+            shift
             if [ "$init" != NO ]
             then
                 echo "iocInit"
                 init=NO
             fi
+            echo "seq $1"
             ;;
-        ( iocInit )
-            init=NO
+        ( -r )
+            shift
+            echo "require $1"
             ;;
-        esac
-        echo $1
-        ;;
-    ( -s )
-        shift
-        if [ "$init" != NO ]
-        then
-            echo "iocInit"
-            init=NO
-        fi
-        echo "seq $1"
-        ;;
-    ( -r )
-        shift
-        echo "require $1"
-        ;;
-    ( -* )
-        echo "Unknown option $1" >&2
-        echo "Try: $(basename $0) --help" >&2
-        exit 1
-       ;;
-    ( *$LIBPOSTFIX )
-        if [ "$BASECODE" -ge 3141200 ]
-        then
-            echo "dlload \"$file\""
-        else
-            echo "ld \"$file\""
-        fi
-        ;;
-    ( *=* )
-        echo -n $file | awk -F '=' '{printf "epicsEnvSet %s '\''%s'\''\n", $1, $2}'
-        ;;
-    ( * )
-        subst=""
-        while [ "$#" -gt 1 ]
-        do
-            case $2 in
-                ( *=* )
-                    subst="$subst,$2"; shift
+        ( -* )
+            echo "Unknown option $1" >&2
+            echo "Try: $(basename $0) --help" >&2
+            exit 1
+           ;;
+        ( *$LIBPOSTFIX )
+            if [ "$BASECODE" -ge 3141200 ]
+            then
+                echo "dlload \"$file\""
+            else
+                echo "ld \"$file\""
+            fi
+            ;;
+        ( *=* )
+            echo -n $file | awk -F '=' '{printf "epicsEnvSet %s '\''%s'\''\n", $1, $2}'
+            ;;
+        ( * )
+            subst=""
+            while [ "$#" -gt 1 ]
+            do
+                case $2 in
+                    ( *=* )
+                        subst="$subst,$2"; shift
+                        ;;
+                    ( * )
+                        break
+                        ;;
+                esac
+            done
+            subst=${subst#,}
+            case $file in
+                ( *.db | *.template)
+                    echo "dbLoadRecords '$file','$subst'"
+                    ;;
+                ( *.subs | *.subst )
+                    echo "dbLoadTemplate '$file','$subst'"
+                    ;;
+                ( *.dbd )
+                    # some dbd files must be loaded before main to take effect
+                    echo "dbLoadDatabase '$file','$DBD','$subst'"
                     ;;
                 ( * )
-                    break
+                    if [ "$BASECODE" -ge 3150000 ]
+                    then
+                        echo "iocshLoad '$file','$subst'"
+                    else
+                        echo -n $subst | awk -F '=' -v 'RS=,' '{printf "epicsEnvSet %s '\''%s'\''\n", $1, $2}'
+                        echo "< '$file'"
+                    fi
+                    if grep -q iocInit $file; then init=NO; fi
                     ;;
             esac
-        done
-        subst=${subst#,}
-        case $file in
-            ( *.db | *.template)
-                echo "dbLoadRecords '$file','$subst'"
-                ;;
-            ( *.subs | *.subst )
-                echo "dbLoadTemplate '$file','$subst'"
-                ;;
-            ( *.dbd )
-                # some dbd files must be loaded before main to take effect
-                echo "dbLoadDatabase '$file','$DBD','$subst'"
-                ;;
-            ( * )
-                if [ "$BASECODE" -ge 3150000 ]
-                then
-                    echo "iocshLoad '$file','$subst'"
-                else
-                    echo -n $subst | awk -F '=' -v 'RS=,' '{printf "epicsEnvSet %s '\''%s'\''\n", $1, $2}'
-                    echo "< '$file'"
-                fi
-                if grep -q iocInit $file; then init=NO; fi
-                ;;
-        esac
-        ;;
-  esac
-  shift
+            ;;
+    esac
+    shift
 done
 }
 
@@ -461,7 +459,7 @@ fi
 # use WINE to run softIo, and convert EPICS_DRIVER_PATH to windows format
 if [[ "$EXEPOSTFIX" == ".exe" ]]
 then
-    LOADER="wine"
+    LOADER="$LOADER wine"
     EPICS_DRIVER_PATH_WIN=
     while read -d ':' p; do
         EPICS_DRIVER_PATH_WIN="$EPICS_DRIVER_PATH_WIN;${p/#\//z:/}"
@@ -512,4 +510,3 @@ eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
 STATUS=$?
 cleanup
 exit $STATUS
-
