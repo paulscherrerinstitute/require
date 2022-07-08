@@ -35,6 +35,9 @@ help () {
     echo "If a readable file iocsh.init exists in ./, cfg/, or /etc/, it is sourced"
     echo "when iocsh starts. Only the first one found is sourced."
     echo
+    echo "If the environment variable NOPVA is not empty, it works like --nopva"
+    echo "except if set to 0, n, no, f, false or off (case insensitive)."
+    echo
     echo "Examples:"
     echo "  iocsh st.cmd"
     echo "  iocsh my_database.template P=XY M=3"
@@ -427,7 +430,7 @@ done
 
 if [ "$BASECODE" -ge 3141200 ]
 then
-    if [ -z "$NOPVA" -a -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]
+    if [[ "${NOPVA,,}" =~ ^(|0|n|no|f|false|off)$ && -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]]
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
