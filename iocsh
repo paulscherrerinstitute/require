@@ -199,18 +199,24 @@ then
     exit 1
 fi
 
+LIBDIR=lib
+LIBPREFIX=lib
+LIBPOSTFIX=.so
+EXEPOSTFIX=
+
 case $(uname) in
     ( Darwin )
-        LIBPREFIX=lib; LIBPOSTFIX=.dylib
-    ;;
-    ( * )      
-        LIBPREFIX=lib; LIBPOSTFIX=.so; EXEPOSTFIX=
-        # assume we need to run Windows softIoc on UNIX via WINE
-        if [[ "$EPICS_HOST_ARCH" == win* ]]; then
-            LIBPREFIX=; LIBPOSTFIX=.dll; EXEPOSTFIX=.exe
-        fi
+        LIBPOSTFIX=.dylib
     ;;
 esac
+
+if [[ "$EPICS_HOST_ARCH" == win* ]]
+then
+    LIBDIR=bin
+    LIBPREFIX=
+    LIBPOSTFIX=.dll
+    EXEPOSTFIX=.exe
+fi
 
 # Get actual EPICS BASE version, either from CONFIG_BASE_VERSION (text) file or from version string in libCom.so
 # Version may have 3 or 4 digits. We make a (4*2 digit) BASECODE too for easier comparison.
@@ -224,10 +230,10 @@ then
         /^[ \t]*EPICS_PATCH_LEVEL[ \t]*=/ {p=$2+0}
         END {print "BASE3="v"."r"."m";BASE4="v"."r"."m"."p";BASECODE="v*1000000+r*10000+m*100+p}
     ' < $EPICS_BASE/configure/CONFIG_BASE_VERSION)
-elif [ -f "$EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX" ]
+elif [ -f "$EPICS_BASE/$LIBDIR/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX" ]
 then
-    strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | grep "EPICS R[0-9]"
-    eval $(strings $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | awk -F'[.R]' '
+    strings $EPICS_BASE/$LIBDIR/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | grep "EPICS R[0-9]"
+    eval $(strings $EPICS_BASE/$LIBDIR/$EPICS_HOST_ARCH/${LIBPREFIX}Com$LIBPOSTFIX | awk -F'[.R]' '
         /EPICS R[0-9]/ {print "BASE3="$2"."$3"."$4+0";BASE4="$2"."$3"."$4+0"."$5+0";BASECODE="$2*1000000+$3*10000+$4*100+$5 }')
 else
     echo "Cannot guess EPICS base version." >&2
@@ -254,7 +260,7 @@ do
 done
 
 # Check for 64 bit versions, default to 32 bit
-if [ ! -d "$EPICS_BASE/lib/${EPICS_HOST_ARCH}" -a -d "$EPICS_BASE/lib/${EPICS_HOST_ARCH%_64}" ]
+if [ ! -d "$EPICS_BASE/bin/${EPICS_HOST_ARCH}" -a -d "$EPICS_BASE/bin/${EPICS_HOST_ARCH%_64}" ]
 then
     echo "No 64 bit EPICS installation found. Defaulting to 32 bit" >&2
     EPICS_HOST_ARCH=${EPICS_HOST_ARCH%_64}
@@ -432,13 +438,8 @@ then
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
-        if [[ "$EXEPOSTFIX" == ".exe" ]]; then
-            echo "dlload $EPICS_BASE/bin/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
-            echo "dlload $EPICS_BASE/bin/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
-        else
-            echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
-            echo "dlload $EPICS_BASE/lib/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
-        fi
+        echo "dlload $EPICS_BASE/$LIBDIR/$EPICS_HOST_ARCH/${LIBPREFIX}nt$LIBPOSTFIX"
+        echo "dlload $EPICS_BASE/$LIBDIR/$EPICS_HOST_ARCH/${LIBPREFIX}pvDatabase$LIBPOSTFIX"
     else
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIoc$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIoc.dbd"
@@ -447,7 +448,7 @@ then
 else
     # get rid of the compiled-in rpath because at PSI that is a link pointing to current EPICS version.
     LOADER="$LOADER /lib/ld-linux.so.2"
-    LOADERARGS="--library-path $EPICS_BASE/lib/$EPICS_HOST_ARCH --inhibit-rpath ''"
+    LOADERARGS="--library-path $EPICS_BASE/$LIBDIR/$EPICS_HOST_ARCH --inhibit-rpath ''"
     APP=ioc
     EXE=$EPICS_EXTENSIONS/bin/$EPICS_HOST_ARCH/$APP
     DBD=$EPICS_EXTENSIONS/dbd
