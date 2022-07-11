@@ -439,7 +439,7 @@ done
 
 if [ "$BASECODE" -ge 3141200 ]
 then
-    if [[ $(tr [A-Z] [a-z] <<< "$NOPVA") =~ ^(|0|n|no|f|false|off)$ && -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]]
+    if [[ $(tr A-Z a-z <<< "$NOPVA") =~ ^(0|n|no|f|false|off)?$ && -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]]
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
