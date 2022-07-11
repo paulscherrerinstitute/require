@@ -101,6 +101,11 @@ while true
 do
     case $1 in
         ( -win | --win )
+            LOADER="$LOADER wine"
+            export WINEDEBUG=fixme-all
+            export WINEDLLOVERRIDES="mscoree,mshtml="
+            export WINEPREFIX=$HOME/.wine-$EPICS_HOST_ARCH
+            [[ $(wine --version) = wine-6.* ]] && stty -isig 2> /dev/null # or CTRL-C hangs up on wine 6
             EPICS_HOST_ARCH=windows-x64
             ;;
         ( -32 )
@@ -460,7 +465,6 @@ fi
 # use WINE to run softIo, and convert EPICS_DRIVER_PATH to windows format
 if [[ "$EXEPOSTFIX" == ".exe" ]]
 then
-    LOADER="$LOADER wine"
     EPICS_DRIVER_PATH_WIN=
     while read -d ':' p; do
         EPICS_DRIVER_PATH_WIN="$EPICS_DRIVER_PATH_WIN;${p/#\//z:/}"
