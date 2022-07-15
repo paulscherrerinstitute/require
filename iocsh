@@ -131,6 +131,12 @@ do
         ( -dp )
             LOADER="perf record $LOADER"
             ;;
+        ( -h | "-?" | -help | --help )
+            help
+            ;;
+        ( -v | -ver | --ver | -version | --version )
+            version
+            ;;
         ( * ) break
         ;;
     esac
