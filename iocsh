@@ -33,7 +33,11 @@ help () {
 	After a file you can specify substitutions like m1=v1 m2=v1 for that file.
 	
 	If a readable file iocsh.init exists in ./, cfg/, or /etc/, it is sourced
-	when iocsh starts. Only the first one found is sourced.
+	when iocsh starts (see also -i option). Only the first one found is sourced.
+	This allows to set environment variables etc before EPICS starts.
+	In this context, the variables \${IOC}, \${BASE}, and \${EPICS_HOST_ARCH} are
+	already set to the ioc name, the path to the used EPICS installation and the
+	used architecture (which may have been modified by -32 or -win).
 	
 	If the environment variable NOPVA is not empty, it works like --nopva
 	except if set to 0, n, no, f, false or off (case insensitive).
@@ -445,7 +449,8 @@ done
 
 if [ "$BASECODE" -ge 3141200 ]
 then
-    if [[ $(tr A-Z a-z <<< "$NOPVA") =~ ^(0|n|no|f|false|off)?$ && -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]]
+    case $(tr A-Z a-z <<< "$NOPVA") in (0|n|no|f|false|off) unset NOPVA; esac
+    if [ -z "$NOPVA" -a -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
