@@ -65,11 +65,11 @@ MAKEHOME:=$(dir $(lastword ${MAKEFILE_LIST}))
 USERMAKEFILE:=$(lastword $(filter-out $(lastword ${MAKEFILE_LIST}), ${MAKEFILE_LIST}))
 
 # Some configuration:
-DEFAULT_EPICS_VERSIONS = 3.13.10 3.14.12 7.0.5
+DEFAULT_EPICS_VERSIONS ?= 3.13.10 3.14.12 7.0.5
 BUILDCLASSES = vxWorks
 EPICS_MODULES ?= /ioc/modules
-MODULE_LOCATION = ${EPICS_MODULES}/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
-EPICS_LOCATION = /usr/local/epics
+MODULE_LOCATION ?= ${EPICS_MODULES}/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
+EPICS_LOCATION ?= /usr/local/epics
 
 DOCUEXT = txt html htm doc pdf ps tex dvi gif jpg png
 DOCUEXT += TXT HTML HTM DOC PDF PS TEX DVI GIF JPG PNG
