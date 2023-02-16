@@ -222,16 +222,22 @@ EXEPOSTFIX=
 case $(uname) in
     ( Darwin )
         LIBPOSTFIX=.dylib
-    ;;
+        ;;
 esac
 
-if [[ "$EPICS_HOST_ARCH" == win* ]]
-then
-    LIBDIR=bin
-    LIBPREFIX=
-    LIBPOSTFIX=.dll
-    EXEPOSTFIX=.exe
-fi
+case "$EPICS_HOST_ARCH" in
+    ( win* )
+        LIBDIR=bin
+        LIBPREFIX=
+        LIBPOSTFIX=.dll
+        EXEPOSTFIX=.exe
+        ;;
+
+    # Some architectures have not enough memory to run PVA
+    ( moxa42-armv6l )
+        NOPVA=1
+        ;;
+esac
 
 # Get actual EPICS BASE version, either from CONFIG_BASE_VERSION (text) file or from version string in libCom.so
 # Version may have 3 or 4 digits. We make a (4*2 digit) BASECODE too for easier comparison.
