@@ -139,7 +139,10 @@ MISSING_EPICS_VERSIONS = $(filter-out ${BUILD_EPICS_VERSIONS},${EPICS_VERSIONS})
 BUILD_EPICS_VERSIONS = $(filter ${INSTALLED_EPICS_VERSIONS},${EPICS_VERSIONS})
 $(foreach v,$(sort $(basename $(basename $(basename ${BUILD_EPICS_VERSIONS}))) $(basename $(basename ${BUILD_EPICS_VERSIONS})) $(basename ${BUILD_EPICS_VERSIONS})),$(eval EPICS_VERSIONS_$v=$(filter $v.%,${BUILD_EPICS_VERSIONS})))
 
-SUBMODULES:=$(foreach f,$(wildcard .gitmodules),$(shell awk '/^\[submodule/ { print gensub(/["\]]/,"","g",$$2) }' $f))
+# Checkout all git submodules except hidden ones like ".ci" which we most likely don't need
+# User can extend or overwrite IGNORE_SUBMODULES
+IGNORE_SUBMODULES = .%
+SUBMODULES:=$(filter-out ${IGNORE_SUBMODULES},$(foreach f,$(wildcard .gitmodules),$(shell awk '/^\[submodule/ { print gensub(/["\]]/,"","g",$$2) }' $f)))
 
 # Check only version of files needed to build the module. But which are they?
 VERSIONCHECKFILES = $(filter-out /% -none-, $(USERMAKEFILE) $(wildcard *.db *.template *.subs *.dbd *.cmd *.iocsh) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $($(filter SOURCES_% DBDS_%,${.VARIABLES})))
@@ -217,6 +220,7 @@ help:
 	@echo "  BUILDCLASSES     (vxWorks) [other choices: Linux]"
 	@echo "  <module>_VERSION () [build against specific version of other module]"
 	@echo "  IGNORE_MODULES   () [do not use header files from these modules]"
+	@echo "  IGNORE_SUBMODULES(.%) [do not check out these git submodules]"
 
 # "make version" shows the module version and why it is what it is.       
 version: ${IGNOREFILES}
