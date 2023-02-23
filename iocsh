@@ -437,13 +437,8 @@ done
 startup=${IOCSH_TMP:-/tmp}/iocsh.startup.$$
 
 # clean up and kill the softIoc when killed by any signal
-cleanup() {
-    trap EXIT
-    rm -f $startup
-    stty sane 2> /dev/null
-    echo
-}
-trap "kill -s SIGTERM 0; cleanup" EXIT
+# execute any exiting exit trap (from init scripts) as well
+trap "stty sane 2> /dev/null;echo;rm -f $startup;$(trap -p EXIT | sed 's/.*\x27\(.*\)\x27.*/\1; /')kill -s SIGTERM 0" EXIT
 
 {
 echo "# date=\"$(date)\""
@@ -530,5 +525,4 @@ echo $EXE $ARGS $startup
 ulimit -c unlimited
 eval "$LOADER $LOADERARGS $EXE" $ARGS "$startup" 2>&1
 STATUS=$?
-cleanup
 exit $STATUS
