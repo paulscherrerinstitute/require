@@ -76,9 +76,10 @@ then
     EPICS_HOST_ARCH=$(basename $(dirname $(rp $(which caRepeater 2>/dev/null)) 2>/dev/null) 2>/dev/null)
     if [ -n "$EPICS_HOST_ARCH" ]
     then
-        echo "Guessing EPICS_HOST_ARCH=$EPICS_HOST_ARCH" >&2
+        echo "Guessing EPICS_HOST_ARCH=$EPICS_HOST_ARCH." >&2
     else
-        echo "EPICS_HOST_ARCH is not set" >&2
+        echo "EPICS_HOST_ARCH is not set." >&2
+        echo "(And I cannot guess it because I cannot find caRepeater.)" >&2
         exit 1
     fi
 fi
@@ -174,28 +175,31 @@ then
     fi
     if [ -z "$BASE" ]
     then
+        # if no BASE is given, first look for plain /epics/base/ dir
         EPICS_BASE=$(\ls -1vrd $EPICS/base/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
-    else
-        # find highest (requested) EPICS version that supports our architecture (or its 32 bit version)
+    fi
+    if [ -z "$EPICS_BASE" ]
+    then
+        # look for exact requested EPICS version
         EPICS_BASE=$(\ls -1vrd $EPICS/base-$BASE/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null | head -n1)
         if [ -z "$EPICS_BASE" ]
         then
-            unset FILTER
-            if [ -f "$EPICS/ignore" ]
-            then
-                FILTER=$(echo "|grep -Ev '/base-("$(sed < $EPICS/ignore ':b;$!N;s/\n/|/;tb;s/\./\\./g')")/'")
-            fi
-            EPICS_BASE=$(eval \ls -1vrd $EPICS/base-$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null $FILTER | head -n1)
+            # find highest (requested) EPICS version that supports our architecture (or its 32 bit version)
+            # ignore all versions listed in ignore file
+            EPICS_BASE=$(eval \ls -1vrd $EPICS/base-$BASE*/bin/{${EPICS_HOST_ARCH},${EPICS_HOST_ARCH%_64}} 2>/dev/null \
+                $(test -f $EPICS/ignore && sed < $EPICS/ignore ':b;$!N;s/[[:space:]]/|/;tb;s/\./\\./g;s/.*/|grep -Ev \x27&\x27/g') \
+                | head -n1)
         fi
     fi
     if [ -z "$EPICS_BASE" ]
     then
         if [ -z "$(\ls -1vrd $EPICS/base-$BASE*/ 2>/dev/null)" ]
         then
-            echo "No EPICS $BASE installed." >&2
+            echo No EPICS $BASE installation found $(test -n "$EPICS" && echo -n " in $EPICS").>&2
             exit 1
         fi
-        echo EPICS $BASE not available for EPICS_HOST_ARCH=$EPICS_HOST_ARCH. >&2
+        echo No EPICS $BASE available for EPICS_HOST_ARCH=$EPICS_HOST_ARCH. >&2
+        test -f $EPICS/ignore && echo "(ignored: $(sed < $EPICS/ignore 's/[[:space:]]/, /g') as listed in $EPICS/ignore)"
         exit 1
     fi
     # maybe we need to change from 64 bit to 32 bit
