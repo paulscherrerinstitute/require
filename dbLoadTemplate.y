@@ -35,6 +35,7 @@
 #include "dbLoadTemplate.h"
 #include "osiFileName.h"
 #include "epicsVersion.h"
+#include "macLib.h"
 
 #if defined(vxWorks) || defined (_WIN32)
 #include "asprintf.h"
@@ -48,11 +49,13 @@ extern void dbLoadRecords(const char*, const char*);
 #include "epicsExport.h"
 #endif
 
-#if (EPICS_VERSION*10000+EPICS_REVISION*100+EPICS_MODIFICATION<31412)
+#define EPICSVER EPICS_VERSION*10000+EPICS_REVISION*100+EPICS_MODIFICATION
+
+#if (EPICSVER<31412)
 #define dbmfStrdup(s) strcpy(dbmfMalloc(strlen((char*)(s))+1),(char*)(s))
 #endif
 
-#if (EPICS_VERSION*10000+EPICS_REVISION*100+EPICS_MODIFICATION>=31600)
+#if (EPICSVER>=31600)
 #define dbmfStrdup(s) dbmfStrdup((char*)s) 
 #endif
 
@@ -67,6 +70,7 @@ static char *sub_locals;
 static char **vars = NULL;
 static char *db_file_name = NULL;
 static int var_count, sub_count;
+static MAC_HANDLE *macHandle = NULL;
 
 /* We allocate MAX_VAR_FACTOR chars in the sub_collect string for each
  * "variable=value," segment, and will accept at most dbTemplateMaxVars
@@ -247,7 +251,7 @@ pattern_value: QUOTE
             strcat(sub_locals, ",");
             strcat(sub_locals, vars[sub_count]);
             strcat(sub_locals, "=\"");
-            strcat(sub_locals, $1);
+            macExpandString(macHandle, $1, sub_locals+strlen(sub_locals), (long)(dbTemplateMaxVars * MAX_VAR_FACTOR - (sub_locals+strlen(sub_locals)-sub_collect) - 1));
             strcat(sub_locals, "\"");
             sub_count++;
         } else {
@@ -265,7 +269,7 @@ pattern_value: QUOTE
             strcat(sub_locals, ",");
             strcat(sub_locals, vars[sub_count]);
             strcat(sub_locals, "=");
-            strcat(sub_locals, $1);
+            macExpandString(macHandle, $1, sub_locals+strlen(sub_locals), (long)(dbTemplateMaxVars * MAX_VAR_FACTOR - (sub_locals+strlen(sub_locals)-sub_collect)));
             sub_count++;
         } else {
             fprintf(stderr, "dbLoadTemplate: Too many values given, line %d.\n",
@@ -327,7 +331,7 @@ variable_definition: WORD EQUALS WORD
         strcat(sub_locals, ",");
         strcat(sub_locals, $1);
         strcat(sub_locals, "=");
-        strcat(sub_locals, $3);
+        macExpandString(macHandle, $3, sub_locals+strlen(sub_locals), (long)(dbTemplateMaxVars * MAX_VAR_FACTOR - (sub_locals+strlen(sub_locals)-sub_collect)));
         dbmfFree($1); dbmfFree($3);
     }
     | WORD EQUALS QUOTE
@@ -338,7 +342,7 @@ variable_definition: WORD EQUALS WORD
         strcat(sub_locals, ",");
         strcat(sub_locals, $1);
         strcat(sub_locals, "=\"");
-        strcat(sub_locals, $3);
+        macExpandString(macHandle, $3, sub_locals+strlen(sub_locals), (long)(dbTemplateMaxVars * MAX_VAR_FACTOR - (sub_locals+strlen(sub_locals)-sub_collect) - 1));
         strcat(sub_locals, "\"");
         dbmfFree($1); dbmfFree($3);
     }
@@ -350,7 +354,7 @@ variable_definition: WORD EQUALS WORD
         strcat(sub_locals, ",\"");
         strcat(sub_locals, $1);
         strcat(sub_locals, "\"=\"");
-        strcat(sub_locals, $3);
+        macExpandString(macHandle, $3, sub_locals+strlen(sub_locals), (long)(dbTemplateMaxVars * MAX_VAR_FACTOR - (sub_locals+strlen(sub_locals)-sub_collect) - 1));
         strcat(sub_locals, "\"");
         dbmfFree($1); dbmfFree($3);
     }
@@ -380,6 +384,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
 {
     FILE *fp;
     int i;
+    char** pairs;
 
     line_num = 1;
     if (!sub_file || !*sub_file) {
@@ -424,6 +429,47 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
         return -1;
     }
 
+    macHandle = NULL;
+    if (macCreateHandle(&macHandle,(
+#if (EPICSVER>=31501)
+        const
+#endif
+        char*[]){ "", "environ", NULL, NULL }) != 0) return -1;
+
+#if (0 && EPICSVER<31403)
+    /* Have no environment macro substitution, thus load envionment explicitly */
+#ifndef vxWorks
+    /* In 3.14 before 3.14.3 we may have non-vxWorks without environment macro substitution */
+    /* non-vxWorks systems have environ instead of ppGlobalEnviron */
+    #define ppGlobalEnviron environ
+#endif
+#ifdef _WRS_VXWORKS_MAJOR
+    /* VxWorks 6 bug: environment is not NULL terminated ! */
+    /* There is a non-public counter 8 bytes after ppGlobalEnviron */
+    char** endEnviron = ppGlobalEnviron+((unsigned int*)&ppGlobalEnviron)[2];
+    if (runScriptDebug)
+            printf("runScript: %u environment variables\n", ((unsigned int*)&ppGlobalEnviron)[2]);
+    for (pairs = ppGlobalEnviron; pairs < endEnviron; pairs++)
+#else
+    for (pairs = ppGlobalEnviron; *pairs; pairs++)
+#endif
+    {
+        char* var, *eq;
+        if (runScriptDebug)
+            printf("runScript: environ %s\n", *pairs);
+
+        /* take a copy to replace '=' with null byte */
+        if ((var = strdup(*pairs)) == NULL) goto error;
+        eq = strchr(var, '=');
+        if (eq)
+        {
+            *eq = 0;
+            macPutValue(macHandle, var, eq+1);
+        }
+        free(var);
+    }
+#endif
+
     vars = malloc(dbTemplateMaxVars * sizeof(char*));
     sub_collect = malloc(dbTemplateMaxVars * MAX_VAR_FACTOR);
     if (!vars || !sub_collect) {
@@ -436,6 +482,10 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
     strcpy(sub_collect, ",");
 
     if (cmd_collect && *cmd_collect) {
+        macParseDefns(macHandle, (char*)cmd_collect, &pairs);
+        macInstallMacros(macHandle, pairs);
+        free(pairs);
+   
         strcat(sub_collect, cmd_collect);
         sub_locals = sub_collect + strlen(sub_collect);
     } else {
@@ -457,6 +507,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
     for (i = 0; i < var_count; i++) {
         dbmfFree(vars[i]);
     }
+    if (macHandle) macDeleteHandle(macHandle);
     free(vars);
     free(sub_collect);
     vars = NULL;
