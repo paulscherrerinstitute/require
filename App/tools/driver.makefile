@@ -65,11 +65,12 @@ MAKEHOME:=$(dir $(lastword ${MAKEFILE_LIST}))
 USERMAKEFILE:=$(lastword $(filter-out $(lastword ${MAKEFILE_LIST}), ${MAKEFILE_LIST}))
 
 # Some configuration:
-DEFAULT_EPICS_VERSIONS = 3.13.10 3.14.12 7.0.5
+DEFAULT_EPICS_VERSIONS ?= 3.13.10 3.14.12 7.0.5
 BUILDCLASSES = vxWorks
 EPICS_MODULES ?= /ioc/modules
-MODULE_LOCATION = ${EPICS_MODULES}/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
-EPICS_LOCATION = /usr/local/epics
+MODULE_LOCATION = $(or ${INSTALL_PATH},${EPICS_MODULES})/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
+EPICS_LOCATION ?= /usr/local/epics
+GIT_DOMAIN ?= psi.ch
 
 DOCUEXT = txt html htm doc pdf ps tex dvi gif jpg png
 DOCUEXT += TXT HTML HTM DOC PDF PS TEX DVI GIF JPG PNG
@@ -166,7 +167,7 @@ export MAKE_FIRST
 export SUBMODULES
 export USE_LIBVERSION
 
-export ORIGIN=$(firstword $(shell git remote -v 2>/dev/null | awk '/psi.ch.*(fetch)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null)) $(addsuffix /,$(shell cat CVS/Root 2>/dev/null))$(shell cat CVS/Repository 2>/dev/null) $(PWD))
+export ORIGIN=$(firstword $(shell git remote -v 2>/dev/null | awk '/${GIT_DOMAIN}.*(fetch)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null)) $(addsuffix /,$(shell cat CVS/Root 2>/dev/null))$(shell cat CVS/Repository 2>/dev/null) $(PWD))
 
 # Some shell commands:
 RMDIR = rm -rf
