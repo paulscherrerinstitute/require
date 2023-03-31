@@ -435,6 +435,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
         const
 #endif
         char*[]){ "", "environ", NULL, NULL }) != 0) return -1;
+    macSuppressWarning(macHandle, 1);
 
 #if (0 && EPICSVER<31403)
     /* Have no environment macro substitution, thus load envionment explicitly */
@@ -459,7 +460,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
             printf("runScript: environ %s\n", *pairs);
 
         /* take a copy to replace '=' with null byte */
-        if ((var = strdup(*pairs)) == NULL) goto error;
+        if ((var = strdup(*pairs)) == NULL) continue;
         eq = strchr(var, '=');
         if (eq)
         {
@@ -473,6 +474,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
     vars = malloc(dbTemplateMaxVars * sizeof(char*));
     sub_collect = malloc(dbTemplateMaxVars * MAX_VAR_FACTOR);
     if (!vars || !sub_collect) {
+        if (macHandle) macDeleteHandle(macHandle);
         free(vars);
         free(sub_collect);
         fclose(fp);
