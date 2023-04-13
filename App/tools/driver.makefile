@@ -100,6 +100,10 @@ DEPFILE = ${PRJ}.dep
 BASH_ENV=
 ENV=
 
+ifeq (${EPICS_HOST_ARCH},)
+$(error EPICS_HOST_ARCH is not set)
+endif
+
 # Default target is "build" for all versions.
 # Don't install anything (different from default EPICS make rules).
 default: build
