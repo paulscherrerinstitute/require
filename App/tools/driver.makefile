@@ -108,6 +108,11 @@ endif
 # Don't install anything (different from default EPICS make rules).
 default: build
 
+# Traditional clean rules, changed to single : in later EPICS versions
+INSTALLRULE=install::
+BUILDRULE=build::
+CLEANRULE = clean::
+
 IGNOREFILES = .cvsignore .gitignore
 %: ${IGNOREFILES}
 ${IGNOREFILES}:
@@ -590,8 +595,6 @@ EPICS_INCLUDES =
 
 # EPICS 3.13 uses :: in some rules where 3.14 uses :
 ifeq (${EPICS_BASETYPE},3.13)
-INSTALLRULE=install::
-BUILDRULE=build::
 BASERULES=${EPICS_BASE}/config/RULES.Vx
 OBJ=.o
 LIB_SUFFIX=.a
@@ -600,6 +603,9 @@ else # 3.14+
 INSTALLRULE=install:
 BUILDRULE=build:
 BASERULES=${EPICS_BASE}/configure/RULES
+ifdef BASE_3_15
+CLEANRULE=clean:
+endif
 endif # 3.14+
 
 INSTALL_REV     = ${MODULE_LOCATION}/R${EPICSVERSION}
