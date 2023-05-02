@@ -696,19 +696,16 @@ endif
 # See ${REGISTRYFILE} and ${EXPORTFILE} rules below.
 LIBOBJS += $(if $(MODULEDBD), $(addsuffix $(OBJ),$(basename ${REGISTRYFILE} $(if $(filter WIN32,${OS_CLASS}),,${EXPORTFILE}))))
 
-ifdef BASE_3_16
-# Suppress "'rset' is deprecated" warning for old drivers
+# Suppress "'rset' is deprecated" warning for old drivers on newer EPICS
 # but not on record types where it would cause an error
-ifndef USING_NEW_RSET
+# Define USE_TYPED_RSET=<empty> to avoid conflics with code using #define USE_TYPED_RSET
 SUPPRESS_RSET_WARNING = -DUSE_TYPED_RSET=
 CPPFLAGS += ${SUPPRESS_RSET_WARNING}
-REC_SUPPRESS_RSET_WARNING=-Wno-deprecated-declarations
+REC_SUPPRESS_RSET_WARNING=$(if $(USING_NEW_RSET),-DUSE_TYPED_RSET=,-Wno-deprecated-declarations)
 ifeq ($(OS_CLASS),WIN32)
-REC_SUPPRESS_RSET_WARNING=
+REC_SUPPRESS_RSET_WARNING=$(if $(USING_NEW_RSET),-DUSE_TYPED_RSET=)
 endif
 %Record$(OBJ) %Record.i %Record.ii %Record$(DEP): SUPPRESS_RSET_WARNING=$(REC_SUPPRESS_RSET_WARNING)
-endif
-endif
 
 endif # Both, 3.13 and 3.14+ from here.
 
