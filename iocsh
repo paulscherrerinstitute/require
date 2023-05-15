@@ -319,6 +319,9 @@ then
 fi
 export EPICS_DRIVER_PATH
 
+# setup search PATH (Windows needs it for libraries, but also find helper programs like msi)
+PATH=$PATH:$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH:$EPICS_BASE/bin/$EPICS_HOST_ARCH:$EPICS_BASE/../seq/bin/$EPICS_HOST_ARCH
+
 # Call init script after IOC name, EPICS_HOST_ARCH and EPICS_BASE are set.
 for dir in . cfg /etc
 do
@@ -447,7 +450,7 @@ trap "stty sane 2> /dev/null;echo;rm -f $startup;$(trap -p EXIT | sed 's/.*\x27\
 {
 echo "# date=\"$(date)\""
 echo "# user=\"${USER:-$(whoami)}\""
-for var in IOC PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER_PATH
+for var in IOC PWD BASE EPICS_HOST_ARCH SHELLBOX EPICS_CA_ADDR_LIST EPICS_DRIVER_PATH PATH LD_LIBRARY_PATH
 do
     echo "# $var=\"${!var}\""
 done
@@ -517,11 +520,6 @@ echo 'epicsEnvSet IOCSH_PS1,"${IOC}> "'
 if [ "${EPICS_HOST_ARCH#win32-}" != "$EPICS_HOST_ARCH" ]
 then
     startup=`cygpath -w $startup`
-fi
-
-if [ "${EPICS_HOST_ARCH#win32-}" != "$EPICS_HOST_ARCH" -o "${EPICS_HOST_ARCH#cygwin-}" != "$EPICS_HOST_ARCH" ]
-then
-    PATH=$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH:$EPIC_BASE/bin/$EPICS_HOST_ARCH:$EPICS_BASE/../seq/bin/$EPICS_HOST_ARCH:$PATH
 fi
 
 echo $EXE $ARGS $startup
