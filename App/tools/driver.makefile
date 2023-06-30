@@ -208,7 +208,11 @@ help:
 	install 'install.<EPICS version>' \
 	uninstall 'uninstall.<EPICS version>' \
 	installui uninstallui \
-	clean help version; \
+	clean \
+	'debug   # for debugging driver.makefile' \
+	'help    # print this help text' \
+	'version # print which library version will be built' \
+	'what    # print what would be built'; \
 	do echo "  make $$target"; \
 	done
 	@echo "Makefile variables:(defaults) [comment]"
@@ -251,6 +255,9 @@ debug::
 	@echo "ARCH_FILTER = ${ARCH_FILTER}"
 	@echo "PRJ = ${PRJ}"
 
+what::
+	@echo "LIBVERSION = ${LIBVERSION}"
+
 prebuild: ${IGNOREFILES}
 
 ifneq ($(SUBMODULES),)
@@ -261,9 +268,9 @@ endif
 
 # Loop over all EPICS versions for second run.
 # Clear EPICS_SITE_VERSION to get rid of git warnings with some base installations
-MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION} EPICS_SITE_VERSION=
+MAKEVERSION = ${MAKE} -f ${USERMAKEFILE} LIBVERSION=${LIBVERSION} EPICS_SITE_VERSION= $(if $(filter what%,$@),-s) 
 
-build install debug:: prebuild
+build install debug what:: prebuild
 	@+for VERSION in ${BUILD_EPICS_VERSIONS}; do ${MAKEVERSION} EPICSVERSION=$$VERSION $@; done
 
 # Handle cases where user requests a group of EPICS versions:
@@ -272,10 +279,10 @@ build install debug:: prebuild
 
 define VERSIONRULES
 $(1): prebuild
-	+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
+	@+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION build; done
 
 %.$(1): prebuild
-	+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
+	@+for VERSION in $${EPICS_VERSIONS_$(1)}; do $${MAKEVERSION} EPICSVERSION=$$$$VERSION $${@:%.$(1)=%}; done
 endef
 $(foreach v,$(filter-out ${INSTALLED_EPICS_VERSIONS},$(sort $(basename $(basename $(basename ${INSTALLED_EPICS_VERSIONS}))) $(basename $(basename ${INSTALLED_EPICS_VERSIONS})) $(basename ${INSTALLED_EPICS_VERSIONS}))),$(eval $(call VERSIONRULES,$v)))
 
@@ -468,9 +475,11 @@ install build::
 	done
 
 # Loop over all architectures.
-install build debug:: ${MAKE_FIRST}
+install build debug what:: ${MAKE_FIRST}
 	@+for ARCH in ${CROSS_COMPILER_TARGET_ARCHS}; do \
-	    umask 002; echo MAKING ${EPICSVERSION} ARCH $$ARCH; $(foreach v,$(filter IGNORE_MODULES%,${.VARIABLES}),$v="${$v}") ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
+	    umask 002; \
+	    $(if $(filter-out what%,$@),echo MAKING ${EPICSVERSION} ARCH $$ARCH;) \
+	    $(foreach v,$(filter IGNORE_MODULES%,${.VARIABLES}),$v="${$v}") ${MAKE} -f ${USERMAKEFILE} T_A=$$ARCH $@; \
 	done
 
 else # T_A
@@ -497,6 +506,9 @@ install build:
 	@true
 
 else
+
+what::
+	@echo ${EPICSVERSION} ${T_A}
 
 # Add sources for specific epics types (3.13 or 3.14) or architectures.
 ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
