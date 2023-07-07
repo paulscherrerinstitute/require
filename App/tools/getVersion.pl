@@ -16,6 +16,10 @@ use constant {
 };
 
 my $version;
+my $tag;
+my $remote;
+my $branch;
+my $remotetagcommit;
 my $debug = 0;
 
 # Check all files in top directory and all files specified explicitly in subdirectories
@@ -40,6 +44,9 @@ sub check_output {
     $child_stderr = gensym();
 
     chomp(my $command = $_[0]);
+    if ($debug) {
+        say STDERR "\$ $command";
+    }
 
     # start the child process capturing stdout and stderr
     my $child_pid = open3(undef, $child_stdout, $child_stderr, $command);
@@ -77,6 +84,9 @@ sub check_output {
 
     waitpid($child_pid, 0);
     die $error if $?;
+    if ($debug) {
+        say STDERR $output;
+    }
 
     return split(/\n/, $output);
 }
@@ -185,67 +195,76 @@ sub parse_git_output {
             return;
         }
         elsif ($line =~ /^\?\? (.*)/) {
-            say STDERR "$1: not in git => version test";
+            say STDERR "$1: Not in git => version test";
             $version = "test";
         }
         elsif ($line =~ /^ M (.*)/) {
-            say STDERR "$1: locally modified => version test";
+            say STDERR "$1: Locally modified => version test";
             $version = "test";
         }
         elsif ($line =~ /^D  (.*)/) {
-            say STDERR "$1: deleted (or renamed) but not committed => version test";
+            say STDERR "$1: Deleted (or renamed) but not committed => version test";
             $version = "test";
         }
         elsif ($line =~ /^ D (.*)/) {
-            say STDERR "$1: locally deleted => version test";
+            say STDERR "$1: Locally deleted => version test";
             $version = "test";
         }
         elsif ($line =~ /^A  (.*)/) {
-            say STDERR "$1: locally added => version test";
+            say STDERR "$1: Locally added => version test";
             $version = "test";
         }
         elsif ($line =~ /^AM (.*)/) {
-            say STDERR "$1: locally added and modified => version test";
+            say STDERR "$1: Locally added and modified => version test";
             $version = "test";
         }
         elsif ($line =~ /^([ MADRCU][ MADRCU]) (.*)/) {
-            say STDERR "$2: $1 (whatever that means) => version test";
+            say STDERR "$2: $1 (Whatever that means) => version test";
             $version = "test";
         }
         elsif ($line =~ /fatal: No names found/) {
-            say STDERR "no tag on this version => version test";
+            say STDERR "No tag on this version => version test";
             $version = "test";
         }
         elsif ($line =~ /On branch/) {
         }
         elsif ($line =~ /^([0-9]+)\.([0-9]+)(\.([0-9]+))?$/) {
+            $tag = $line;
             my $major = $1;
             my $minor = $2;
             my $patch = $4 || "0";
             $version = "$major.$minor.$patch";
-            say STDERR "checking tag $line => version $version";
+            say STDERR "Checking tag $line => version $version";
         }
         elsif ($line =~ /[a-zA-Z]+[a-zA-Z0-9]*_([0-9]+)_([0-9]+)(_([0-9]+))?$/) {
+            $tag = $line;
             my $major = $1;
             my $minor = $2;
             my $patch = $4 || "0";
             $version = "$major.$minor.$patch";
-            say STDERR "checking tag $line => version $version";
+            say STDERR "Checking tag $line => version $version";
         }
         elsif ($line =~ /(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g/) {
             $version = "test";
             my $s = $3 != 1 ? "s" : "";
-            say STDERR "tag $1 is $3 commit$s old => version test";
+            say STDERR "Tag $1 is $3 commit$s old => version test";
         }
         elsif ($line =~ /Your branch is ahead of '(.*)\/(.*)'/) {
-            say STDERR "branch \"$2\" not yet pushed to remote \"$1\" => version test";
-            say STDERR "try: git push --tags $1 $2";
+            say STDERR "Branch \"$2\" not yet pushed to remote \"$1\" => version test";
+            say STDERR "Try: git push --tags $1 $2";
             $version = "test";
         }
         elsif ($line =~ /Your branch and '(.*)\/(.*)' have diverged/) {
-            say STDERR "diverged branch \"$2\" not yet force-pushed to remote \"$1\" => version test";
-            say STDERR "try: git push --force --tags $1 $2";
+            say STDERR "Branch \"$2\" diverged from remote \"$1\" => version test";
+            say STDERR "Try to merge or rebase your changes.";
             $version = "test";
+        }
+        elsif ($line =~ /Your branch is up to date with '(.*)\/(.*)'/) {
+            $remote = $1;
+            $branch = $2;
+        }
+        elsif ($line =~/([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
+            $remotetagcommit = $1
         }
     }
 }
@@ -256,9 +275,6 @@ if ($debug) {
 
 eval {
     # fails if git command exits with error
-    if ($debug) {
-        say STDERR "git status --porcelain $files"
-    }
     @statusinfo = check_output("git status --porcelain $files");
     parse_git_output(\@statusinfo);
     if ($version) {
@@ -266,9 +282,6 @@ eval {
         exit;
     }
 
-    if ($debug) {
-        say STDERR "git describe --tags HEAD";
-    }
     @statusinfo = check_output("git describe --tags HEAD");
     parse_git_output(\@statusinfo);
     if (!defined($version)) {
@@ -277,11 +290,27 @@ eval {
     }
 
     if ($version ne "test") {
-        if ($debug) {
-            say STDERR "git status";
-        }
         @statusinfo = check_output("git status");
         parse_git_output(\@statusinfo);
+    }
+
+    if (defined($remote) && defined($tag)) {
+        @statusinfo = check_output("git ls-remote --tags $remote $tag");
+        parse_git_output(\@statusinfo);
+
+        if (!$remotetagcommit) {
+            say STDERR "Could not find tag $tag on remote \"$remote\" => version test";
+            say STDERR "Try: git push --tags $remote $branch";
+            $version = "test";
+        } else {
+            @statusinfo = check_output("git rev-parse $tag");
+            my $localtagcommit = $statusinfo[0];
+            if ($localtagcommit ne $remotetagcommit) {
+                say STDERR "Tag $tag is different from the same tag on remote \"$remote\" => version test";
+                say STDERR "Try a new tag after fixing $tag: git tag --force $tag $remotetagcommit";
+                say STDERR "or overwrite \"$remote\": git push --force --tags $remote $branch";
+            }
+        }
     }
 
     say $version;
@@ -294,9 +323,6 @@ eval {
 # fix: check local and non local files separately
 
     # fails if we have no cvs or server has a problem
-    if ($debug) {
-        say STDERR "cvs status -l -v $files;"
-    }
     @statusinfo = check_output("cvs status -l -v $files");
     # mark the finsh of the last file for the parser
     push @statusinfo, "===================================================================";
