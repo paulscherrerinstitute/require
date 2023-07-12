@@ -19,6 +19,7 @@ my $version;
 my $tag;
 my $remote;
 my $branch;
+my $commit;
 my $remotetagcommit;
 my $debug = 0;
 
@@ -70,7 +71,7 @@ sub check_output {
                 if ($fh == $child_stdout) {
                     $output .= $line;
                 }
-                elsif ($fh == $child_stdout) {
+                else {
                     $error .= $line;
                 }
             }
@@ -266,6 +267,14 @@ sub parse_git_output {
         elsif ($line =~/([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
             $remotetagcommit = $1
         }
+        elsif ($line =~/\* [^ ]+ ([0-9a-fA-F]+) \[(.*)\/(.*)\]/) {
+            $commit = $1;
+            $remote = $2;
+            $branch = $3;
+            if ($debug) {
+                say STDERR 'Commit $commit on branch $branch on remote "$remote"';
+            }
+        }
     }
 }
 
@@ -282,7 +291,7 @@ eval {
         exit;
     }
 
-    @statusinfo = check_output("git describe --tags HEAD");
+    @statusinfo = check_output("git describe --tags");
     parse_git_output(\@statusinfo);
     if (!defined($version)) {
         say STDERR "Could not find out version tag => version test";
@@ -290,26 +299,39 @@ eval {
     }
 
     if ($version ne "test") {
+        @statusinfo = check_output("git branch -vv");
+        parse_git_output(\@statusinfo);
+    }
+
+    if ($version ne "test") {
         @statusinfo = check_output("git status");
         parse_git_output(\@statusinfo);
     }
 
-    if (defined($remote) && defined($tag)) {
-        @statusinfo = check_output("git ls-remote --tags $remote $tag");
-        parse_git_output(\@statusinfo);
-
-        if (!$remotetagcommit) {
-            say STDERR "Could not find tag $tag on remote \"$remote\" => version test";
-            say STDERR "Try: git push --tags $remote $branch";
-            $version = "test";
-        } else {
-            @statusinfo = check_output("git rev-parse $tag");
-            my $localtagcommit = $statusinfo[0];
-            if ($localtagcommit ne $remotetagcommit) {
-                say STDERR "Tag $tag is different from the same tag on remote \"$remote\" => version test";
-                say STDERR "Try a new tag after fixing $tag: git tag --force $tag $remotetagcommit";
-                say STDERR "or overwrite \"$remote\": git push --force --tags $remote $branch";
+    if (defined($remote) && defined($tag) && defined($commit)) {
+        my $err = eval {
+            @statusinfo = check_output("git ls-remote --tags $remote $tag");
+            parse_git_output(\@statusinfo);
+            if (!$remotetagcommit) {
+                say STDERR "Tag $tag not yet pushed to remote \"$remote\" => version test";
+                say STDERR "Try: git push --tags $remote $branch";
+                $version = "test";
+            } else {
+                $remotetagcommit = substr($remotetagcommit,0,length($commit));
+                if ($remotetagcommit ne $commit) {
+                    say STDERR "Tag $tag differs from the same tag on remote \"$remote\" => version test";
+                    say STDERR "It is commit $commit locally but commit $remotetagcommit on $remote.";
+                    say STDERR "Try a new tag after fixing your $tag tag: git tag --force $tag $remotetagcommit";
+                    say STDERR "Or overwrite \"$remote\": git push --force --tags $remote $branch";
+                    $version = "test";
+                }
             }
+        };
+        if ($@) {
+            $@ =~ s/\n/\n| /g;
+            say STDERR "Cannot check tag $tag on remote \"$remote\":";
+            say STDERR "| $@";
+            say STDERR "I hope you know what you're doing.";
         }
     }
 
