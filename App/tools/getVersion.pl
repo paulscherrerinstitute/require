@@ -267,7 +267,7 @@ sub parse_git_output {
         elsif ($line =~/([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
             $remotetagcommit = $1
         }
-        elsif ($line =~/\* [^ ]+ ([0-9a-fA-F]+) \[(.*)\/(.*)\]/) {
+        elsif ($line =~/\* [^ ]+ +([0-9a-fA-F]+) \[(.*)\/(.*)\]/) {
             $commit = $1;
             $remote = $2;
             $branch = $3;
@@ -308,6 +308,23 @@ eval {
         parse_git_output(\@statusinfo);
     }
 
+    if ($debug) {
+        if (defined($remote)) {
+            say STDERR "remote = $remote";
+        } else {
+            say STDERR "remote undefined";
+        }
+        if (defined($tag)) {
+            say STDERR "tag = $tag";
+        } else {
+            say STDERR "tag undefined";
+        }
+        if (defined($commit)) {
+            say STDERR "commit = $commit";
+        } else {
+            say STDERR "commit undefined";
+        }
+    }
     if (defined($remote) && defined($tag) && defined($commit)) {
         my $err = eval {
             @statusinfo = check_output("git ls-remote --tags $remote $tag");
