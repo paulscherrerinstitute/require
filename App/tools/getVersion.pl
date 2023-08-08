@@ -267,7 +267,7 @@ sub parse_git_output {
         elsif ($line =~/([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
             $remotetagcommit = $1
         }
-        elsif ($line =~/\* [^ ]+ +([0-9a-fA-F]+) \[(.*)\/(.*)\]/) {
+        elsif ($line =~/\* [^ ]+ +([0-9a-fA-F]+) \[(.*)\/([^:]*).*\]/) {
             $commit = $1;
             $remote = $2;
             $branch = $3;
@@ -323,6 +323,11 @@ eval {
             say STDERR "commit = $commit";
         } else {
             say STDERR "commit undefined";
+        }
+        if (defined($branch)) {
+            say STDERR "branch = $branch";
+        } else {
+            say STDERR "branch undefined";
         }
     }
     if (defined($remote) && defined($tag) && defined($commit)) {
