@@ -229,6 +229,12 @@ sub parse_git_output {
         }
         elsif ($line =~ /On branch/) {
         }
+        elsif ($line =~/([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
+            $remotetagcommit = $1;
+            if ($debug) {
+                say STDERR "Remote commit $remotetagcommit";
+            }
+        }
         elsif ($line =~ /^([0-9]+)\.([0-9]+)(\.([0-9]+))?$/) {
             $tag = $line;
             my $major = $1;
@@ -264,16 +270,16 @@ sub parse_git_output {
             $remote = $1;
             $branch = $2;
         }
-        elsif ($line =~/([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
-            $remotetagcommit = $1
-        }
         elsif ($line =~/\* [^ ]+ +([0-9a-fA-F]+) \[(.*)\/([^:]*).*\]/) {
             $commit = $1;
             $remote = $2;
             $branch = $3;
             if ($debug) {
-                say STDERR 'Commit $commit on branch $branch on remote "$remote"';
+                say STDERR "Commit $commit on branch $branch on remote $remote";
             }
+        }
+        elsif ($debug) {
+            say STDERR "unparsed: $line";
         }
     }
 }
