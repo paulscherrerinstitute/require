@@ -238,7 +238,7 @@ case "$EPICS_HOST_ARCH" in
         ;;
 
     # Some architectures have not enough memory to run PVA
-    ( moxa42-armv6l )
+    ( moxa42-armv6l | eldk42-ppc4xxFP )
         NOPVA=1
         ;;
 esac
