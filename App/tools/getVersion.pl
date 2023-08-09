@@ -192,7 +192,7 @@ sub parse_git_output {
 
     foreach my $line (@output) {
         chomp($line);
-        if ($line =~ /fatal: Not a git repository/) {
+        if ($line =~ /^fatal: Not a git repository/) {
             return;
         }
         elsif ($line =~ /^\?\? (.*)/) {
@@ -223,13 +223,13 @@ sub parse_git_output {
             say STDERR "$2: $1 (Whatever that means) => version test";
             $version = "test";
         }
-        elsif ($line =~ /fatal: No names found/) {
+        elsif ($line =~ /^fatal: No names found/) {
             say STDERR "No tag on this version => version test";
             $version = "test";
         }
-        elsif ($line =~ /On branch/) {
+        elsif ($line =~ /^On branch/) {
         }
-        elsif ($line =~/([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
+        elsif ($line =~ /([0-9a-fA-F]+)[ \t]+refs\/tags\//) {
             $remotetagcommit = $1;
             if ($debug) {
                 say STDERR "Remote commit $remotetagcommit";
@@ -243,7 +243,7 @@ sub parse_git_output {
             $version = "$major.$minor.$patch";
             say STDERR "Checking tag $line => version $version";
         }
-        elsif ($line =~ /[a-zA-Z]+[a-zA-Z0-9]*_([0-9]+)_([0-9]+)(_([0-9]+))?$/) {
+        elsif ($line =~ /^[a-zA-Z]+[a-zA-Z0-9]*_([0-9]+)_([0-9]+)(_([0-9]+))?$/) {
             $tag = $line;
             my $major = $1;
             my $minor = $2;
@@ -251,26 +251,26 @@ sub parse_git_output {
             $version = "$major.$minor.$patch";
             say STDERR "Checking tag $line => version $version";
         }
-        elsif ($line =~ /(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g/) {
+        elsif ($line =~ /^(.*[0-9]+[_.][0-9]+([_.][0-9]+)?)-([0-9]+)-g[0-9a-fA-F]+$/) {
             $version = "test";
             my $s = $3 != 1 ? "s" : "";
             say STDERR "Tag $1 is $3 commit$s old => version test";
         }
-        elsif ($line =~ /Your branch is ahead of '(.*)\/(.*)'/) {
+        elsif ($line =~ /^Your branch is ahead of '(.*)\/(.*)'/) {
             say STDERR "Branch \"$2\" not yet pushed to remote \"$1\" => version test";
             say STDERR "Try: git push --tags $1 $2";
             $version = "test";
         }
-        elsif ($line =~ /Your branch and '(.*)\/(.*)' have diverged/) {
+        elsif ($line =~ /^Your branch and '(.*)\/(.*)' have diverged/) {
             say STDERR "Branch \"$2\" diverged from remote \"$1\" => version test";
             say STDERR "Try to merge or rebase your changes.";
             $version = "test";
         }
-        elsif ($line =~ /Your branch is up to date with '(.*)\/(.*)'/) {
+        elsif ($line =~ /^Your branch is up to date with '(.*)\/(.*)'/) {
             $remote = $1;
             $branch = $2;
         }
-        elsif ($line =~/\* [^ ]+ +([0-9a-fA-F]+) \[(.*)\/([^:]*).*\]/) {
+        elsif ($line =~ /^\* [^ ]+ +([0-9a-fA-F]+) \[(.*)\/([^:]*).*\]/) {
             $commit = $1;
             $remote = $2;
             $branch = $3;
