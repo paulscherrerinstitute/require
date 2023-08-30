@@ -410,19 +410,19 @@ HDRS = ${RECORDS:%=${COMMON_DIR}/%.h} ${MENUS:%=${COMMON_DIR}/%.h}
 HDRSX = ${HEADERS}
 HDRSX += ${HEADERS_${EPICS_BASETYPE}}
 HDRSX += ${HEADERS_${EPICSVERSION}}
-HDRS += $(call filter_out_dir,${HDRSX})
+HDRS += $(call filter_out_dir,$(abspath ${HDRSX}))
 export HDRS
 
 TEMPLSX = $(if ${TEMPLATES},$(filter-out -none-,${TEMPLATES}),$(wildcard *.template *.db *.subs))
 TEMPLSX += ${TEMPLATES_${EPICS_BASETYPE}}
 TEMPLSX += ${TEMPLATES_${EPICSVERSION}}
-TEMPLS = $(call filter_out_dir,${TEMPLSX})
+TEMPLS = $(call filter_out_dir,$(abspath ${TEMPLSX}))
 export TEMPLS
 
 SCRX = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd *.iocsh))
 SCRX += ${SCRIPTS_${EPICS_BASETYPE}}
 SCRX += ${SCRIPTS_${EPICSVERSION}}
-SCR = $(call filter_out_dir,${SCRX})
+SCR = $(call filter_out_dir,$(abspath ${SCRX}))
 export SCR
 
 DOCUDIR = .
@@ -518,7 +518,7 @@ export VAR_EXTENSIONS
 REQ = ${REQUIRED} $(foreach x, ${VAR_EXTENSIONS}, ${REQUIRED_$x})
 export REQ
 
-HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, $(call filter_out_dir,${HEADERS_$x}))
+HDRS +=  $(foreach x, ${VAR_EXTENSIONS}, $(call filter_out_dir,$(abspath ${HEADERS_$x})))
 export HDRS
 
 SRCS += $(foreach x, ${VAR_EXTENSIONS}, ${SOURCES_$x})
