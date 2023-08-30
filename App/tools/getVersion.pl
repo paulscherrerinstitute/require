@@ -338,7 +338,7 @@ eval {
     }
     if (defined($remote) && defined($tag) && defined($commit)) {
         my $err = eval {
-            @statusinfo = check_output("git ls-remote --tags $remote $tag");
+            @statusinfo = check_output("git ls-remote --tags '$remote' '$tag' '$tag^*'");
             parse_git_output(\@statusinfo);
             if (!$remotetagcommit) {
                 say STDERR "Tag $tag not yet pushed to remote \"$remote\" => version test";
