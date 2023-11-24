@@ -108,7 +108,7 @@ do
         ( -win | --win )
             PATH=/opt/gfa-wine/bin:$PATH
             LOADER="$LOADER wine64"
-            export WINEDEBUG=fixme-all
+            export WINEDEBUG=fixme-all,err-all
             export WINEDLLOVERRIDES="mscoree,mshtml="
             export WINEPREFIX=$HOME/.wine-$EPICS_HOST_ARCH
             [[ $(wine64 --version) = wine-6.* ]] && stty -isig 2> /dev/null # or CTRL-C hangs up on wine 6
