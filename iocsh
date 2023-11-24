@@ -10,7 +10,8 @@ help () {
 	 -v, --version   Show version and exit.
 	 -win, --win     Run Windows softIOC via wine.
 	 -32             Force 32 bit version (on 64 bit systems).
-	 --nopva         Do not use PVA (in EPICS 7)
+	 --nopva         Do not use PVA (in EPICS 7).
+	 --nolock        Do not lock memory into RAM (in EPICS 3.15.3+).
 	 -x[.z[.y]]      Select EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7).
 	 -d, --debug     Run IOC with gdb.
 	 -dv             Run IOC with valgrind.
@@ -123,6 +124,9 @@ do
             ;;
         ( -nopva | --nopva )
             NOPVA=1
+            ;;
+        ( -nolock | --nolock )
+            NOLOCK=1
             ;;
         ( -n | --name )
             shift
@@ -239,9 +243,12 @@ case "$EPICS_HOST_ARCH" in
         EXEPOSTFIX=.exe
         ;;
 
-    # Some architectures have not enough memory to run PVA
-    ( moxa42-armv6l | eldk42-ppc4xxFP )
+    # Some architectures have little memory
+    ( mvl40-xscale_be | moxa42-armv6l | eldk42-ppc4xxFP )
+        # Safe memory by not using PVA
         NOPVA=1
+        # Do not lock memory in RAM to save on VmRSS
+        NOLOCK=1
         ;;
 esac
 
@@ -481,6 +488,12 @@ else
     LDCMD="ld"
     echo "dbLoadDatabase \"$APP.dbd\",\"$DBD\""
     echo "${APP}_registerRecordDeviceDriver(pdbbase)"
+fi
+
+# switch off memoy lock if requested (only for EPICS 3.15.3+)
+if [ "$BASECODE" -ge 3150300 -a -n "$NOLOCK" ]
+then
+    echo "var dbThreadRealtimeLock 0"
 fi
 
 # use WINE to run softIo, and convert EPICS_DRIVER_PATH to windows format
