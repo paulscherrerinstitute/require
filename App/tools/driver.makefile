@@ -151,7 +151,7 @@ $(foreach v,$(sort $(basename $(basename $(basename ${BUILD_EPICS_VERSIONS}))) $
 # Checkout all git submodules except hidden ones like ".ci" which we most likely don't need
 # User can extend or overwrite IGNORE_SUBMODULES
 IGNORE_SUBMODULES = .%
-SUBMODULES:=$(filter-out ${IGNORE_SUBMODULES},$(foreach f,$(wildcard .gitmodules),$(shell awk '/^\[submodule/ { print gensub(/["\]]/,"","g",$$2) }' $f)))
+SUBMODULES=$(filter-out ${IGNORE_SUBMODULES},$(foreach f,$(wildcard .gitmodules),$(shell awk '/^\[submodule/ { print gensub(/["\]]/,"","g",$$2) }' $f)))
 
 # Check only version of files needed to build the module. But which are they?
 VERSIONCHECKFILES = $(filter-out /% -none-, $(USERMAKEFILE) $(wildcard *.db *.template *.subs *.dbd *.cmd *.iocsh) ${SOURCES} ${DBDS} ${TEMPLATES} ${SCRIPTS} $($(filter SOURCES_% DBDS_%,${.VARIABLES})))
@@ -260,11 +260,9 @@ what::
 
 prebuild: ${IGNOREFILES}
 
-ifneq ($(SUBMODULES),)
 prebuild: submodules
 submodules:
-	git submodule update --init --recursive
-endif
+	$(if $(SUBMODULES),git submodule update --init --recursive $(SUBMODULES))
 
 # Loop over all EPICS versions for second run.
 # Clear EPICS_SITE_VERSION to get rid of git warnings with some base installations
