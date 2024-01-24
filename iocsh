@@ -331,6 +331,8 @@ export EPICS_DRIVER_PATH
 # setup search PATH (Windows needs it for libraries, but also find helper programs like msi)
 PATH=$PATH:$INSTBASE/iocBoot/R$BASE/$EPICS_HOST_ARCH:$EPICS_BASE/bin/$EPICS_HOST_ARCH:$EPICS_BASE/../seq/bin/$EPICS_HOST_ARCH
 
+export EPICS_IOCSH_HISTFILE=
+
 # Call init script after IOC name, EPICS_HOST_ARCH and EPICS_BASE are set.
 for dir in . cfg /etc
 do
