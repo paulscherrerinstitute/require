@@ -358,6 +358,7 @@ ${CONFIG}/CONFIG:
 # Some TOP and EPICS_BASE tweeking necessary to work around release check in 3.14.10+.
 EB:=${EPICS_BASE}
 TOP:=${EPICS_BASE}
+DELAY_INSTALL_LIBS = YES
 -include ${CONFIG}/CONFIG
 SHELL = /bin/bash -O extglob
 BASE_CPPFLAGS=
