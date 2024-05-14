@@ -509,6 +509,11 @@ else
 what::
 	@echo ${EPICSVERSION} ${T_A}
 
+ifdef SYSROOT
+export PKG_CONFIG_LIBDIR=$(wildcard $(SYSROOT:%=%/lib*/pkgconfig))
+export PKG_CONFIG_SYSROOT_DIR = $(SYSROOT)
+endif
+
 # Add sources for specific epics types (3.13 or 3.14) or architectures.
 ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
 VAR_EXTENSIONS = $(firstword $(subst ., ,${EPICSVERSION})) ${EPICS_BASETYPE} ${EPICSVERSION} ${ARCH_PARTS} ${ARCH_PARTS:%=${EPICS_BASETYPE}_%} ${ARCH_PARTS:%=${EPICSVERSION}_%}
