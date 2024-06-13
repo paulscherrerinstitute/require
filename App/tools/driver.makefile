@@ -1196,10 +1196,6 @@ ${DEPFILE}: ${LIBOBJS} $(USERMAKEFILE)
 	@echo "# Generated file. Do not edit." > $@
 #	Check dependencies on ${REQ} and other module headers.
 	$(foreach m,$(sort ${REQ} $(shell cat *.d 2>/dev/null | sed 's/ /\n/g' | sed -n 's%${EPICS_MODULES}/*\([^/]*\)/.*%\1%p' | sort -u)),echo "$m $(or $(if $(strip $(wildcard ${EPICS_MODULES}/$m/use_exact_version)$(shell echo ${$m_VERSION}|sed 'y/0123456789./           /')),$(strip ${$m_VERSION}),$(addsuffix .,$(word 1,$(subst ., ,${$m_VERSION})))$(word 2,$(subst ., ,${$m_VERSION}))),$(and $(wildcard ${EPICS_MODULES}/$m),$(error No numeric version found for REQUIRED module "$m". For using a test version try setting $m_VERSION in your $(notdir $(USERMAKEFILE)))),$(error REQUIRED module "$m" not found for ${T_A}))" >> $@;)
-ifdef OLD_INCLUDE
-#	Check dependencies on old style driver headers.
-	${MAKEHOME}/getPrerequisites.tcl -dep ${OLD_INCLUDE} | grep -vw -e ${PRJ} -e ^$$ >> $@ && echo "Warning: dependency on old style driver"; true;
-endif
 ifeq (${EPICS_BASETYPE},3.13)
 ifneq ($(strip $(filter %.st %.stt,$(SRCS))),)
 	@echo seq >> $@
