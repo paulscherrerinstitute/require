@@ -423,13 +423,15 @@ driver.makefile, simply remove the `GNUmakefile` but keep (or create) the
 
 ### Versions and Tags
 
-The version is generated from a tag in CVS or GIT. If all used files are
-checked in (committed) and tagged and the tag ends in two or three numbers 
-separated by `_` or consists of two or three numbers separated by `.` then
-the version number is generated from these numbers. A missing third number
-is replaced with 0.
+The version is generated from a GIT tag which must consist of two or three
+numbers separated by `.` or (for backward compatibility) must end in two or
+three numbers separated by `_`. A missing third number is replaced with 0.
 
-**Examples:** `mydriver_7_2`, `1.2.3`
+All used files must be committed, the commit must be tagged and pushed
+together with the tag and the tag on the remote server must match the local
+tag.
+
+**Examples:** `1.2.3`, `mydriver_7_2`
 
 The first number is the major version number. It must be incremented if any
 change in the module is not backward compatible. Such changes include:
@@ -458,8 +460,9 @@ The third number is the patch level. It resets whenever the minor version
 number is changed. Increment the patch level with every bug fix. Do not add
 new features without using a new minor version number.
 
-When the current source is not tagged, not committed (or, for GIT, not
-pushed) or not even tracked by CVS or GIT, then a test version is built.
+If the current source is not tagged, not committed, not pushed or not even
+tracked by GIT, or the remote tag is not on the same commit as the local one,
+then a test version is built.
 By default the version string is the content of the `$USER` variable. You
 can overwrite this by calling `make LIBVERSION=versionstring`. Be careful
 when doing this!

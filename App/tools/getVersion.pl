@@ -8,13 +8,6 @@ use File::Glob qw/bsd_glob/;
 use IPC::Open3 qw/open3/;
 use Symbol qw/gensym/;
 
-# cvs status parsing state
-use constant {
-    GLOBAL => 0,
-    FILE => 1,
-    SKIP => 2
-};
-
 my $version;
 my $tag;
 my $remote;
@@ -90,101 +83,6 @@ sub check_output {
     }
 
     return split(/\n/, $output);
-}
-
-sub parse_cvs_output {
-    my @output = @{$_[0]}; 
-    my $scope = GLOBAL;
-    my $file;
-    my %rev;
-    my %tag;
-    my ($major, $minor, $patch);
-
-    foreach my $line (@output) {
-        chomp($line);
-        if ($scope == SKIP) {
-            if ($line =~ /=================/) {
-                    $scope = GLOBAL;
-            }
-        }
-        elsif ($scope == FILE) {
-            if ($line =~ /Working revision:/) {
-                $rev{$file} = (split " ", $line)[2];
-            }
-            elsif ($line =~ /Sticky Tag:.*_([0-9]+)_([0-9]+)(_([0-9]+))?[ \t]+\(revision: /) {
-                $major = $1;
-                $minor = $2;
-                $patch = $4 || 0;
-                $tag{$file} = (split " ", $line)[2] . " (sticky)";
-                $scope = SKIP;
-            }
-            elsif ($line =~ /_([0-9]+)_([0-9]+)(_([0-9]+))?[ \t]+\(revision: ([\.0-9]+)\)/) {
-                if ($rev{$file} eq $5) {
-                    my $Major = $1;
-                    my $Minor = $2;
-                    my $Patch = $4 || 0;
-                    if (!defined($major) ||
-                        $Major > $major ||
-                        ($Major == $major && ($Minor > $minor
-                                || ($Minor == $minor && $Patch > $patch)))) {
-                        $major = $Major;
-                        $minor = $Minor;
-                        $patch = $Patch;
-                        $tag{$file} = (split " ", $line)[0];
-                    }
-                }
-            }
-            elsif ($line =~ /=================/) {
-                if (!defined($major)) {
-                    say STDERR "checking $file: revision $rev{$file} not tagged => version test";
-                    $version = "test";
-                } else {
-                    say STDERR "checking $file: revision $rev{$file} tag $tag{$file} => version $major.$minor.$patch";
-                    if (!defined($version)) {
-                        $version = "$major.$minor.$patch";
-                    } else {
-                        if ($version ne "$major.$minor.$patch") {
-                            $version = "test";
-                        }
-                    }
-                }
-                $scope = GLOBAL;
-            }
-        }
-        elsif ($scope == GLOBAL) {
-            if ($line =~ /there is no version here/) {
-                return;
-            }
-            elsif ($line =~ /cvs status: failed/) {
-                say STDERR "Error: $line";
-                return;
-            }
-            elsif ($line =~ /no such directory `(.*)'/) {
-                say STDERR "checking directory $1: no so such directory";
-                return;
-            }
-            elsif ($line =~ /cvs \[status aborted\]: there is no version here/) {
-                return;
-            }
-            elsif ($line =~ /^File: (\S+)\s+Status: Up-to-date/) {
-                $file = $1;
-                $major = undef();
-                $minor = undef();
-                $patch = undef();
-                $scope = FILE;
-            }
-            elsif ($line =~ /^File: (\S+)\s+Status: (.*)/) {
-                $file = $1;
-                say STDERR "checking $file: $2 => verson test";
-                $version = "test";
-            }
-            elsif ($line =~ /^\? .*/) {
-                $file = (split " ", $line)[1];
-                say STDERR "checking $file: not in cvs => version test";
-                $version = "test";
-            }
-        }
-    }
 }
 
 sub parse_git_output {
@@ -361,25 +259,6 @@ eval {
             say STDERR "| $@";
             say STDERR "I hope you know what you're doing.";
         }
-    }
-
-    say $version;
-    exit;
-};
-
-eval {
-# cvs bug: calling cvs status for files in other directories spoils status
-# information for local files.
-# fix: check local and non local files separately
-
-    # fails if we have no cvs or server has a problem
-    @statusinfo = check_output("cvs status -l -v $files");
-    # mark the finsh of the last file for the parser
-    push @statusinfo, "===================================================================";
-    parse_cvs_output(\@statusinfo);
-    if (!defined($version)) {
-        say STDERR "Could not find out version tag => version test";
-        $version = "test";
     }
 
     say $version;

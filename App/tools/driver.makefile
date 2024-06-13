@@ -33,9 +33,10 @@
 #
 # Module names are derived from the directory name (unless overwritten
 # with the MODULE variable in your Makefile).
-# A LIBVERSION number is generated from the latest CVS or GIT tag of the sources.
-# If any file is not up-to-date in CVS/GIT, not tagged, or tagged differently from the
-# other files, the version is a test version and labelled with the user name.
+# A LIBVERSION number is generated from the latest GIT tag of the sources.
+# All changes must be committed, tagged and pushed (including the tag)
+# and the tag found on the remote repo must match the local tag.
+# Otherwise, the version is a test version and labelled with the user name.
 # The library is installed to ${EPICS_MODULES}/${MODULE}/${LIBVERSION}/lib/${T_A}/.
 # A module can be loaded with  require "<module>" [,"<version>"] [,"<variable>=<substitution>, ..."]
 #
@@ -113,7 +114,7 @@ INSTALLRULE=install::
 BUILDRULE=build::
 CLEANRULE = clean::
 
-IGNOREFILES = .cvsignore .gitignore
+IGNOREFILES = .gitignore
 %: ${IGNOREFILES}
 ${IGNOREFILES}:
 	@echo -e "O.*\n.*ignore" > $@
@@ -178,7 +179,7 @@ export MAKE_FIRST
 export SUBMODULES
 export USE_LIBVERSION
 
-export ORIGIN=$(firstword $(shell git remote -v 2>/dev/null | awk '/psi.ch.*(fetch)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null)) $(addsuffix /,$(shell cat CVS/Root 2>/dev/null))$(shell cat CVS/Repository 2>/dev/null) $(PWD))
+export ORIGIN=$(firstword $(shell git remote -v 2>/dev/null | awk '/psi.ch.*(fetch)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null)) $(PWD))
 
 # Some shell commands:
 RMDIR = rm -rf
