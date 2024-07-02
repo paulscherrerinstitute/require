@@ -1,7 +1,0 @@
-# setup mount points
-hostAdd ("fileserver","129.129.145.42")
-nfsMount ("fileserver","/export/hipa/work","/hipa/work")
-nfsMount ("fileserver","/export/hipa/prod","/hipa/prod")
-nfsMount ("fileserver","/export/hipa/ioc","/ioc")
-nfsMount (&sysBootHost, "/home/ioc", "/home/ioc")
-nfsAuthUnixSet &sysBootHost,500,9102

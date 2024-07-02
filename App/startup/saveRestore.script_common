@@ -1,1 +1,0 @@
-require "autoSRarray",getenv("autoSRarray_VERSION")

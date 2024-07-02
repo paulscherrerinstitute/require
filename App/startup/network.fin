@@ -1,9 +1,0 @@
-# setup mount points
-hostAdd ("fileserver","129.129.145.56")
-nfsMount ("fileserver", "/export/fin/ioc", "/ioc")
-nfsMount ("fileserver", "/export/fin/work", "/fin/work")
-nfsMount ("fileserver", "/export/fin/prod", "/fin/prod")
-nfsMount ("fileserver", "/export/fin/devl", "/fin/devl")
-nfsMount (&sysBootHost, "/home/ioc", "/home/ioc")
-putenv("EPICS_CA_AUTO_ADDR_LIST=NO")
-putenv("EPICS_CA_ADDR_LIST=172.21.10.255 172.21.11.255 172.21.12.255 172.21.13.255")

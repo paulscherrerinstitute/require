@@ -1,9 +1,0 @@
-# $Source: /cvs/A/CS/startup/startup.script_part2,v $
-# 2nd part of common startup
-
-#Enable memory >32MB on IOC that have it. (Is a NOOP on all others)
-memAddToPool sysMemTop(), EXTENDED_MEMORY
-
-iocInit
-
-# end of startup.script_part2
