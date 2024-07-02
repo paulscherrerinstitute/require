@@ -180,7 +180,7 @@ export MAKE_FIRST
 export SUBMODULES
 export USE_LIBVERSION
 
-export ORIGIN=$(firstword $(shell git remote -v 2>/dev/null | awk '/${GIT_DOMAIN}.*(fetch)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null)) $(PWD))
+export ORIGIN=$(firstword $(foreach D,${GIT_DOMAIN},$(shell git remote -v 2>/dev/null | awk '/$(subst .,\.,$D).*\(fetch\)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null))) $(PWD))
 
 # Some shell commands:
 RMDIR = rm -rf
@@ -257,6 +257,7 @@ debug::
 	@echo "ARCH_FILTER = ${ARCH_FILTER}"
 	@echo "PRJ = ${PRJ}"
 	@echo "GIT_DOMAIN = ${GIT_DOMAIN}"
+	@echo "ORIGIN = ${ORIGIN}"
 
 what::
 	@echo "LIBVERSION = ${LIBVERSION}"
