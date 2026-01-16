@@ -170,7 +170,7 @@ VERSIONDEBUGFLAG = $(if ${VERSIONDEBUG}, -d)
 # Avoid using environment variables for MODULE or PROJECT
 MODULE=
 PROJECT=
-PRJDIR:=$(subst -,_,$(subst .,_,$(notdir $(patsubst %Lib,%,$(patsubst %/snl,%,$(patsubst %/src,%,${PWD}))))))
+PRJDIR:=$(subst -,_,$(subst .,_,$(notdir $(patsubst %Lib,%,$(patsubst %/snl,%,$(patsubst %/src,%,$(abspath .)))))))
 PRJ = $(strip $(or ${MODULE},${PROJECT},${PRJDIR}))
 export PRJ
 
@@ -183,7 +183,7 @@ export MAKE_FIRST
 export SUBMODULES
 export USE_LIBVERSION
 
-export ORIGIN=$(firstword $(foreach D,${GIT_DOMAIN},$(shell git remote -v 2>/dev/null | awk '/$(subst .,\.,$D).*\(fetch\)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null))) $(PWD))
+export ORIGIN=$(firstword $(foreach D,${GIT_DOMAIN},$(shell git remote -v 2>/dev/null | awk '/$(subst .,\.,$D).*\(fetch\)/{print $$2;exit}')$(patsubst %,[%],$(shell git describe --tags --dirty --always --long 2>/dev/null))) $(abspath .))
 
 # Some shell commands:
 RMDIR = rm -rf
