@@ -26,6 +26,7 @@
 
 #include "macLib.h"
 #include "dbmf.h"
+#include "errlog.h"
 
 #include "dbAccess.h"
 #include "dbLoadTemplate.h"
@@ -65,6 +66,10 @@ extern char **ppGlobalEnviron;
 #define environ ppGlobalEnviron
 #endif
 
+#if EPICS_VERSION_INT < VERSION_INT(7,0,7,0)
+#define ERL_ERROR "Error"
+#endif
+
 /* from runScript.c */
 extern int isAbsPath(const char* filename);
 
@@ -87,6 +92,17 @@ static MAC_HANDLE *macHandle = NULL;
 
 int dbTemplateMaxVars = 100;
 epicsExportAddress(int, dbTemplateMaxVars);
+
+static
+int msiLoadRecords(const char *fname, const char *subs)
+{
+    int ret = dbLoadRecords(fname, subs);
+    if(ret) {
+        fprintf(stderr, "dbLoadRecords(\"%s\", %s)\n", fname, subs);
+        yyerror("Error while reading included file");
+    }
+    return ret;
+}
 
 %}
 
@@ -214,7 +230,7 @@ pattern_definition: global_definitions
         fprintf(stderr, "pattern_definition: pattern_values empty\n");
         fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
     #endif
-        dbLoadRecords(db_file_name, sub_collect+1);
+        if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
     }
     | O_BRACE pattern_values C_BRACE
     {
@@ -222,7 +238,7 @@ pattern_definition: global_definitions
         fprintf(stderr, "pattern_definition:\n");
         fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
     #endif
-        dbLoadRecords(db_file_name, sub_collect+1);
+        if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         *sub_locals = '\0';
         sub_count = 0;
     }
@@ -237,7 +253,7 @@ pattern_definition: global_definitions
         fprintf(stderr, "pattern_definition:\n");
         fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
     #endif
-        dbLoadRecords(db_file_name, sub_collect+1);
+        if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         dbmfFree($1);
         *sub_locals = '\0';
         sub_count = 0;
@@ -297,7 +313,7 @@ variable_substitution: global_definitions
         fprintf(stderr, "variable_substitution: variable_definitions empty\n");
         fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
     #endif
-        dbLoadRecords(db_file_name, sub_collect+1);
+        if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
     }
     | O_BRACE variable_definitions C_BRACE
     {
@@ -305,7 +321,7 @@ variable_substitution: global_definitions
         fprintf(stderr, "variable_substitution:\n");
         fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
     #endif
-        dbLoadRecords(db_file_name, sub_collect+1);
+        if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         *sub_locals = '\0';
     }
     | WORD O_BRACE variable_definitions C_BRACE
@@ -319,7 +335,7 @@ variable_substitution: global_definitions
         fprintf(stderr, "variable_substitution:\n");
         fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
     #endif
-        dbLoadRecords(db_file_name, sub_collect+1);
+        if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         dbmfFree($1);
         *sub_locals = '\0';
     }
@@ -391,16 +407,19 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
 {
     FILE *fp;
     int i;
+    int err;
     char** pairs;
 
     line_num = 1;
+
     if (!sub_file || !*sub_file) {
         fprintf(stderr, "must specify variable substitution file\n");
         return -1;
     }
 
-    if (dbTemplateMaxVars < 1) {
-        fprintf(stderr,"Error: dbTemplateMaxVars = %d, must be positive\n",
+    if (dbTemplateMaxVars < 1)
+    {
+        fprintf(stderr,ERL_ERROR ": dbTemplateMaxVars = %d, must be +ve\n",
                 dbTemplateMaxVars);
         return -1;
     }
@@ -505,7 +524,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
         yyrestart(fp);
     }
 
-    yyparse();
+    err = yyparse();
 
     for (i = 0; i < var_count; i++) {
         dbmfFree(vars[i]);
@@ -519,7 +538,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
         dbmfFree(db_file_name);
         db_file_name = NULL;
     }
-    return 0;
+    return err;
 }
 
 #if EPICS_VERSION_INT > VERSION_INT(3,14,0,0)
