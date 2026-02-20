@@ -45,6 +45,8 @@
 #define EPICS_3_13
 extern void dbLoadRecords(const char*, const char*);
 #else
+#undef EPICS_DEPRECATED
+#define EPICS_DEPRECATED
 #include "iocsh.h"
 #include "epicsExport.h"
 #endif
@@ -522,7 +524,6 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
 }
 
 #ifndef EPICS_3_13
-#include "registry.h"
 epicsExportAddress(int, dbTemplateMaxVars);
 
 static const iocshFuncDef dbLoadTemplateDef = {
@@ -547,7 +548,13 @@ static void dbLoadTemplateRegister(void)
 {
     static int firstTime = 1;
     if (firstTime) {
-        iocshRegister(&dbLoadTemplateDef, dbLoadTemplateFunc);
+#if (EPICSVER>=70000)
+        iocshCmdDef * cmd = (iocshCmdDef *)iocshFindCommand(dbLoadTemplateDef.name);
+        if (cmd)
+            cmd->func = dbLoadTemplateFunc;
+        else
+#endif
+            iocshRegister(&dbLoadTemplateDef, dbLoadTemplateFunc);
         firstTime = 0;
     }
 }
