@@ -24,10 +24,6 @@
 #include <unistd.h>
 #endif
 
-#if defined(vxWorks)
-#include <ioLib.h>
-#endif
-
 #include "macLib.h"
 #include "dbmf.h"
 
@@ -59,6 +55,12 @@ extern void dbLoadRecords(const char*, const char*);
 
 #if (EPICSVER>=31600)
 #define dbmfStrdup(s) dbmfStrdup((char*)s) 
+#endif
+
+#if defined(vxWorks)
+#include <ioLib.h>
+extern char **ppGlobalEnviron;
+#define environ ppGlobalEnviron
 #endif
 
 /* from runScript.c */
@@ -441,20 +443,14 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
 
 #if (0 && EPICSVER<31403)
     /* Have no environment macro substitution, thus load envionment explicitly */
-#ifndef vxWorks
-    /* In 3.14 before 3.14.3 we may have non-vxWorks without environment macro substitution */
-    /* non-vxWorks systems have environ instead of ppGlobalEnviron */
-    #define ppGlobalEnviron environ
-#endif
 #ifdef _WRS_VXWORKS_MAJOR
     /* VxWorks 6 bug: environment is not NULL terminated ! */
-    /* There is a non-public counter 8 bytes after ppGlobalEnviron */
-    char** endEnviron = ppGlobalEnviron+((unsigned int*)&ppGlobalEnviron)[2];
-    if (runScriptDebug)
-            printf("runScript: %u environment variables\n", ((unsigned int*)&ppGlobalEnviron)[2]);
-    for (pairs = ppGlobalEnviron; pairs < endEnviron; pairs++)
+    /* There is a non-public counter 8 bytes after environ */
+    char** endEnviron = environ;
+    endEnviron += ((unsigned int*)&endEnviron)[2];
+    for (pairs = environ; pairs < endEnviron; pairs++)
 #else
-    for (pairs = ppGlobalEnviron; *pairs; pairs++)
+    for (pairs = environ; *pairs; pairs++)
 #endif
     {
         char* var, *eq;
