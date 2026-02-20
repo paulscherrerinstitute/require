@@ -37,15 +37,6 @@
 #include "asprintf.h"
 #endif
 
-#ifdef BASE_VERSION
-extern void dbLoadRecords(const char*, const char*);
-#else
-#undef EPICS_DEPRECATED
-#define EPICS_DEPRECATED
-#include "iocsh.h"
-#include "epicsExport.h"
-#endif
-
 #ifndef VERSION_INT
 #define VERSION_INT(V,R,M,P) ( ((V)<<24) | ((R)<<16) | ((M)<<8) | (P))
 #define EPICS_VERSION_INT VERSION_INT(EPICS_VERSION, EPICS_REVISION, EPICS_MODIFICATION, EPICS_PATCH_LEVEL)
@@ -57,6 +48,15 @@ extern void dbLoadRecords(const char*, const char*);
 
 #if EPICS_VERSION_INT >= VERSION_INT(3,16,0,0)
 #define dbmfStrdup(s) dbmfStrdup((char*)s) 
+#endif
+
+#if EPICS_VERSION_INT < VERSION_INT(3,14,0,0)
+#define epicsExportAddress(a,b)
+#else
+#undef EPICS_DEPRECATED
+#define EPICS_DEPRECATED
+#include "iocsh.h"
+#include "epicsExport.h"
 #endif
 
 #if defined(vxWorks)
@@ -86,6 +86,7 @@ static MAC_HANDLE *macHandle = NULL;
 #define MAX_VAR_FACTOR 50
 
 int dbTemplateMaxVars = 100;
+epicsExportAddress(int, dbTemplateMaxVars);
 
 %}
 
@@ -522,8 +523,6 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
 }
 
 #if EPICS_VERSION_INT > VERSION_INT(3,14,0,0)
-epicsExportAddress(int, dbTemplateMaxVars);
-
 static const iocshFuncDef dbLoadTemplateDef = {
     "dbLoadTemplate", 3, (const iocshArg *[]) {
         &(iocshArg) { "filename", iocshArgString },
