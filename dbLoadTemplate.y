@@ -38,7 +38,6 @@
 #endif
 
 #ifdef BASE_VERSION
-#define EPICS_3_13
 extern void dbLoadRecords(const char*, const char*);
 #else
 #undef EPICS_DEPRECATED
@@ -47,13 +46,16 @@ extern void dbLoadRecords(const char*, const char*);
 #include "epicsExport.h"
 #endif
 
-#define EPICSVER EPICS_VERSION*10000+EPICS_REVISION*100+EPICS_MODIFICATION
+#ifndef VERSION_INT
+#define VERSION_INT(V,R,M,P) ( ((V)<<24) | ((R)<<16) | ((M)<<8) | (P))
+#define EPICS_VERSION_INT VERSION_INT(EPICS_VERSION, EPICS_REVISION, EPICS_MODIFICATION, EPICS_PATCH_LEVEL)
+#endif
 
-#if (EPICSVER<31412)
+#if EPICS_VERSION_INT < VERSION_INT(3,14,12,0)
 #define dbmfStrdup(s) strcpy(dbmfMalloc(strlen((char*)(s))+1),(char*)(s))
 #endif
 
-#if (EPICSVER>=31600)
+#if EPICS_VERSION_INT >= VERSION_INT(3,16,0,0)
 #define dbmfStrdup(s) dbmfStrdup((char*)s) 
 #endif
 
@@ -435,13 +437,13 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
 
     macHandle = NULL;
     if (macCreateHandle(&macHandle,(
-#if (EPICSVER>=31501)
+#if EPICS_VERSION_INT >= VERSION_INT(3,15,1,0)
         const
 #endif
         char*[]){ "", "environ", NULL, NULL }) != 0) return -1;
     macSuppressWarning(macHandle, 1);
 
-#if (0 && EPICSVER<31403)
+#if 0 && EPICS_VERSION_INT < VERSION_INT(3,14,3,0)
     /* Have no environment macro substitution, thus load envionment explicitly */
 #ifdef _WRS_VXWORKS_MAJOR
     /* VxWorks 6 bug: environment is not NULL terminated ! */
@@ -519,7 +521,7 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
     return 0;
 }
 
-#ifndef EPICS_3_13
+#if EPICS_VERSION_INT > VERSION_INT(3,14,0,0)
 epicsExportAddress(int, dbTemplateMaxVars);
 
 static const iocshFuncDef dbLoadTemplateDef = {
@@ -544,7 +546,7 @@ static void dbLoadTemplateRegister(void)
 {
     static int firstTime = 1;
     if (firstTime) {
-#if (EPICSVER>=70000)
+#if EPICS_VERSION_INT >= VERSION_INT(7,0,0,0)
         iocshCmdDef * cmd = (iocshCmdDef *)iocshFindCommand(dbLoadTemplateDef.name);
         if (cmd)
             cmd->func = dbLoadTemplateFunc;
