@@ -463,34 +463,6 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
         char*[]){ "", "environ", NULL, NULL }) != 0) return -1;
     macSuppressWarning(macHandle, 1);
 
-#if 0 && EPICS_VERSION_INT < VERSION_INT(3,14,3,0)
-    /* Have no environment macro substitution, thus load envionment explicitly */
-#ifdef _WRS_VXWORKS_MAJOR
-    /* VxWorks 6 bug: environment is not NULL terminated ! */
-    /* There is a non-public counter 8 bytes after environ */
-    char** endEnviron = environ;
-    endEnviron += ((unsigned int*)&endEnviron)[2];
-    for (pairs = environ; pairs < endEnviron; pairs++)
-#else
-    for (pairs = environ; *pairs; pairs++)
-#endif
-    {
-        char* var, *eq;
-        if (runScriptDebug)
-            printf("runScript: environ %s\n", *pairs);
-
-        /* take a copy to replace '=' with null byte */
-        if ((var = strdup(*pairs)) == NULL) continue;
-        eq = strchr(var, '=');
-        if (eq)
-        {
-            *eq = 0;
-            macPutValue(macHandle, var, eq+1);
-        }
-        free(var);
-    }
-#endif
-
     vars = malloc(dbTemplateMaxVars * sizeof(char*));
     sub_collect = malloc(dbTemplateMaxVars * MAX_VAR_FACTOR);
     if (!vars || !sub_collect) {
