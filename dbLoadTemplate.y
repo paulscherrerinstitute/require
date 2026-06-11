@@ -60,6 +60,9 @@
 #include "epicsExport.h"
 #endif
 
+int dbLoadTemplateDebug;
+epicsExportAddress(int, dbLoadTemplateDebug);
+
 #if defined(vxWorks)
 #include <ioLib.h>
 extern char **ppGlobalEnviron;
@@ -137,26 +140,23 @@ global_or_template: global_definitions
 global_definitions: GLOBAL O_BRACE C_BRACE
     | GLOBAL O_BRACE variable_definitions C_BRACE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "global_definitions: %s\n", sub_collect+1);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "global_definitions: %s\n", sub_collect+1);
         sub_locals += strlen(sub_locals);
     }
     ;
 
 template_substitutions: template_filename O_BRACE C_BRACE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "template_substitutions: %s unused\n", db_file_name);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "template_substitutions: %s unused\n", db_file_name);
         dbmfFree(db_file_name);
         db_file_name = NULL;
     }
     | template_filename O_BRACE substitutions C_BRACE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "template_substitutions: %s finished\n", db_file_name);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "template_substitutions: %s finished\n", db_file_name);
         dbmfFree(db_file_name);
         db_file_name = NULL;
     }
@@ -164,9 +164,8 @@ template_substitutions: template_filename O_BRACE C_BRACE
 
 template_filename: DBFILE WORD
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "template_filename: %s\n", $2);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "template_filename: %s\n", $2);
         var_count = 0;
         db_file_name = dbmfMalloc(strlen($2)+1);
         strcpy(db_file_name, $2);
@@ -174,9 +173,8 @@ template_filename: DBFILE WORD
     }
     | DBFILE QUOTE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "template_filename: \"%s\"\n", $2);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "template_filename: \"%s\"\n", $2);
         var_count = 0;
         db_file_name = dbmfMalloc(strlen($2)+1);
         strcpy(db_file_name, $2);
@@ -201,9 +199,8 @@ pattern_names: pattern_name
 
 pattern_name: WORD
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "pattern_name: [%d] = %s\n", var_count, $1);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "pattern_name: [%d] = %s\n", var_count, $1);
         if (var_count >= dbTemplateMaxVars) {
             fprintf(stderr,
                 "More than dbTemplateMaxVars = %d macro variables used\n",
@@ -226,18 +223,18 @@ pattern_definitions: pattern_definition
 pattern_definition: global_definitions
     | O_BRACE C_BRACE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "pattern_definition: pattern_values empty\n");
-        fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-    #endif
+        if (dbLoadTemplateDebug) {
+            fprintf(stderr, "pattern_definition: pattern_values empty\n");
+            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
+        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
     }
     | O_BRACE pattern_values C_BRACE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "pattern_definition:\n");
-        fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-    #endif
+        if (dbLoadTemplateDebug) {
+            fprintf(stderr, "pattern_definition:\n");
+            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
+        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         *sub_locals = '\0';
         sub_count = 0;
@@ -249,10 +246,10 @@ pattern_definition: global_definitions
             "    the string '%s' on line %d that comes just before the\n"
             "    '{' character is extraneous and should be removed.\n",
             $1, line_num);
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "pattern_definition:\n");
-        fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-    #endif
+        if (dbLoadTemplateDebug) {
+            fprintf(stderr, "pattern_definition:\n");
+            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
+        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         dbmfFree($1);
         *sub_locals = '\0';
@@ -267,9 +264,8 @@ pattern_values: pattern_value
 
 pattern_value: QUOTE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "pattern_value: [%d] = \"%s\"\n", sub_count, $1);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "pattern_value: [%d] = \"%s\"\n", sub_count, $1);
         if (sub_count < var_count) {
             strcat(sub_locals, ",");
             strcat(sub_locals, vars[sub_count]);
@@ -285,9 +281,8 @@ pattern_value: QUOTE
     }
     | WORD
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "pattern_value: [%d] = %s\n", sub_count, $1);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "pattern_value: [%d] = %s\n", sub_count, $1);
         if (sub_count < var_count) {
             strcat(sub_locals, ",");
             strcat(sub_locals, vars[sub_count]);
@@ -309,18 +304,18 @@ variable_substitutions: variable_substitution
 variable_substitution: global_definitions
     | O_BRACE C_BRACE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "variable_substitution: variable_definitions empty\n");
-        fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-    #endif
+        if (dbLoadTemplateDebug) {
+            fprintf(stderr, "variable_substitution: variable_definitions empty\n");
+            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
+        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
     }
     | O_BRACE variable_definitions C_BRACE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "variable_substitution:\n");
-        fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-    #endif
+        if (dbLoadTemplateDebug) {
+            fprintf(stderr, "variable_substitution:\n");
+            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
+        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         *sub_locals = '\0';
     }
@@ -331,10 +326,10 @@ variable_substitution: global_definitions
             "    the string '%s' on line %d that comes just before the\n"
             "    '{' character is extraneous and should be removed.\n",
             $1, line_num);
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "variable_substitution:\n");
-        fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-    #endif
+        if (dbLoadTemplateDebug) {
+            fprintf(stderr, "variable_substitution:\n");
+            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
+        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         dbmfFree($1);
         *sub_locals = '\0';
