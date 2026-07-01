@@ -328,7 +328,12 @@ static HMODULE loadlib(const char* libname)
             fprintf (stderr, "Loading %s library failed: out of memory\n", libname);
             return NULL;
         }
-        if ((libhandle = LoadLibrary(libpath)) == NULL)
+        /* LoadLibraryEx needs backspash for LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR to work */
+        char* p = libpath;
+        while ((p = strchr(p, '/')) != NULL) *p = '\\';
+
+        if ((libhandle = LoadLibraryEx(libpath, NULL,
+            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)) == NULL)
         {
             LPSTR lpMsgBuf;
 
