@@ -343,9 +343,8 @@ variable_definitions: variable_definition
 
 variable_definition: WORD EQUALS WORD
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "variable_definition: %s = %s\n", $1, $3);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "variable_definition: %s = %s\n", $1, $3);
         strcat(sub_locals, ",");
         strcat(sub_locals, $1);
         strcat(sub_locals, "=");
@@ -354,9 +353,8 @@ variable_definition: WORD EQUALS WORD
     }
     | WORD EQUALS QUOTE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "variable_definition: %s = \"%s\"\n", $1, $3);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "variable_definition: %s = \"%s\"\n", $1, $3);
         strcat(sub_locals, ",");
         strcat(sub_locals, $1);
         strcat(sub_locals, "=\"");
@@ -366,9 +364,8 @@ variable_definition: WORD EQUALS WORD
     }
     | QUOTE EQUALS QUOTE
     {
-    #ifdef ERROR_STUFF
-        fprintf(stderr, "variable_definition: \"%s\" = \"%s\"\n", $1, $3);
-    #endif
+        if (dbLoadTemplateDebug)
+            fprintf(stderr, "variable_definition: \"%s\" = \"%s\"\n", $1, $3);
         strcat(sub_locals, ",\"");
         strcat(sub_locals, $1);
         strcat(sub_locals, "\"=\"");
