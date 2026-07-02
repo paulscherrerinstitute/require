@@ -530,9 +530,10 @@ static void dbLoadTemplateRegister(void)
     if (firstTime) {
 #if EPICS_VERSION_INT >= VERSION_INT(7,0,0,0)
         iocshCmdDef * cmd = (iocshCmdDef *)iocshFindCommand(dbLoadTemplateDef.name);
-        if (cmd)
+        if (cmd) {
+            *(iocshFuncDef**)&cmd->pFuncDef = &dbLoadTemplateDef;
             cmd->func = dbLoadTemplateFunc;
-        else
+        } else
 #endif
             iocshRegister(&dbLoadTemplateDef, dbLoadTemplateFunc);
         firstTime = 0;
