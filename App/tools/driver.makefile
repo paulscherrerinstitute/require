@@ -530,7 +530,7 @@ export PKG_CONFIG_SYSROOT_DIR = $(SYSROOT)
 endif
 
 # Add sources for specific epics types (3.13 or 3.14) or architectures.
-ARCH_PARTS = ${T_A} $(subst -, ,${T_A}) ${OS_CLASS}
+ARCH_PARTS = ${OS_CLASS} $(subst -, ,${T_A}) ${T_A}
 export ARCH_PARTS
 
 VAR_EXTENSIONS = $(firstword $(subst ., ,${EPICSVERSION})) ${EPICS_BASETYPE} ${EPICSVERSION} ${ARCH_PARTS} ${ARCH_PARTS:%=${EPICS_BASETYPE}_%} ${ARCH_PARTS:%=${EPICSVERSION}_%}
