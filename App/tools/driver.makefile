@@ -77,6 +77,10 @@ DOCUEXT = txt html htm doc pdf ps tex dvi gif jpg png
 DOCUEXT += TXT HTML HTM DOC PDF PS TEX DVI GIF JPG PNG
 DOCUEXT += template db dbt subs subst substitutions script
 
+export WINE = wine64
+export WINEDEBUG = -all
+export WINEDLLOVERRIDES = mscoree,mshtml
+
 # Override config here:
 -include ${MAKEHOME}/config
 
@@ -600,8 +604,26 @@ install:: build
 	$(RMDIR) ${MODULE_LOCATION}/R${EPICSVERSION}/lib/${T_A})
 endif
 
-install build debug:: O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
+prebuild_arch:
+install build debug:: prebuild_arch O.${EPICSVERSION}_Common O.${EPICSVERSION}_${T_A}
 	@${MAKE} -C O.${EPICSVERSION}_${T_A} -f ../${USERMAKEFILE} $@
+
+# Allow cmake to use compiler settings from base
+
+CMAKE_FLAGS += -Wno-dev --no-warn-unused-cli
+CMAKE_FLAGS += -DCMAKE_BUILD_TYPE=Release
+CMAKE_FLAGS += -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF
+CMAKE_FLAGS += -DCMAKE_C_COMPILER=$(shell PATH=$(PATH) which $(firstword $(CC)))
+CMAKE_FLAGS += -DCMAKE_CXX_COMPILER=$(shell PATH=$(PATH) which $(firstword $(CCC)))
+CMAKE_FLAGS += $(if $(WRAPPER) $(SYSROOT), -DCMAKE_C_FLAGS="$(WRAPPER) $(SYSROOT:%=--sysroot=%)" -DCMAKE_CXX_FLAGS="$(WRAPPER) $(SYSROOT:%=--sysroot=%)")
+CMAKE_FLAGS += -DCMAKE_C_COMPILER_FORCED=YES
+CMAKE_FLAGS += -DCMAKE_CXX_COMPILER_FORCED=YES
+CMAKE_FLAGS += $(if $(STD_CXXFLAGS), -DCXX_STANDARD=$(patsubst -std=%,%,$(STD_CXXFLAGS)))
+CMAKE_FLAGS_Linux += -DCMAKE_AR=$(shell PATH=$(PATH) which $(firstword $(AR)))
+CMAKE_FLAGS_Linux += -DCMAKE_RANLIB=$(shell PATH=$(PATH) which $(firstword $(RANLIB)))
+CMAKE_FLAGS_WIN32 += -DCMAKE_SYSTEM_NAME=Windows
+CMAKE_FLAGS_WIN32 += -DCMAKE_LINKER=$(shell PATH=$(PATH) which link)
+CMAKE_FLAGS += $(CMAKE_FLAGS_$(OS_CLASS)) $(CMAKE_FLAGS_$(T_A))
 
 endif
 
