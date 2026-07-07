@@ -621,6 +621,7 @@ COMMON_DIR = ${COMMON_DIR_${EPICS_BASETYPE}}
 # Remove include directory for this module from search path.
 # 3.13 and 3.14+ use different variables
 INSTALL_INCLUDES = $(addprefix -I,$(wildcard $(foreach d, $(OTHER_MODULE_INCLUDES), $d $(addprefix $d/, os/${OS_CLASS} $(POSIX_$(POSIX)) os/default))))
+USR_LDFLAGS_WIN32 = $(patsubst %/include, -LIBPATH:%/lib/$(T_A), $(OTHER_MODULE_INCLUDES))
 EPICS_INCLUDES =
 
 # EPICS 3.13 uses :: in some rules where 3.14 uses :
