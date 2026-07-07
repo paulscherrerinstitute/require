@@ -586,9 +586,6 @@ IGNORE_MODULES+=$(foreach x, ${VAR_EXTENSIONS}, ${IGNORE_MODULES_$x})
 $(eval $(foreach m,$(filter-out $(PRJ) $(IGNORE_MODULES),${OTHER_MODULES}),$(call ADD_OTHER_MODULE_INCLUDES,$m)))
 export OTHER_MODULE_INCLUDES
 
-# Include path for old style modules.
-OTHER_MODULE_INCLUDES += ${INSTBASE}/iocBoot/R${EPICSVERSION}/include
-
 O.%:
 	$(MKDIR) $@
 
