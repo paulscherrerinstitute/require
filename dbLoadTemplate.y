@@ -99,7 +99,12 @@ epicsExportAddress(int, dbTemplateMaxVars);
 static
 int msiLoadRecords(const char *fname, const char *subs)
 {
-    int ret = dbLoadRecords(fname, subs);
+    int ret;
+
+    if (dbLoadTemplateDebug)
+        fprintf(stderr, "    dbLoadRecords(\"%s\", %s)\n", fname, subs);
+
+    ret = dbLoadRecords(fname, subs);
     if(ret) {
         fprintf(stderr, "dbLoadRecords(\"%s\", %s)\n", fname, subs);
         yyerror("Error while reading included file");
@@ -223,18 +228,14 @@ pattern_definitions: pattern_definition
 pattern_definition: global_definitions
     | O_BRACE C_BRACE
     {
-        if (dbLoadTemplateDebug) {
+        if (dbLoadTemplateDebug)
             fprintf(stderr, "pattern_definition: pattern_values empty\n");
-            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
     }
     | O_BRACE pattern_values C_BRACE
     {
-        if (dbLoadTemplateDebug) {
+        if (dbLoadTemplateDebug)
             fprintf(stderr, "pattern_definition:\n");
-            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         *sub_locals = '\0';
         sub_count = 0;
@@ -246,10 +247,8 @@ pattern_definition: global_definitions
             "    the string '%s' on line %d that comes just before the\n"
             "    '{' character is extraneous and should be removed.\n",
             $1, line_num);
-        if (dbLoadTemplateDebug) {
+        if (dbLoadTemplateDebug)
             fprintf(stderr, "pattern_definition:\n");
-            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         dbmfFree($1);
         *sub_locals = '\0';
@@ -306,16 +305,13 @@ variable_substitution: global_definitions
     {
         if (dbLoadTemplateDebug) {
             fprintf(stderr, "variable_substitution: variable_definitions empty\n");
-            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
         }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
     }
     | O_BRACE variable_definitions C_BRACE
     {
-        if (dbLoadTemplateDebug) {
+        if (dbLoadTemplateDebug)
             fprintf(stderr, "variable_substitution:\n");
-            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         *sub_locals = '\0';
     }
@@ -326,10 +322,8 @@ variable_substitution: global_definitions
             "    the string '%s' on line %d that comes just before the\n"
             "    '{' character is extraneous and should be removed.\n",
             $1, line_num);
-        if (dbLoadTemplateDebug) {
+        if (dbLoadTemplateDebug)
             fprintf(stderr, "variable_substitution:\n");
-            fprintf(stderr, "    dbLoadRecords(%s)\n", sub_collect+1);
-        }
         if(msiLoadRecords(db_file_name, sub_collect+1)) YYABORT;
         dbmfFree($1);
         *sub_locals = '\0';
