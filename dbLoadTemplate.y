@@ -459,19 +459,16 @@ int dbLoadTemplate(const char *sub_file, const char *cmd_collect, const char *pa
         fprintf(stderr, "dbLoadTemplate: Out of memory!\n");
         return -1;
     }
-    strcpy(sub_collect, ",");
+    strcpy(sub_collect, ",#=#");
 
     if (cmd_collect && *cmd_collect) {
         macParseDefns(macHandle, (char*)cmd_collect, &pairs);
         macInstallMacros(macHandle, pairs);
         free(pairs);
-   
+        strcat(sub_collect, ",");
         strcat(sub_collect, cmd_collect);
-        sub_locals = sub_collect + strlen(sub_collect);
-    } else {
-        sub_locals = sub_collect;
-        *sub_locals = '\0';
     }
+    sub_locals = sub_collect + strlen(sub_collect);
     var_count = 0;
     sub_count = 0;
 
