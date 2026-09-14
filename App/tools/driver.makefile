@@ -71,7 +71,7 @@ BUILDCLASSES = vxWorks Linux WIN32
 EPICS_MODULES ?= /ioc/modules
 MODULE_LOCATION = ${EPICS_MODULES}/$(or ${PRJ},$(error PRJ not defined))/$(or ${LIBVERSION},$(error LIBVERSION not defined))
 EPICS_LOCATION = /usr/local/epics
-GIT_DOMAIN = psi.ch
+GIT_DOMAIN = psi.ch github.com
 
 DOCUEXT = txt html htm doc pdf ps tex dvi gif jpg png
 DOCUEXT += TXT HTML HTM DOC PDF PS TEX DVI GIF JPG PNG
@@ -429,13 +429,13 @@ export HDRS
 TEMPLSX = $(if ${TEMPLATES},$(filter-out -none-,${TEMPLATES}),$(wildcard *.template *.db *.subs))
 TEMPLSX += ${TEMPLATES_${EPICS_BASETYPE}}
 TEMPLSX += ${TEMPLATES_${EPICSVERSION}}
-TEMPLS = $(call filter_out_dir,$(abspath ${TEMPLSX}))
+TEMPLS = $(call filter_out_dir,${TEMPLSX})
 export TEMPLS
 
 SCRX = $(if ${SCRIPTS},$(filter-out -none-,${SCRIPTS}),$(wildcard *.cmd *.iocsh))
 SCRX += ${SCRIPTS_${EPICS_BASETYPE}}
 SCRX += ${SCRIPTS_${EPICSVERSION}}
-SCR = $(call filter_out_dir,$(abspath ${SCRX}))
+SCR = $(call filter_out_dir,${SCRX})
 export SCR
 
 DOCUDIR = .
@@ -1074,40 +1074,46 @@ ${INSTALL_DEPS}: $(notdir ${INSTALL_DEPS})
 ifeq ($(DEP),.d)
 # 3.14.10+
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
-	@echo "Installing module template files $^ to $(@D)"
-	$(INSTALL) -d -m444 $^ $(@D)
+	@echo Installing $(if $(word 20,$^),$(words $^)) module db files $(if $(word 20,$^),,$(^F)) to $(@D)
+	@$(shell rm -f .db.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .db.files))
+	@xargs -a .db.files -0 -n100 -r -I{} $(INSTALL) -d -m444 {} $(@D)
+	@rm .db.files
 else ifeq (${EPICS_BASETYPE},3.13)
 # 3.13
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
-	@echo "Installing module template files $^ to $(@D)"
+	@echo Installing $(if $(word 20,$^),$(words $^)) module db files $(if $(word 20,$^),,$(^F)) to $(@D)
 	$(MKDIR) $(@D)
 	for i in $^; do sed -r 's/\$$\{([^={]*)=[^}]*\}/$${\1}/g;s/\$$\(([^=(]*)=[^)]*\)/$$(\1)/g;s/(^|\))[ \t]*(alias|info)[ \t]*\(/#&/g' $$i > $(@D)/$$(basename $$i); done
 else
 # 3.14.9-
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
-	@echo "Installing module template files $^ to $(@D)"
+	@echo Installing $(if $(word 20,$^),$(words $^)) module db files $(if $(word 20,$^),,$(^F)) to $(@D)
 	$(MKDIR) $(@D)
 	for i in $^; do sed -r 's/(^|\))[ \t]*alias[ \t]*/#&/g' $$i > $(@D)/$$(basename $$i); done
 endif
 
 ${INSTALL_SCRS}: $(notdir ${SCR})
-	@echo "Installing scripts $^ to $(@D)"
-	$(INSTALL) -d -m555 $^ $(@D)
+	@echo Installing $(if $(word 20,$^),$(words $^)) scripts $(if $(word 20,$^),,$(^F)) to $(@D)
+	@$(shell rm -f .script.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .script.files))
+	@xargs -a .script.files -0 -n100 -I{} $(INSTALL) -d -m555 {} $(@D)
+	@rm .script.files
 
 ${INSTALL_CFGS}: ${CFGS}
-	@echo "Installing configuration files $^ to $(@D)"
-	$(INSTALL) -d -m444 $^ $(@D)
+	@echo "Installing $(if $(word 20,$^),$(words $^)) configuration files $(if $(word 20,$^),,$(^F)) to $(@D)
+	@$(shell rm -f .cfg.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .cfg.files))
+	@xargs -a .cfg.files -0 -n100 -r -I{} $(INSTALL) -d -m444 {} $(@D)
+	@rm .cfg.files
 
 ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
-	@echo "Installing binaries $^ to $(@D)"
+	@echo Installing binar$(if $(word 2,$^),ies,y) $(^F) to $(@D)
 	$(INSTALL) -d -m555 $^ $(@D)
 
 $(INSTALL_INCLUDE)/os/default/% : %
-	@echo "Installing default include file $@"
+	@echo Installing default include file $@
 	$(INSTALL) -d -m444 $< $(@D)
 
 $(INSTALL_INCLUDE)/os/$(OS_CLASS)/% : %
-	@echo "Installing $(OS_CLASS) include file $@"
+	@echo Installing $(OS_CLASS) include file $@
 	$(INSTALL) -d -m444 $< $(@D)
 
 # Create SNL code from st/stt file.
