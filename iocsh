@@ -85,10 +85,17 @@ then
     fi
 fi
 
-if read BASE < EPICSVERSION || read BASE < cfg/EPICSVERSION
-then
-    unset EPICS_BASE
-fi 2> /dev/null
+export EPICS_IOCSH_CFG_PATH=./:cfg/:/etc/:$EPICS_IOCSH_CFG_PATH
+
+for dir in $(echo "$EPICS_IOCSH_CFG_PATH" | tr ':' ' ')
+do
+    if read BASE < $dir/EPICSVERSION
+    then
+        unset EPICS_BASE
+        break
+    fi 2> /dev/null
+done
+
 
 # IOC name derives from hostname
 # (trailing possible '\r' under cygwin)
@@ -308,7 +315,7 @@ PATH=$PATH:$EPICS_BASE/bin/$EPICS_HOST_ARCH:$EPICS_BASE/../seq/bin/$EPICS_HOST_A
 export EPICS_IOCSH_HISTFILE=
 
 # Call init script after IOC name, EPICS_HOST_ARCH and EPICS_BASE are set.
-for dir in . cfg /etc
+for dir in $(echo "$EPICS_IOCSH_CFG_PATH" | tr ':' ' ')
 do
     if [ -r "$dir/iocsh.init" ]
     then
