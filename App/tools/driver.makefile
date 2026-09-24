@@ -1076,7 +1076,7 @@ ifeq ($(DEP),.d)
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
 	@echo Installing $(if $(word 20,$^),$(words $^)) module db files $(if $(word 20,$^),,$(^F)) to $(@D)
 	@$(shell rm -f .db.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .db.files))
-	@xargs -a .db.files -0 -n100 -r -I{} $(INSTALL) -d -m444 {} $(@D)
+	@xargs -a .db.files -0 -r -I{} $(INSTALL) -d -m444 {} $(@D)
 	@rm .db.files
 else ifeq (${EPICS_BASETYPE},3.13)
 # 3.13
@@ -1095,13 +1095,13 @@ endif
 ${INSTALL_SCRS}: $(notdir ${SCR})
 	@echo Installing $(if $(word 20,$^),$(words $^)) scripts $(if $(word 20,$^),,$(^F)) to $(@D)
 	@$(shell rm -f .script.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .script.files))
-	@xargs -a .script.files -0 -n100 -I{} $(INSTALL) -d -m555 {} $(@D)
+	@xargs -a .script.files -0 -I{} $(INSTALL) -d -m555 {} $(@D)
 	@rm .script.files
 
 ${INSTALL_CFGS}: ${CFGS}
 	@echo "Installing $(if $(word 20,$^),$(words $^)) configuration files $(if $(word 20,$^),,$(^F)) to $(@D)
 	@$(shell rm -f .cfg.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .cfg.files))
-	@xargs -a .cfg.files -0 -n100 -r -I{} $(INSTALL) -d -m444 {} $(@D)
+	@xargs -a .cfg.files -0 -r -I{} $(INSTALL) -d -m444 {} $(@D)
 	@rm .cfg.files
 
 ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
