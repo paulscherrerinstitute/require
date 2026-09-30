@@ -10,6 +10,7 @@ help () {
 	 -v, --version   Show version and exit.
 	 -win, --win     Run Windows softIOC via wine.
 	 -32             Force 32 bit version (on 64 bit systems).
+	 --pvxs          Use PVXS (in EPICS 7.0.10+).
 	 --nopva         Do not use PVA (in EPICS 7).
 	 --nolock        Do not lock memory into RAM (in EPICS 3.15.3+).
 	 -x[.z[.y]]      Select EPICS base version x.z.y (e.g. 3.14.8, 3.15, 7).
@@ -124,6 +125,9 @@ do
             ;;
         ( -nopva | --nopva )
             NOPVA=1
+            ;;
+        ( -pvx | --pvx | -pvxs | --pvxs )
+            PVXS=1
             ;;
         ( -nolock | --nolock )
             NOLOCK=1
@@ -443,7 +447,13 @@ done
 if [ "$BASECODE" -ge 3141200 ]
 then
     case $(tr A-Z a-z <<< "$NOPVA") in (0|n|no|f|false|off) unset NOPVA; esac
-    if [ -z "$NOPVA" -a -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]
+    case $(tr A-Z a-z <<< "$PVXS") in (0|n|no|f|false|off) unset PVXS; esac
+
+    if [ -n "$PVXS" -a -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVX$EXEPOSTFIX" ]
+    then
+        EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVX$EXEPOSTFIX
+        ARGS="-D $EPICS_BASE/dbd/softIocPVX.dbd"
+    elif [ -z "$NOPVA" -a -x "$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX" ]
     then
         EXE=$EPICS_BASE/bin/$EPICS_HOST_ARCH/softIocPVA$EXEPOSTFIX
         ARGS="-D $EPICS_BASE/dbd/softIocPVA.dbd"
