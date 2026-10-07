@@ -1055,58 +1055,58 @@ ${INSTALL_REV}:
 
 ${INSTALLRULE} ${INSTALLS}
 
+
+.NOTPARALLEL: ${INSTALL_DBDS}
 ${INSTALL_DBDS}: $(notdir ${INSTALL_DBDS})
 	@echo "Installing module dbd file $@"
 	$(INSTALL) -d -m444 $^ $(@D)
 
+.NOTPARALLEL: ${INSTALL_LIBS}
 ${INSTALL_LIBS}: $(notdir ${INSTALL_LIBS})
 	@echo "Installing module library $@"
 	$(INSTALL) -d -m555 $^ $(@D)
 
+.NOTPARALLEL: ${INSTALL_DEPS}
 ${INSTALL_DEPS}: $(notdir ${INSTALL_DEPS})
 	@echo "Installing module dependency file $@"
 	$(INSTALL) -d -m444 $^ $(@D)
+
+define INSTALL_BATCH_WISE
+	$(INSTALL) -d -m$1 $(wordlist 1,100,$(or $2,$^)) $(@D)
+	$(if $(word 101,$(or $2,$^)),$(call INSTALL_BATCH_WISE,$1,$(wordlist 101,$(words $(or $2,$^)),$(or $2,$^))))
+endef
 
 # Fix templates for older EPICS versions:
 # Remove 'alias' for EPICS <= 3.14.10
 # and 'info' and macro defaults for EPICS 3.13.
 # Make use of differences in defined variables.
-ifeq ($(DEP),.d)
-# 3.14.10+
+.NOTPARALLEL: ${INSTALL_DBS}
 ${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
-	@echo Installing $(if $(word 20,$^),$(words $^)) module db files $(if $(word 20,$^),,$(^F)) to $(@D)
-	@$(shell rm -f .db.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .db.files))
-	@xargs -a .db.files -0 -r -I{} $(INSTALL) -d -m444 {} $(@D)
-	@rm .db.files
-else ifeq (${EPICS_BASETYPE},3.13)
-# 3.13
-${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
-	@echo Installing $(if $(word 20,$^),$(words $^)) module db files $(if $(word 20,$^),,$(^F)) to $(@D)
+	@echo Installing $(words $^) module db file$(if $(word 2,$^),s) to $(@D)
+ifeq ($(DEP),.d) # 3.14.10+
+	$(call INSTALL_BATCH_WISE,444)
+else ifeq (${EPICS_BASETYPE},3.13) # 3.13
 	$(MKDIR) $(@D)
 	for i in $^; do sed -r 's/\$$\{([^={]*)=[^}]*\}/$${\1}/g;s/\$$\(([^=(]*)=[^)]*\)/$$(\1)/g;s/(^|\))[ \t]*(alias|info)[ \t]*\(/#&/g' $$i > $(@D)/$$(basename $$i); done
-else
-# 3.14.9-
-${INSTALL_DBS}: $(notdir ${INSTALL_DBS})
-	@echo Installing $(if $(word 20,$^),$(words $^)) module db files $(if $(word 20,$^),,$(^F)) to $(@D)
+else # 3.14.9-
 	$(MKDIR) $(@D)
 	for i in $^; do sed -r 's/(^|\))[ \t]*alias[ \t]*/#&/g' $$i > $(@D)/$$(basename $$i); done
 endif
 
+.NOTPARALLEL: ${INSTALL_SCRS}
 ${INSTALL_SCRS}: $(notdir ${SCR})
-	@echo Installing $(if $(word 20,$^),$(words $^)) scripts $(if $(word 20,$^),,$(^F)) to $(@D)
-	@$(shell rm -f .script.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .script.files))
-	@xargs -a .script.files -0 -I{} $(INSTALL) -d -m555 {} $(@D)
-	@rm .script.files
+	@echo Installing $(words $^) script$(if $(word 2,$^),s) to $(@D)
+	$(call INSTALL_BATCH_WISE,555)
 
+.NOTPARALLEL: ${INSTALL_CFGS}
 ${INSTALL_CFGS}: ${CFGS}
-	@echo "Installing $(if $(word 20,$^),$(words $^)) configuration files $(if $(word 20,$^),,$(^F)) to $(@D)
-	@$(shell rm -f .cfg.files)$(foreach f,$^,$(shell printf '%s\0' '$f' >> .cfg.files))
-	@xargs -a .cfg.files -0 -r -I{} $(INSTALL) -d -m444 {} $(@D)
-	@rm .cfg.files
+	@echo Installing $(words $^) configuration file$(if $(word 2,$^),s) to $(@D)
+	$(call INSTALL_BATCH_WISE,444)
 
+.NOTPARALLEL: ${INSTALL_BINS}
 ${INSTALL_BINS}: $(addprefix ../,$(filter-out /%,${BINS})) $(filter /%,${BINS})
 	@echo Installing binar$(if $(word 2,$^),ies,y) $(^F) to $(@D)
-	$(INSTALL) -d -m555 $^ $(@D)
+	$(call INSTALL_BATCH_WISE,555)
 
 $(INSTALL_INCLUDE)/os/default/% : %
 	@echo Installing default include file $@
