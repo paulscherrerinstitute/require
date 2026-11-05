@@ -328,12 +328,14 @@ static HMODULE loadlib(const char* libname)
             fprintf (stderr, "Loading %s library failed: out of memory\n", libname);
             return NULL;
         }
-        /* LoadLibraryEx needs backspash for LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR to work */
-        char* p = libpath;
+        /*
+           To load automatically possible dependency libs installed together with the module,
+           call LoadLibraryEx with an absolute path and LOAD_WITH_ALTERED_SEARCH_PATH flag.
+           However after tests, libpath must be '\' separated to qualify as an absolute path.
+        */
+        char *p = libpath;
         while ((p = strchr(p, '/')) != NULL) *p = '\\';
-
-        if ((libhandle = LoadLibraryEx(libpath, NULL,
-            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)) == NULL)
+        if ((libhandle = LoadLibraryEx(libpath, NULL, LOAD_WITH_ALTERED_SEARCH_PATH)) == NULL)
         {
             LPSTR lpMsgBuf;
 
